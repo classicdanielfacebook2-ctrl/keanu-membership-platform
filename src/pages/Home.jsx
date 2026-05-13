@@ -89,7 +89,7 @@ export default function Home() {
         </div>
         <div className="hero-video-banner">
           <ApprovedVideoSlot
-            video={getVideoForSlot("top-video-advert-local", "Top video advert placeholder")}
+            video={getVideoForSlot("top-video-advert", "Top video advert placeholder")}
             label="Top video advert placeholder"
           />
         </div>
@@ -132,18 +132,18 @@ export default function Home() {
         />
         <div className="media-layout">
           <ApprovedVideoSlot
-            video={getVideoForSlot("main-video-banner-local-replacement", "Main approved video banner")}
+            video={getVideoForSlot("main-video-banner-approved-v2", "Main approved video banner")}
             label="Main approved video banner"
           />
           <div className="video-card-grid">
             <ApprovedVideoSlot
               compact
-              video={getVideoForSlot("interview-preview-local", "Interview preview")}
+              video={getVideoForSlot("interview-preview", "Interview preview")}
               label="Interview preview"
             />
             <ApprovedVideoSlot
               compact
-              video={getVideoForSlot("membership-campaign-preview-local", "Membership campaign preview")}
+              video={getVideoForSlot("membership-campaign-preview", "Membership campaign preview")}
               label="Membership campaign preview"
             />
           </div>

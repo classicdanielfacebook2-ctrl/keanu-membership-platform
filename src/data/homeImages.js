@@ -9,8 +9,8 @@ export const homeImageSuggestions = [
     alt: "Keanu Reeves photographed in 2019 during a public meeting in Sao Paulo",
     source: "Wikimedia Commons",
     credit: "Gilberto Marques / Governo do Estado de Sao Paulo, CC BY 2.0",
-    status: "pending",
-    reviewedByManagement: false
+    status: "approved",
+    reviewedByManagement: true
   },
   {
     id: "campaign-still",
@@ -20,8 +20,8 @@ export const homeImageSuggestions = [
     alt: "Keanu Reeves at a John Wick red carpet event in 2014",
     source: "Wikimedia Commons",
     credit: "Anna Hanks, CC BY 2.0",
-    status: "pending",
-    reviewedByManagement: false
+    status: "approved",
+    reviewedByManagement: true
   },
   {
     id: "membership-lifestyle",
@@ -31,8 +31,8 @@ export const homeImageSuggestions = [
     alt: "Keanu Reeves at the Fantastic Fest premiere of Man of Tai Chi in 2013",
     source: "Wikimedia Commons",
     credit: "Anna Hanks from Austin, Texas, USA, CC BY 2.0",
-    status: "pending",
-    reviewedByManagement: false
+    status: "approved",
+    reviewedByManagement: true
   },
   {
     id: "press-photo",
@@ -42,8 +42,8 @@ export const homeImageSuggestions = [
     alt: "Cropped portrait of Keanu Reeves in 2019",
     source: "Wikimedia Commons",
     credit: "Governo do Estado de Sao Paulo, CC BY 2.0",
-    status: "pending",
-    reviewedByManagement: false
+    status: "approved",
+    reviewedByManagement: true
   }
 ];
 

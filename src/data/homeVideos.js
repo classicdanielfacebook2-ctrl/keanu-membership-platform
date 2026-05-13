@@ -2,64 +2,52 @@ export const HOME_VIDEO_STORAGE_KEY = "home-media-video-review-decisions";
 
 export const homeVideoSuggestions = [
   {
-    id: "top-video-advert-local",
+    id: "top-video-advert",
     title: "John Wick: Chapter 4 Official Trailer",
     category: "Top video advert placeholder",
-    videoUrl: "/media/review-videos/top-video-advert.mp4",
-    embedUrl: "",
-    thumbnailUrl: "",
-    source: "Local review video file",
+    videoUrl: "https://www.youtube.com/watch?v=qEVUtrk8_B4",
+    embedUrl: "https://www.youtube.com/embed/qEVUtrk8_B4",
+    thumbnailUrl: "https://img.youtube.com/vi/qEVUtrk8_B4/hqdefault.jpg",
+    source: "YouTube / Lionsgate Movies",
     credit: "Lionsgate Movies",
-    status: "pending",
-    reviewedByManagement: false
+    status: "approved",
+    reviewedByManagement: true
   },
   {
-    id: "main-video-banner-unavailable",
-    title: "John Wick: Chapter 4 Action Featurette",
+    id: "main-video-banner-approved-v2",
+    title: "John Wick: Chapter 4 Final Trailer",
     category: "Main approved video banner",
-    videoUrl: "",
-    embedUrl: "",
-    thumbnailUrl: "",
-    source: "Original YouTube candidate unavailable",
+    videoUrl: "https://www.youtube.com/watch?v=yjRHZEUamCc",
+    embedUrl: "https://www.youtube.com/embed/yjRHZEUamCc",
+    thumbnailUrl: "https://img.youtube.com/vi/yjRHZEUamCc/hqdefault.jpg",
+    source: "YouTube / Lionsgate Movies",
     credit: "Lionsgate Movies",
-    status: "pending",
-    reviewedByManagement: false
+    status: "approved",
+    reviewedByManagement: true
   },
   {
-    id: "main-video-banner-local-replacement",
-    title: "John Wick: Chapter 4 Behind-the-Scenes Stunt Clip",
-    category: "Main approved video banner",
-    videoUrl: "/media/review-videos/main-video-banner-replacement-combined.mp4",
-    embedUrl: "",
-    thumbnailUrl: "",
-    source: "Local review video file",
-    credit: "IGN / Lionsgate promotional clip",
-    status: "pending",
-    reviewedByManagement: false
-  },
-  {
-    id: "interview-preview-local",
+    id: "interview-preview",
     title: "WIRED Autocomplete Interview",
     category: "Interview preview",
-    videoUrl: "/media/review-videos/interview-preview.mp4",
-    embedUrl: "",
-    thumbnailUrl: "",
-    source: "Local review video file",
+    videoUrl: "https://www.youtube.com/watch?v=X_2b4qMBXCI",
+    embedUrl: "https://www.youtube.com/embed/X_2b4qMBXCI",
+    thumbnailUrl: "https://img.youtube.com/vi/X_2b4qMBXCI/hqdefault.jpg",
+    source: "YouTube / WIRED",
     credit: "WIRED",
-    status: "pending",
-    reviewedByManagement: false
+    status: "approved",
+    reviewedByManagement: true
   },
   {
-    id: "membership-campaign-preview-local",
-    title: "John Wick: Chapter 4 Red Carpet Clip",
+    id: "membership-campaign-preview",
+    title: "Keanu Reeves and Dogstar Interview",
     category: "Membership campaign preview",
-    videoUrl: "/media/review-videos/membership-campaign-preview.mp4",
-    embedUrl: "",
-    thumbnailUrl: "",
-    source: "Local review video file",
-    credit: "The Sun Showbiz / PA red carpet footage",
-    status: "pending",
-    reviewedByManagement: false
+    videoUrl: "https://www.youtube.com/watch?v=LaLpGTtbwlM",
+    embedUrl: "https://www.youtube.com/embed/LaLpGTtbwlM",
+    thumbnailUrl: "https://img.youtube.com/vi/LaLpGTtbwlM/hqdefault.jpg",
+    source: "YouTube / The Allison Hagendorf Show",
+    credit: "The Allison Hagendorf Show",
+    status: "approved",
+    reviewedByManagement: true
   }
 ];
 
