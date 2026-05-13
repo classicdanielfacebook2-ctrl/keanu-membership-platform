@@ -553,6 +553,52 @@ button:disabled {
   min-width: 0;
 }
 
+.advert-stack {
+  display: grid;
+  gap: clamp(4rem, 8vw, 7rem);
+  max-width: 92rem;
+  margin: 0 auto clamp(2rem, 5vw, 4rem);
+}
+
+.advert-block {
+  display: grid;
+  gap: clamp(1.25rem, 3vw, 2rem);
+  padding-bottom: clamp(3rem, 6vw, 5rem);
+  border-bottom: 1px solid rgba(244, 216, 139, 0.22);
+}
+
+.advert-block:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.advert-copy {
+  display: grid;
+  gap: 0.8rem;
+  max-width: 58rem;
+}
+
+.advert-copy h3 {
+  margin: 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3.6rem);
+  line-height: 1;
+}
+
+.advert-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.04rem;
+  line-height: 1.85;
+}
+
+.advert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 0.4rem;
+}
+
 .gallery-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   max-width: 92rem;
@@ -655,9 +701,32 @@ button:disabled {
   aspect-ratio: 16 / 9;
 }
 
+.advert-video-frame {
+  min-height: clamp(20rem, 48vw, 42rem);
+}
+
 .approved-video-frame.compact {
   aspect-ratio: 16 / 9;
   min-height: 100%;
+}
+
+.video-waiting-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 0.8rem;
+  padding: 2rem;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(244, 216, 139, 0.13), transparent 18rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.8));
+}
+
+.video-waiting-state strong {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.8rem, 4vw, 3.5rem);
+  line-height: 1;
 }
 
 .approved-video-frame:hover,
@@ -713,6 +782,16 @@ button:disabled {
   z-index: 1;
   display: grid;
   gap: 0.25rem;
+}
+
+.advert-video-frame .approved-media-caption {
+  inset: 1rem auto auto 1rem;
+  max-width: min(30rem, calc(100% - 2rem));
+  padding: 0.72rem 0.82rem;
+  border: 1px solid rgba(244, 216, 139, 0.2);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
 }
 
 .approved-media-caption strong,
@@ -2496,7 +2575,8 @@ textarea {
   .hero-actions,
   .card-actions,
   .payment-actions,
-  .step-actions {
+  .step-actions,
+  .advert-actions {
     flex-direction: column;
   }
 

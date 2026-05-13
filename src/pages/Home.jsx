@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRef, useEffect, useMemo, useState } from "react";
 import { ArrowRight, BadgeCheck, Headset, ShieldCheck, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PhotoPlaceholder, VideoPlaceholder } from "../components/MediaPlaceholder.jsx";
@@ -14,80 +14,69 @@ const trustBadges = [
   { label: "Premium Membership Cards", icon: Sparkles }
 ];
 
-function ApprovedVideoSlot({ video, label, compact = false }) {
-  const [videoElement, setVideoElement] = useState(null);
+const advertCopy = {
+  "top-video-advert-downloaded": {
+    category: "Top Video Advert",
+    copy: "Discover a premium membership experience designed for dedicated supporters and approved applicants.",
+    action: "Apply for Membership",
+    to: "/apply"
+  },
+  "main-video-banner-downloaded": {
+    category: "Main Approved Video Banner",
+    copy: "Explore the official membership card process, created to guide applicants through a secure and professional application journey.",
+    action: "View Cards",
+    to: "/cards"
+  },
+  "interview-preview-downloaded": {
+    category: "Interview Preview",
+    copy: "Watch selected approved media moments that highlight the story, personality, and career journey behind the platform.",
+    action: "Apply for Membership",
+    to: "/apply"
+  },
+  "membership-campaign-preview-downloaded": {
+    category: "Membership Campaign Preview",
+    copy: "Learn how each card tier is structured, what applicants receive, and how the premium membership experience works.",
+    action: "View Cards",
+    to: "/cards"
+  }
+};
 
-  const bindVideoElement = useCallback((element) => {
-    if (element) {
-      element.muted = false;
-      element.defaultMuted = false;
-      element.volume = 1;
-    }
-    setVideoElement(element);
-  }, []);
-
-  useEffect(() => {
-    if (!videoElement) return undefined;
-
-    const playVideo = () => {
-      videoElement.muted = false;
-      videoElement.volume = 1;
-      videoElement.play().catch(() => {
-        // Browsers can block autoplay with audio until the visitor interacts with the page.
-      });
-    };
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          playVideo();
-        } else {
-          videoElement.pause();
-        }
-      },
-      { threshold: 0.35 }
-    );
-
-    observer.observe(videoElement);
-    playVideo();
-
-    const playAfterInteraction = () => playVideo();
-    window.addEventListener("pointerdown", playAfterInteraction, { once: true });
-    window.addEventListener("keydown", playAfterInteraction, { once: true });
-    window.addEventListener("touchstart", playAfterInteraction, { once: true });
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("pointerdown", playAfterInteraction);
-      window.removeEventListener("keydown", playAfterInteraction);
-      window.removeEventListener("touchstart", playAfterInteraction);
-    };
-  }, [videoElement]);
-
+function ApprovedVideoSlot({ video, label, activeIframeId, onPlay, registerVideo }) {
   if (!video) {
-    return <VideoPlaceholder compact={compact} label={label} />;
+    return <VideoPlaceholder label={label} />;
   }
 
   return (
-    <div className={compact ? "approved-video-frame compact" : "approved-video-frame"}>
+    <div className="approved-video-frame advert-video-frame">
       {video.isDirectVideo ? (
         <video
-          ref={bindVideoElement}
+          ref={(element) => {
+            if (element) {
+              element.muted = false;
+              element.defaultMuted = false;
+              element.volume = 1;
+            }
+            registerVideo(video.id, element);
+          }}
           src={video.videoUrl}
-          autoPlay
-          loop
+          onPlay={() => onPlay(video.id)}
           controls
-          preload="auto"
+          preload="metadata"
           playsInline
         />
-      ) : (
+      ) : activeIframeId === video.id ? (
         <iframe
           src={video.embedUrl}
           title={video.title}
           loading="lazy"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allow="autoplay; encrypted-media; picture-in-picture; web-share"
           allowFullScreen
         />
+      ) : (
+        <div className="video-waiting-state">
+          <span className="ad-kicker">Approved media ad</span>
+          <strong>{video.title}</strong>
+        </div>
       )}
       <div className="approved-media-caption">
         <span className="ad-kicker">Approved media ad</span>
@@ -119,6 +108,8 @@ function ApprovedPhotoSlot({ image, label }) {
 export default function Home() {
   const [approvedVideos, setApprovedVideos] = useState([]);
   const [approvedImages, setApprovedImages] = useState([]);
+  const [activeIframeId, setActiveIframeId] = useState("");
+  const videoRefs = useRef({});
 
   useEffect(() => {
     setApprovedVideos(getApprovedHomeVideos());
@@ -136,6 +127,47 @@ export default function Home() {
   const getVideoForSlot = (preferredId, category) =>
     videoById[preferredId] || approvedVideos.find((video) => video.category === category);
 
+  const pauseOtherVideos = (activeId) => {
+    Object.entries(videoRefs.current).forEach(([id, element]) => {
+      if (id !== activeId && element && !element.paused) {
+        element.pause();
+      }
+    });
+  };
+
+  const handleVideoPlay = (videoId) => {
+    pauseOtherVideos(videoId);
+    setActiveIframeId(videoId);
+  };
+
+  const playAdvert = (video) => {
+    if (!video) return;
+    pauseOtherVideos(video.id);
+    setActiveIframeId(video.id);
+
+    const element = videoRefs.current[video.id];
+    if (element) {
+      element.muted = false;
+      element.defaultMuted = false;
+      element.volume = 1;
+      element.play().catch(() => {});
+    }
+  };
+
+  const registerVideo = (id, element) => {
+    if (element) {
+      videoRefs.current[id] = element;
+    } else {
+      delete videoRefs.current[id];
+    }
+  };
+
+  const advertVideos = [
+    getVideoForSlot("main-video-banner-downloaded", "Main approved video banner"),
+    getVideoForSlot("interview-preview-downloaded", "Interview preview"),
+    getVideoForSlot("membership-campaign-preview-downloaded", "Membership campaign preview")
+  ].filter(Boolean);
+
   return (
     <>
       <section className="hero-section cinematic-hero">
@@ -149,6 +181,9 @@ export default function Home() {
           <ApprovedVideoSlot
             video={getVideoForSlot("top-video-advert-downloaded", "Top video advert placeholder")}
             label="Top video advert placeholder"
+            activeIframeId={activeIframeId}
+            onPlay={handleVideoPlay}
+            registerVideo={registerVideo}
           />
         </div>
         <div className="hero-content">
@@ -163,6 +198,13 @@ export default function Home() {
               Apply for Membership
               <ArrowRight size={18} />
             </Link>
+            <button
+              className="button secondary large"
+              type="button"
+              onClick={() => playAdvert(getVideoForSlot("top-video-advert-downloaded", "Top video advert placeholder"))}
+            >
+              Play Advert
+            </button>
             <Link className="button secondary large" to="/cards">
               View Cards
             </Link>
@@ -188,23 +230,40 @@ export default function Home() {
           title="Premium placeholders for approved videos and photos."
           copy="All media areas remain private placeholders until management approves the collected video and photo URLs in the Media Review page."
         />
-        <div className="media-layout">
-          <ApprovedVideoSlot
-            video={getVideoForSlot("main-video-banner-downloaded", "Main approved video banner")}
-            label="Main approved video banner"
-          />
-          <div className="video-card-grid">
-            <ApprovedVideoSlot
-              compact
-              video={getVideoForSlot("interview-preview-downloaded", "Interview preview")}
-              label="Interview preview"
-            />
-            <ApprovedVideoSlot
-              compact
-              video={getVideoForSlot("membership-campaign-preview-downloaded", "Membership campaign preview")}
-              label="Membership campaign preview"
-            />
-          </div>
+        <div className="advert-stack">
+          {advertVideos.map((video) => {
+            const meta = advertCopy[video.id] || {
+              category: video.category,
+              copy: "Approved media prepared for management review and premium membership presentation.",
+              action: "View Cards",
+              to: "/cards"
+            };
+
+            return (
+              <article className="advert-block" key={video.id}>
+                <ApprovedVideoSlot
+                  video={video}
+                  label={meta.category}
+                  activeIframeId={activeIframeId}
+                  onPlay={handleVideoPlay}
+                  registerVideo={registerVideo}
+                />
+                <div className="advert-copy">
+                  <span className="eyebrow">{meta.category}</span>
+                  <h3>{video.title}</h3>
+                  <p>{meta.copy}</p>
+                  <div className="advert-actions">
+                    <button className="button primary" type="button" onClick={() => playAdvert(video)}>
+                      Play Advert
+                    </button>
+                    <Link className="button secondary" to={meta.to}>
+                      {meta.action}
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
         <div className="gallery-grid premium-gallery">
           <ApprovedPhotoSlot image={imageById["official-portrait"]} label="Official portrait placeholder" />
