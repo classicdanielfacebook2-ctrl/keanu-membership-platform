@@ -9,25 +9,25 @@ const rootDir = join(__dirname, "..");
 
 const homeVideos = [
   {
-    id: "top-video-advert",
+    id: "top-video-advert-downloaded",
     title: "John Wick: Chapter 4 Official Trailer",
     path: "public/media/review-videos/top-video-advert.mp4",
     contentType: "video/mp4"
   },
   {
-    id: "main-video-banner-approved-v2",
+    id: "main-video-banner-downloaded",
     title: "John Wick: Chapter 4 Behind-the-Scenes Stunt Clip",
     path: "public/media/review-videos/main-video-banner-replacement-combined.mp4",
     contentType: "video/mp4"
   },
   {
-    id: "interview-preview",
+    id: "interview-preview-downloaded",
     title: "WIRED Autocomplete Interview",
     path: "public/media/review-videos/interview-preview.mp4",
     contentType: "video/mp4"
   },
   {
-    id: "membership-campaign-preview",
+    id: "membership-campaign-preview-downloaded",
     title: "John Wick: Chapter 4 Red Carpet Clip",
     path: "public/media/review-videos/membership-campaign-preview.mp4",
     contentType: "video/mp4"

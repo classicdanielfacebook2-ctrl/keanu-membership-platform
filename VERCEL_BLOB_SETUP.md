@@ -39,4 +39,4 @@ git commit -m "Use Vercel Blob for home media"
 git push origin main
 ```
 
-The public Home page prefers Vercel Blob URLs. YouTube/Wikimedia URLs remain only as fallback values until Blob URLs are generated.
+The public Home page prefers Vercel Blob URLs. Before Blob upload, the local review build uses the downloaded MP4 files in `public/media/review-videos/`.
