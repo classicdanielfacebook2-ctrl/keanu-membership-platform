@@ -7,6 +7,24 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
 
+const loadLocalEnv = async () => {
+  const envPath = join(rootDir, ".env.local");
+  if (!existsSync(envPath)) {
+    return;
+  }
+
+  const envFile = await readFile(envPath, "utf8");
+  for (const line of envFile.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) {
+      continue;
+    }
+    const [key, ...valueParts] = trimmed.split("=");
+    const value = valueParts.join("=").trim().replace(/^["']|["']$/g, "");
+    process.env[key.trim()] ||= value;
+  }
+};
+
 const homeVideos = [
   {
     id: "top-video-advert-downloaded",
@@ -100,6 +118,7 @@ const writeManifest = async (relativePath, exportName, manifest) => {
   await writeFile(target, file);
 };
 
+await loadLocalEnv();
 assertToken();
 
 const videoManifest = await uploadItems(homeVideos, "videos");
