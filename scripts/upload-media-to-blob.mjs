@@ -75,6 +75,64 @@ const homeImages = [
   }
 ];
 
+const keanuImages = [
+  {
+    id: "homepage-hero",
+    path: "public/media/review-images/keanu-reeves-2019.jpg",
+    contentType: "image/jpeg"
+  },
+  {
+    id: "young-keanu",
+    path: "public/media/review-images/young-keanu-cropped2.jpg",
+    contentType: "image/jpeg"
+  },
+  {
+    id: "early-acting",
+    path: "public/media/review-images/keanu-andy-griffith-1986.jpg",
+    contentType: "image/jpeg"
+  },
+  {
+    id: "bill-ted-era",
+    path: "public/media/review-images/bill-ted-be-excellent.jpg",
+    contentType: "image/jpeg"
+  },
+  {
+    id: "speed-era",
+    path: "public/media/review-images/young-keanu-cropped2.jpg",
+    contentType: "image/jpeg"
+  },
+  {
+    id: "matrix-era",
+    path: "public/media/review-images/matrix-neo-prop.jpg",
+    contentType: "image/jpeg"
+  },
+  {
+    id: "john-wick-era",
+    path: "public/media/review-images/keanu-reeves-2014.jpg",
+    contentType: "image/jpeg"
+  },
+  {
+    id: "red-carpet-legacy",
+    path: "public/media/review-images/keanu-grand-rex-2023.jpg",
+    contentType: "image/jpeg"
+  },
+  {
+    id: "gallery-2013-premiere",
+    path: "public/media/review-images/keanu-fantastic-fest-2013.jpg",
+    contentType: "image/jpeg"
+  },
+  {
+    id: "gallery-2013-qa",
+    path: "public/media/review-images/keanu-fantastic-fest-qa-2013.jpg",
+    contentType: "image/jpeg"
+  },
+  {
+    id: "gallery-2019-cropped",
+    path: "public/media/review-images/keanu-reeves-2019-cropped.jpg",
+    contentType: "image/jpeg"
+  }
+];
+
 const assertToken = () => {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error("BLOB_READ_WRITE_TOKEN is required. Add it from Vercel Blob before running this upload.");
@@ -97,6 +155,7 @@ const uploadItems = async (items, folder) => {
     const blob = await put(pathname, body, {
       access: "public",
       addRandomSuffix: false,
+      allowOverwrite: true,
       contentType: item.contentType
     });
 
@@ -123,8 +182,10 @@ assertToken();
 
 const videoManifest = await uploadItems(homeVideos, "videos");
 const imageManifest = await uploadItems(homeImages, "images");
+const keanuImageManifest = await uploadItems(keanuImages, "journey-images");
 
 await writeManifest("src/data/blobHomeVideos.js", "blobHomeVideos", videoManifest);
 await writeManifest("src/data/blobHomeImages.js", "blobHomeImages", imageManifest);
+await writeManifest("src/data/blobKeanuImages.js", "blobKeanuImages", keanuImageManifest);
 
 console.log("Vercel Blob media manifests updated.");
