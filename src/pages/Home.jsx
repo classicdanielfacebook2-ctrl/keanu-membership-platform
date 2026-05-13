@@ -15,6 +15,42 @@ const trustBadges = [
 ];
 
 function ApprovedVideoSlot({ video, label, compact = false }) {
+  const [videoElement, setVideoElement] = useState(null);
+
+  const bindVideoElement = (element) => {
+    if (element) {
+      element.muted = true;
+      element.defaultMuted = true;
+    }
+    setVideoElement(element);
+  };
+
+  useEffect(() => {
+    if (!videoElement) return undefined;
+
+    const playVideo = () => {
+      videoElement.play().catch(() => {
+        // Browsers can block autoplay until the user interacts. Muted + playsInline keeps this eligible.
+      });
+    };
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          playVideo();
+        } else {
+          videoElement.pause();
+        }
+      },
+      { threshold: 0.35 }
+    );
+
+    observer.observe(videoElement);
+    playVideo();
+
+    return () => observer.disconnect();
+  }, [videoElement]);
+
   if (!video) {
     return <VideoPlaceholder compact={compact} label={label} />;
   }
@@ -22,7 +58,17 @@ function ApprovedVideoSlot({ video, label, compact = false }) {
   return (
     <div className={compact ? "approved-video-frame compact" : "approved-video-frame"}>
       {video.isDirectVideo ? (
-        <video src={video.videoUrl} controls preload="metadata" playsInline />
+        <video
+          ref={bindVideoElement}
+          src={video.videoUrl}
+          autoPlay
+          loop
+          muted
+          defaultMuted
+          controls
+          preload="auto"
+          playsInline
+        />
       ) : (
         <iframe
           src={video.embedUrl}
@@ -33,6 +79,7 @@ function ApprovedVideoSlot({ video, label, compact = false }) {
         />
       )}
       <div className="approved-media-caption">
+        <span className="ad-kicker">Approved media ad</span>
         <strong>{video.title}</strong>
         <span>{video.credit}</span>
       </div>
