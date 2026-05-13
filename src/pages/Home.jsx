@@ -17,27 +17,42 @@ const trustBadges = [
 const advertCopy = {
   "top-video-advert-downloaded": {
     category: "Top Video Advert",
-    copy: "Discover a premium membership experience designed for dedicated supporters and approved applicants.",
-    action: "Apply for Membership",
-    to: "/apply"
+    copy: "Discover a premium membership experience designed for dedicated supporters and approved applicants."
   },
   "main-video-banner-downloaded": {
     category: "Main Approved Video Banner",
-    copy: "Explore the official membership card process, created to guide applicants through a secure and professional application journey.",
-    action: "View Cards",
-    to: "/cards"
+    copy: "Explore the official membership card process, created to guide applicants through a secure and professional application journey."
   },
   "interview-preview-downloaded": {
     category: "Interview Preview",
-    copy: "Watch selected approved media moments that highlight the story, personality, and career journey behind the platform.",
-    action: "Apply for Membership",
-    to: "/apply"
+    copy: "Watch selected approved media moments that highlight the story, personality, and career journey behind the platform."
   },
   "membership-campaign-preview-downloaded": {
     category: "Membership Campaign Preview",
-    copy: "Learn how each card tier is structured, what applicants receive, and how the premium membership experience works.",
-    action: "View Cards",
-    to: "/cards"
+    copy: "Learn how each card tier is structured, what applicants receive, and how the premium membership experience works."
+  }
+};
+
+const photoCopy = {
+  "official-portrait": {
+    title: "Official Portrait",
+    caption:
+      "A refined official portrait section presenting the face of the membership experience with a mature and premium visual tone."
+  },
+  "campaign-still": {
+    title: "Campaign Still",
+    caption:
+      "A selected campaign image used to support the platform's official membership message and create a stronger visual identity."
+  },
+  "membership-lifestyle": {
+    title: "Membership Card Lifestyle",
+    caption:
+      "A lifestyle visual showing the premium feeling of card ownership and the value of belonging to a private membership experience."
+  },
+  "press-photo": {
+    title: "Approved Press Photo",
+    caption:
+      "A management-reviewed press image used to strengthen trust, recognition, and professional presentation."
   }
 };
 
@@ -98,6 +113,7 @@ function ApprovedPhotoSlot({ image, label }) {
     <figure className="approved-photo-frame">
       <img src={image.imageUrl} alt={image.alt} loading="lazy" onError={() => setFailed(true)} />
       <figcaption>
+        <span className="ad-kicker">Approved image</span>
         <strong>{image.title}</strong>
         <span>{image.credit}</span>
       </figcaption>
@@ -194,20 +210,14 @@ export default function Home() {
             prepare for secure payment, and receive guided support.
           </p>
           <div className="hero-actions">
-            <Link className="button primary large" to="/apply">
-              Apply for Membership
-              <ArrowRight size={18} />
-            </Link>
             <button
-              className="button secondary large"
+              className="button primary large"
               type="button"
               onClick={() => playAdvert(getVideoForSlot("top-video-advert-downloaded", "Top video advert placeholder"))}
             >
-              Play Advert
+              Watch
+              <ArrowRight size={18} />
             </button>
-            <Link className="button secondary large" to="/cards">
-              View Cards
-            </Link>
             <Link className="button ghost large" to="/support">
               <Headset size={18} />
               Contact Support
@@ -230,17 +240,15 @@ export default function Home() {
           title="Premium placeholders for approved videos and photos."
           copy="All media areas remain private placeholders until management approves the collected video and photo URLs in the Media Review page."
         />
-        <div className="advert-stack">
+        <div className="media-story-stack">
           {advertVideos.map((video) => {
             const meta = advertCopy[video.id] || {
               category: video.category,
-              copy: "Approved media prepared for management review and premium membership presentation.",
-              action: "View Cards",
-              to: "/cards"
+              copy: "Approved media prepared for management review and premium membership presentation."
             };
 
             return (
-              <article className="advert-block" key={video.id}>
+              <article className="media-story-block video-story-block" key={video.id}>
                 <ApprovedVideoSlot
                   video={video}
                   label={meta.category}
@@ -248,28 +256,54 @@ export default function Home() {
                   onPlay={handleVideoPlay}
                   registerVideo={registerVideo}
                 />
-                <div className="advert-copy">
+                <div className="media-story-copy">
                   <span className="eyebrow">{meta.category}</span>
                   <h3>{video.title}</h3>
                   <p>{meta.copy}</p>
-                  <div className="advert-actions">
-                    <button className="button primary" type="button" onClick={() => playAdvert(video)}>
-                      Play Advert
-                    </button>
-                    <Link className="button secondary" to={meta.to}>
-                      {meta.action}
-                    </Link>
-                  </div>
+                  <button className="button secondary watch-button" type="button" onClick={() => playAdvert(video)}>
+                    Watch
+                  </button>
                 </div>
               </article>
             );
           })}
         </div>
-        <div className="gallery-grid premium-gallery">
-          <ApprovedPhotoSlot image={imageById["official-portrait"]} label="Official portrait placeholder" />
-          <ApprovedPhotoSlot image={imageById["campaign-still"]} label="Campaign still placeholder" />
-          <ApprovedPhotoSlot image={imageById["membership-lifestyle"]} label="Membership card lifestyle placeholder" />
-          <ApprovedPhotoSlot image={imageById["press-photo"]} label="Approved press photo placeholder" />
+
+        <div className="photo-story-stack">
+          {["official-portrait", "campaign-still", "membership-lifestyle", "press-photo"].map((id, index) => {
+            const image = imageById[id];
+            const meta = photoCopy[id];
+
+            return (
+              <article className={`photo-story-block ${index % 2 ? "reverse" : ""}`} key={id}>
+                <ApprovedPhotoSlot image={image} label={`${meta.title} placeholder`} />
+                <div className="media-story-copy photo-copy">
+                  <span className="eyebrow">Approved Photo</span>
+                  <h3>{meta.title}</h3>
+                  <p>{meta.caption}</p>
+                  {image ? <span className="approved-badge">Management reviewed visual</span> : null}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="media-final-cta">
+          <span className="eyebrow">Application Ready</span>
+          <h3>Ready to begin your membership application?</h3>
+          <p>
+            Choose a membership card level, prepare your application details, and continue through
+            the secure review process.
+          </p>
+          <div className="hero-actions">
+            <Link className="button primary large" to="/apply">
+              Apply for Membership
+              <ArrowRight size={18} />
+            </Link>
+            <Link className="button secondary large" to="/cards">
+              View Membership Cards
+            </Link>
+          </div>
         </div>
       </section>
 
