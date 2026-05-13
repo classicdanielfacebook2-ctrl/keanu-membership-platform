@@ -1,0 +1,9 @@
+node_modules/
+dist/
+data/
+public/media/review-images/
+public/media/review-videos/
+.env
+.env.*
+*.log
+.DS_Store
