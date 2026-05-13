@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight, BadgeCheck, Headset, ShieldCheck, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PhotoPlaceholder, VideoPlaceholder } from "../components/MediaPlaceholder.jsx";
@@ -17,20 +17,23 @@ const trustBadges = [
 function ApprovedVideoSlot({ video, label, compact = false }) {
   const [videoElement, setVideoElement] = useState(null);
 
-  const bindVideoElement = (element) => {
+  const bindVideoElement = useCallback((element) => {
     if (element) {
-      element.muted = true;
-      element.defaultMuted = true;
+      element.muted = false;
+      element.defaultMuted = false;
+      element.volume = 1;
     }
     setVideoElement(element);
-  };
+  }, []);
 
   useEffect(() => {
     if (!videoElement) return undefined;
 
     const playVideo = () => {
+      videoElement.muted = false;
+      videoElement.volume = 1;
       videoElement.play().catch(() => {
-        // Browsers can block autoplay until the user interacts. Muted + playsInline keeps this eligible.
+        // Browsers can block autoplay with audio until the visitor interacts with the page.
       });
     };
 
@@ -48,7 +51,17 @@ function ApprovedVideoSlot({ video, label, compact = false }) {
     observer.observe(videoElement);
     playVideo();
 
-    return () => observer.disconnect();
+    const playAfterInteraction = () => playVideo();
+    window.addEventListener("pointerdown", playAfterInteraction, { once: true });
+    window.addEventListener("keydown", playAfterInteraction, { once: true });
+    window.addEventListener("touchstart", playAfterInteraction, { once: true });
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("pointerdown", playAfterInteraction);
+      window.removeEventListener("keydown", playAfterInteraction);
+      window.removeEventListener("touchstart", playAfterInteraction);
+    };
   }, [videoElement]);
 
   if (!video) {
@@ -63,8 +76,6 @@ function ApprovedVideoSlot({ video, label, compact = false }) {
           src={video.videoUrl}
           autoPlay
           loop
-          muted
-          defaultMuted
           controls
           preload="auto"
           playsInline
