@@ -7,10 +7,12 @@
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite --host 127.0.0.1",
     "dev:api": "node server/authServer.js",
+    "upload:media": "node scripts/upload-media-to-blob.mjs",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "@vercel/blob": "^2.3.3",
     "@vitejs/plugin-react": "latest",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",

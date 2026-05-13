@@ -82,7 +82,7 @@ function ReviewSection({
                   </div>
                 ) : type === "video" ? (
                   <>
-                    {item.isLocalVideo ? (
+                    {item.isDirectVideo ? (
                       <video
                         src={item.videoUrl}
                         preload="metadata"

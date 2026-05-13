@@ -21,7 +21,7 @@ function ApprovedVideoSlot({ video, label, compact = false }) {
 
   return (
     <div className={compact ? "approved-video-frame compact" : "approved-video-frame"}>
-      {video.isLocalVideo ? (
+      {video.isDirectVideo ? (
         <video src={video.videoUrl} controls preload="metadata" playsInline />
       ) : (
         <iframe

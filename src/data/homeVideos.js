@@ -1,27 +1,31 @@
+import { blobHomeVideos } from "./blobHomeVideos.js";
+
 export const HOME_VIDEO_STORAGE_KEY = "home-media-video-review-decisions";
+
+const blobVideoUrl = (id, fallback = "") => blobHomeVideos[id]?.url || fallback;
 
 export const homeVideoSuggestions = [
   {
     id: "top-video-advert",
     title: "John Wick: Chapter 4 Official Trailer",
     category: "Top video advert placeholder",
-    videoUrl: "https://www.youtube.com/watch?v=qEVUtrk8_B4",
-    embedUrl: "https://www.youtube.com/embed/qEVUtrk8_B4",
+    videoUrl: blobVideoUrl("top-video-advert", "https://www.youtube.com/watch?v=qEVUtrk8_B4"),
+    embedUrl: "",
     thumbnailUrl: "https://img.youtube.com/vi/qEVUtrk8_B4/hqdefault.jpg",
-    source: "YouTube / Lionsgate Movies",
+    source: blobHomeVideos["top-video-advert"]?.url ? "Vercel Blob" : "YouTube / Lionsgate Movies",
     credit: "Lionsgate Movies",
     status: "approved",
     reviewedByManagement: true
   },
   {
     id: "main-video-banner-approved-v2",
-    title: "John Wick: Chapter 4 Final Trailer",
+    title: "John Wick: Chapter 4 Behind-the-Scenes Stunt Clip",
     category: "Main approved video banner",
-    videoUrl: "https://www.youtube.com/watch?v=yjRHZEUamCc",
-    embedUrl: "https://www.youtube.com/embed/yjRHZEUamCc",
+    videoUrl: blobVideoUrl("main-video-banner-approved-v2", "https://www.youtube.com/watch?v=yjRHZEUamCc"),
+    embedUrl: "",
     thumbnailUrl: "https://img.youtube.com/vi/yjRHZEUamCc/hqdefault.jpg",
-    source: "YouTube / Lionsgate Movies",
-    credit: "Lionsgate Movies",
+    source: blobHomeVideos["main-video-banner-approved-v2"]?.url ? "Vercel Blob" : "YouTube / Lionsgate Movies",
+    credit: blobHomeVideos["main-video-banner-approved-v2"]?.url ? "IGN / Lionsgate promotional clip" : "Lionsgate Movies",
     status: "approved",
     reviewedByManagement: true
   },
@@ -29,23 +33,23 @@ export const homeVideoSuggestions = [
     id: "interview-preview",
     title: "WIRED Autocomplete Interview",
     category: "Interview preview",
-    videoUrl: "https://www.youtube.com/watch?v=X_2b4qMBXCI",
-    embedUrl: "https://www.youtube.com/embed/X_2b4qMBXCI",
+    videoUrl: blobVideoUrl("interview-preview", "https://www.youtube.com/watch?v=X_2b4qMBXCI"),
+    embedUrl: "",
     thumbnailUrl: "https://img.youtube.com/vi/X_2b4qMBXCI/hqdefault.jpg",
-    source: "YouTube / WIRED",
+    source: blobHomeVideos["interview-preview"]?.url ? "Vercel Blob" : "YouTube / WIRED",
     credit: "WIRED",
     status: "approved",
     reviewedByManagement: true
   },
   {
     id: "membership-campaign-preview",
-    title: "Keanu Reeves and Dogstar Interview",
+    title: "John Wick: Chapter 4 Red Carpet Clip",
     category: "Membership campaign preview",
-    videoUrl: "https://www.youtube.com/watch?v=LaLpGTtbwlM",
-    embedUrl: "https://www.youtube.com/embed/LaLpGTtbwlM",
+    videoUrl: blobVideoUrl("membership-campaign-preview", "https://www.youtube.com/watch?v=LaLpGTtbwlM"),
+    embedUrl: "",
     thumbnailUrl: "https://img.youtube.com/vi/LaLpGTtbwlM/hqdefault.jpg",
-    source: "YouTube / The Allison Hagendorf Show",
-    credit: "The Allison Hagendorf Show",
+    source: blobHomeVideos["membership-campaign-preview"]?.url ? "Vercel Blob" : "YouTube / The Allison Hagendorf Show",
+    credit: blobHomeVideos["membership-campaign-preview"]?.url ? "The Sun Showbiz / PA red carpet footage" : "The Allison Hagendorf Show",
     status: "approved",
     reviewedByManagement: true
   }
@@ -86,15 +90,18 @@ export const mergeHomeVideoDecisions = (decisions = {}) =>
     const decision = decisions[video.id] || {};
     const status = decision.status || video.status;
     const videoUrl = decision.videoUrl ?? video.videoUrl;
+    const isDirectVideo = /\.(mp4|webm|ogg)(\?.*)?$/i.test(videoUrl);
     const isLocalVideo = videoUrl.startsWith("/");
+    const shouldUseVideoTag = isLocalVideo || isDirectVideo;
 
     return {
       ...video,
       ...decision,
       videoUrl,
+      isDirectVideo: shouldUseVideoTag,
       isLocalVideo,
-      embedUrl: isLocalVideo ? "" : decision.videoUrl ? getVideoEmbedUrl(decision.videoUrl) : decision.embedUrl || video.embedUrl,
-      thumbnailUrl: isLocalVideo
+      embedUrl: shouldUseVideoTag ? "" : decision.videoUrl ? getVideoEmbedUrl(decision.videoUrl) : decision.embedUrl || video.embedUrl || getVideoEmbedUrl(videoUrl),
+      thumbnailUrl: shouldUseVideoTag
         ? ""
         : decision.videoUrl
           ? getVideoThumbnailUrl(decision.videoUrl)
