@@ -26,7 +26,7 @@ export default function CardType({ card, featured = false, compact = false }) {
 
   return (
     <article className={`membership-card ${card.id} ${featured ? "featured" : ""} ${compact ? "compact" : ""}`}>
-      <div className="lux-card-preview" aria-label={`${card.name} preview`}>
+      <div className="lux-card-preview" aria-label={`${card.name} card design`}>
         <div className="card-shine" />
         <div className="chip" aria-hidden="true">
           <span />
@@ -44,7 +44,7 @@ export default function CardType({ card, featured = false, compact = false }) {
       <div className="card-copy">
         <div className="card-topline">
           <span>{card.name}</span>
-          {featured ? <strong>Management review pick</strong> : null}
+          {featured ? <strong>Featured tier</strong> : null}
         </div>
         <h3>{card.name}</h3>
         <p className="price">{card.price}</p>

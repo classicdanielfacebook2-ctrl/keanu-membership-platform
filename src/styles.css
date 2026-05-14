@@ -849,6 +849,33 @@ button:disabled {
   background: #050505;
 }
 
+.sound-toggle {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  border: 1px solid rgba(244, 216, 139, 0.45);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: var(--gold-light);
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding: 0.58rem 0.78rem;
+  text-transform: uppercase;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 0.9rem 2.2rem rgba(0, 0, 0, 0.34), 0 0 1.25rem rgba(201, 157, 67, 0.16);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.sound-toggle:hover {
+  transform: translateY(-2px);
+  border-color: rgba(244, 216, 139, 0.8);
+  background: rgba(15, 12, 7, 0.84);
+  box-shadow: 0 1.1rem 2.6rem rgba(0, 0, 0, 0.42), 0 0 1.55rem rgba(201, 157, 67, 0.25);
+}
+
 .approved-photo-frame {
   min-height: 16rem;
   margin: 0;

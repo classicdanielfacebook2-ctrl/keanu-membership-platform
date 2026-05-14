@@ -73,8 +73,8 @@ export default function App() {
         <NavLink to="/" className="brand" onClick={closeMenu}>
           <span className="brand-mark">KR</span>
           <span>
-            <strong>Membership Review</strong>
-            <small>Authorized platform draft</small>
+            <strong>Membership Platform</strong>
+            <small>Official membership platform</small>
           </span>
         </NavLink>
         <button
@@ -153,9 +153,9 @@ export default function App() {
         <div className="footer-brand">
           <span className="brand-mark">KR</span>
           <div>
-            <strong>Membership Review</strong>
+            <strong>Membership Platform</strong>
             <span>support@example.com</span>
-            <small>Copyright 2026. Review version before publishing.</small>
+            <small>Copyright 2026. All rights reserved.</small>
           </div>
         </div>
         <div className="footer-stack">

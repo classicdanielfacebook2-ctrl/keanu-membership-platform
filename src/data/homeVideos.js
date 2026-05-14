@@ -20,7 +20,7 @@ export const homeVideoSuggestions = [
   {
     id: "main-video-banner-downloaded",
     title: "John Wick: Chapter 4 Behind-the-Scenes Stunt Clip",
-    category: "Main approved video banner",
+    category: "Main video banner",
     videoUrl: blobVideoUrl("main-video-banner-downloaded", "/media/review-videos/main-video-banner-replacement-combined.mp4"),
     embedUrl: "",
     thumbnailUrl: "",

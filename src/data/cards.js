@@ -2,7 +2,7 @@ export const cardTypes = [
   {
     id: "silver",
     name: "Silver Card",
-    price: "Price to be approved",
+    price: "Pricing available soon",
     benefits: [
       "Official membership registration",
       "Member ID number",
@@ -13,7 +13,7 @@ export const cardTypes = [
   {
     id: "gold",
     name: "Gold Card",
-    price: "Price to be approved",
+    price: "Pricing available soon",
     benefits: [
       "Everything in Silver",
       "Priority support",
@@ -24,23 +24,23 @@ export const cardTypes = [
   {
     id: "vip",
     name: "VIP Card",
-    price: "Price to be approved",
+    price: "Pricing available soon",
     benefits: [
       "Everything in Gold",
       "VIP badge",
-      "Faster application review",
+      "Faster application processing",
       "Exclusive member updates"
     ]
   },
   {
     id: "premium",
     name: "Premium Card",
-    price: "Price to be approved",
+    price: "Pricing available soon",
     benefits: [
       "Everything in VIP",
       "Premium recognition",
       "Priority email and live chat support",
-      "Special access offers when approved by management"
+      "Special access offers for eligible members"
     ]
   }
 ];
