@@ -66,7 +66,7 @@ export default function Support() {
             </span>
             <span>
               <Mail size={16} />
-              support@example.com
+              support@keanureeves.company
             </span>
           </div>
         </aside>

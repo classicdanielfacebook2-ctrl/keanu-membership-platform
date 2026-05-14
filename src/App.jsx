@@ -173,7 +173,7 @@ export default function App() {
           </span>
           <div>
             <strong>Keanu Reeves Company</strong>
-            <span>support@example.com</span>
+            <span>support@keanureeves.company</span>
             <small>Copyright 2026. All rights reserved.</small>
           </div>
         </div>
