@@ -85,7 +85,7 @@ function ApprovedVideoSlot({ video, label, soundEnabled, activeIframeId, onPlay,
         />
       ) : (
         <div className="video-waiting-state">
-          <strong>{video.title}</strong>
+          <span>Video ready</span>
         </div>
       )}
       {!soundEnabled ? (
@@ -93,10 +93,6 @@ function ApprovedVideoSlot({ video, label, soundEnabled, activeIframeId, onPlay,
           Tap for Sound
         </button>
       ) : null}
-      <div className="approved-media-caption">
-        <strong>{video.title}</strong>
-        <span>{video.credit}</span>
-      </div>
     </div>
   );
 }
@@ -296,6 +292,7 @@ export default function Home() {
                 <div className="media-story-copy">
                   <span className="eyebrow">{meta.category}</span>
                   <h3>{video.title}</h3>
+                  <span className="video-source">{video.credit}</span>
                   <p>{meta.copy}</p>
                 </div>
               </article>

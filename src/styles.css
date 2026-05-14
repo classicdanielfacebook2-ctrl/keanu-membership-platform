@@ -837,10 +837,16 @@ button:disabled {
     linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.8));
 }
 
-.video-waiting-state strong {
-  font-family: "Playfair Display", Georgia, serif;
-  font-size: clamp(1.8rem, 4vw, 3.5rem);
-  line-height: 1;
+.video-waiting-state span {
+  border: 1px solid rgba(244, 216, 139, 0.3);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.44);
+  color: var(--gold-light);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 0.48rem 0.68rem;
+  text-transform: uppercase;
 }
 
 .approved-video-frame:hover,
@@ -912,7 +918,6 @@ button:disabled {
   transform: scale(1.055);
 }
 
-.approved-video-frame::after,
 .approved-photo-frame::after {
   content: "";
   position: absolute;
@@ -962,6 +967,13 @@ button:disabled {
   letter-spacing: 0.12em;
   padding: 0.28rem 0.48rem;
   text-transform: uppercase;
+}
+
+.video-source {
+  color: var(--gold-light);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .premium-panel,
