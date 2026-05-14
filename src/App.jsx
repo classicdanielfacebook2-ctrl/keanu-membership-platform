@@ -26,6 +26,7 @@ import MediaReview from "./pages/MediaReview.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
+import { getApprovedHomeImages } from "./data/homeImages.js";
 
 const navItems = [
   { to: "/", label: "Home", icon: BadgeCheck },
@@ -44,6 +45,8 @@ const adminNavItems = [
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [brandImage, setBrandImage] = useState("");
+  const [brandImageFailed, setBrandImageFailed] = useState(false);
   const location = useLocation();
   const auth = useAuth();
 
@@ -60,6 +63,13 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [location.pathname]);
 
+  useEffect(() => {
+    const portrait = getApprovedHomeImages().find((image) => image.id === "official-portrait");
+    setBrandImage(portrait?.imageUrl || "");
+  }, []);
+
+  const showBrandImage = brandImage && !brandImageFailed;
+
   return (
     <div className="app-shell">
       {loading ? (
@@ -71,10 +81,16 @@ export default function App() {
       ) : null}
       <header className="site-header">
         <NavLink to="/" className="brand" onClick={closeMenu}>
-          <span className="brand-mark">KR</span>
-          <span>
-            <strong>Membership Platform</strong>
-            <small>Official membership platform</small>
+          <span className="brand-mark brand-portrait" aria-hidden="true">
+            {showBrandImage ? (
+              <img src={brandImage} alt="" onError={() => setBrandImageFailed(true)} />
+            ) : (
+              <span>KR</span>
+            )}
+          </span>
+          <span className="brand-copy">
+            <span className="brand-name">Keanu Reeves</span>
+            <span className="brand-company">Company</span>
           </span>
         </NavLink>
         <button
@@ -151,9 +167,11 @@ export default function App() {
 
       <footer className="site-footer">
         <div className="footer-brand">
-          <span className="brand-mark">KR</span>
+          <span className="brand-mark brand-portrait" aria-hidden="true">
+            {showBrandImage ? <img src={brandImage} alt="" /> : <span>KR</span>}
+          </span>
           <div>
-            <strong>Membership Platform</strong>
+            <strong>Keanu Reeves Company</strong>
             <span>support@example.com</span>
             <small>Copyright 2026. All rights reserved.</small>
           </div>
