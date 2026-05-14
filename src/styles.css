@@ -27,11 +27,17 @@
 
 html {
   scroll-behavior: smooth;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   min-width: 320px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 18% 0%, rgba(201, 157, 67, 0.18), transparent 32rem),
     radial-gradient(circle at 92% 10%, rgba(255, 255, 255, 0.07), transparent 28rem),
@@ -54,6 +60,12 @@ body::before {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+img,
+video,
+iframe {
+  max-width: 100%;
 }
 
 button,
@@ -330,6 +342,7 @@ button:disabled {
 .hero-video-banner {
   position: relative;
   width: min(100%, 92rem);
+  max-width: 100%;
   min-height: clamp(18rem, 42vw, 35rem);
   margin-inline: auto;
   overflow: hidden;
@@ -786,6 +799,8 @@ button:disabled {
 .approved-video-frame,
 .approved-photo-frame {
   position: relative;
+  width: 100%;
+  max-width: 100%;
   min-height: 21rem;
   overflow: hidden;
   border: 1px solid rgba(244, 216, 139, 0.34);
@@ -797,6 +812,7 @@ button:disabled {
 
 .approved-video-frame {
   aspect-ratio: 16 / 9;
+  height: auto;
 }
 
 .advert-video-frame {
@@ -841,6 +857,7 @@ button:disabled {
   inset: 0;
   width: 100%;
   height: 100%;
+  max-width: 100%;
   border: 0;
 }
 
@@ -2574,6 +2591,29 @@ textarea {
   }
 }
 
+@media (max-width: 1440px) {
+  .hero-video-banner,
+  .media-story-stack,
+  .photo-story-stack,
+  .media-final-cta,
+  .cards-grid {
+    max-width: min(92rem, 100%);
+  }
+}
+
+@media (max-width: 1024px) {
+  .hero-section {
+    padding-inline: clamp(1rem, 4vw, 2.5rem);
+  }
+
+  .hero-video-banner,
+  .approved-video-frame,
+  .advert-video-frame {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 860px) {
   .menu-button {
     display: inline-grid;
@@ -2613,6 +2653,18 @@ textarea {
   .hero-video-banner,
   .hero-video-banner .media-placeholder {
     min-height: clamp(12.5rem, 38vw, 18rem);
+  }
+
+  .approved-video-frame,
+  .advert-video-frame,
+  .hero-video-banner {
+    aspect-ratio: 16 / 9;
+    min-height: auto;
+  }
+
+  .approved-video-frame video,
+  .approved-video-frame iframe {
+    object-fit: contain;
   }
 
   .video-card-grid,
@@ -2692,6 +2744,47 @@ textarea {
   }
 }
 
+@media (max-width: 768px) {
+  .hero-section {
+    gap: 1.5rem;
+  }
+
+  .hero-video-banner,
+  .hero-video-banner .approved-video-frame,
+  .hero-video-banner .advert-video-frame,
+  .media-story-block .approved-video-frame,
+  .media-story-block .advert-video-frame {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: auto;
+  }
+
+  .hero-video-banner .approved-video-frame video,
+  .hero-video-banner .approved-video-frame iframe,
+  .media-story-block .approved-video-frame video,
+  .media-story-block .approved-video-frame iframe {
+    object-fit: contain;
+  }
+
+  .approved-media-caption {
+    inset: auto 0.75rem 0.75rem;
+    max-width: calc(100% - 1.5rem);
+  }
+
+  .advert-video-frame .approved-media-caption {
+    inset: auto 0.75rem 0.75rem;
+    max-width: calc(100% - 1.5rem);
+  }
+
+  .sound-toggle {
+    top: 0.75rem;
+    right: 0.75rem;
+    padding: 0.48rem 0.64rem;
+    font-size: 0.68rem;
+  }
+}
+
 @media (max-width: 560px) {
   .content-section,
   .page-section,
@@ -2748,6 +2841,22 @@ textarea {
   .hero-video-banner,
   .hero-video-banner .media-placeholder {
     min-height: 12.8rem;
+  }
+
+  .hero-video-banner,
+  .hero-video-banner .approved-video-frame,
+  .hero-video-banner .advert-video-frame,
+  .media-story-block .approved-video-frame,
+  .media-story-block .advert-video-frame {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: auto;
+  }
+
+  .hero-video-banner .approved-video-frame video,
+  .media-story-block .approved-video-frame video {
+    object-fit: contain;
   }
 
   .play-ring {
@@ -2824,5 +2933,68 @@ textarea {
 
   .journey-closing h2 {
     font-size: clamp(2rem, 10vw, 3.2rem);
+  }
+}
+
+@media (max-width: 425px) {
+  .hero-section,
+  .content-section,
+  .page-section {
+    padding-inline: 0.85rem;
+  }
+
+  .hero-video-banner,
+  .approved-video-frame,
+  .advert-video-frame {
+    border-radius: 7px;
+    min-height: auto;
+  }
+
+  .approved-media-caption strong {
+    font-size: 0.86rem;
+    line-height: 1.2;
+  }
+
+  .approved-media-caption span {
+    font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 375px) {
+  .hero-section,
+  .content-section,
+  .page-section {
+    padding-inline: 0.75rem;
+  }
+
+  .hero-content h1 {
+    max-width: 13ch;
+    font-size: clamp(1.92rem, 10vw, 2.35rem);
+  }
+
+  .sound-toggle {
+    max-width: calc(100% - 1.5rem);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 320px) {
+  .hero-section,
+  .content-section,
+  .page-section {
+    padding-inline: 0.65rem;
+  }
+
+  .hero-video-banner,
+  .hero-video-banner .approved-video-frame,
+  .hero-video-banner .advert-video-frame,
+  .media-story-block .approved-video-frame,
+  .media-story-block .advert-video-frame {
+    aspect-ratio: 16 / 9;
+    min-height: auto;
+  }
+
+  .approved-media-caption {
+    display: none;
   }
 }
