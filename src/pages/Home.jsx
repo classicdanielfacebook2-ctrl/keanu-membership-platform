@@ -260,6 +260,12 @@ export default function Home() {
             Explore the story, the career, the defining moments, and the premium membership
             experience created for dedicated supporters.
           </p>
+          <div className="hero-actions discover-actions">
+            <a className="button discover-button" href="#featured-story">
+              Discover More
+              <ArrowRight size={16} />
+            </a>
+          </div>
         </div>
       </section>
 
@@ -272,18 +278,18 @@ export default function Home() {
             experience designed for dedicated supporters.
           </p>
           <div className="hero-actions">
-            <Link className="button primary large" to="/apply">
+            <Link className="button discover-button large" to="/apply">
               Apply for Membership
               <ArrowRight size={18} />
             </Link>
-            <Link className="button secondary large" to="/cards">
+            <Link className="button secondary discover-button large" to="/cards">
               View Membership Cards
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="content-section media-showcase">
+      <section className="content-section media-showcase" id="featured-story">
         <SectionHeader
           eyebrow="Featured Story"
           title="A cinematic path through career, character, and cultural impact."

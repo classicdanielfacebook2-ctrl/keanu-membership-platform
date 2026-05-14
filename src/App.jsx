@@ -93,8 +93,9 @@ export default function App() {
             <span className="brand-company">Company</span>
           </span>
         </NavLink>
+        {menuOpen ? <button className="menu-overlay" type="button" aria-label="Close navigation" onClick={closeMenu} /> : null}
         <button
-          className="icon-button menu-button"
+          className={menuOpen ? "icon-button menu-button active" : "icon-button menu-button"}
           type="button"
           onClick={() => setMenuOpen((open) => !open)}
           aria-label="Toggle navigation"
