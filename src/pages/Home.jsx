@@ -3,8 +3,6 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PhotoPlaceholder, VideoPlaceholder } from "../components/MediaPlaceholder.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
-import CardType from "../components/CardType.jsx";
-import { cardTypes } from "../data/cards.js";
 import { getApprovedHomeImages } from "../data/homeImages.js";
 import { getApprovedHomeVideos } from "../data/homeVideos.js";
 
@@ -265,6 +263,26 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="application-ready-section">
+        <div className="media-final-cta">
+          <span className="eyebrow">Application Ready</span>
+          <h3>Begin your membership application</h3>
+          <p>
+            Choose your preferred membership level and continue through a secure guided application
+            experience designed for dedicated supporters.
+          </p>
+          <div className="hero-actions">
+            <Link className="button primary large" to="/apply">
+              Apply for Membership
+              <ArrowRight size={18} />
+            </Link>
+            <Link className="button secondary large" to="/cards">
+              View Membership Cards
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section className="content-section media-showcase">
         <SectionHeader
           eyebrow="Featured Story"
@@ -316,37 +334,6 @@ export default function Home() {
               </article>
             );
           })}
-        </div>
-
-        <div className="media-final-cta">
-          <span className="eyebrow">Application Ready</span>
-          <h3>Ready to begin your membership application?</h3>
-          <p>
-            Choose a membership card level, prepare your application details, and continue through
-            the guided application process.
-          </p>
-          <div className="hero-actions">
-            <Link className="button primary large" to="/apply">
-              Apply for Membership
-              <ArrowRight size={18} />
-            </Link>
-            <Link className="button secondary large" to="/cards">
-              View Membership Cards
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="content-section dark-band">
-        <SectionHeader
-          eyebrow="Membership Cards"
-          title="Luxury card tiers prepared for dedicated supporters."
-          copy="Each card includes a polished card design, placeholder pricing, benefits, and clear application and purchase actions."
-        />
-        <div className="cards-grid">
-          {cardTypes.map((card, index) => (
-            <CardType key={card.id} card={card} featured={index === 2} compact />
-          ))}
         </div>
       </section>
     </>

@@ -656,19 +656,42 @@ button:disabled {
   text-transform: uppercase;
 }
 
+.application-ready-section {
+  position: relative;
+  padding: clamp(2rem, 5vw, 4rem) clamp(1rem, 5vw, 5rem) clamp(4.5rem, 8vw, 7rem);
+  background:
+    linear-gradient(180deg, rgba(6, 6, 6, 0.92), rgba(9, 9, 9, 0.98)),
+    radial-gradient(circle at 15% 30%, rgba(244, 216, 139, 0.12), transparent 22rem);
+}
+
+.application-ready-section::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 50%;
+  width: min(72rem, calc(100% - 2rem));
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(244, 216, 139, 0.46), transparent);
+  transform: translateX(-50%);
+}
+
 .media-final-cta {
   display: grid;
-  gap: 1rem;
+  gap: clamp(0.95rem, 2vw, 1.25rem);
   max-width: 92rem;
-  margin: clamp(4rem, 8vw, 7rem) auto 0;
-  padding: clamp(1.4rem, 4vw, 2.6rem);
+  margin: 0 auto;
+  padding: clamp(1.45rem, 4vw, 3.2rem);
   border: 1px solid rgba(244, 216, 139, 0.34);
   border-radius: var(--radius);
   background:
-    radial-gradient(circle at 85% 10%, rgba(244, 216, 139, 0.14), transparent 20rem),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.024)),
+    radial-gradient(circle at 88% 8%, rgba(244, 216, 139, 0.16), transparent 20rem),
+    radial-gradient(circle at 8% 100%, rgba(255, 255, 255, 0.06), transparent 18rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.024)),
     rgba(8, 8, 8, 0.82);
-  box-shadow: var(--shadow), 0 0 2.8rem rgba(201, 157, 67, 0.08);
+  box-shadow: 0 2.6rem 6rem rgba(0, 0, 0, 0.46), 0 0 2.8rem rgba(201, 157, 67, 0.1);
+}
+
+.media-final-cta p {
+  max-width: 47rem;
 }
 
 .advert-block {
@@ -2800,7 +2823,8 @@ textarea {
 @media (max-width: 560px) {
   .content-section,
   .page-section,
-  .hero-section {
+  .hero-section,
+  .application-ready-section {
     padding-inline: 1rem;
   }
 
@@ -2951,7 +2975,8 @@ textarea {
 @media (max-width: 425px) {
   .hero-section,
   .content-section,
-  .page-section {
+  .page-section,
+  .application-ready-section {
     padding-inline: 0.85rem;
   }
 
@@ -2975,7 +3000,8 @@ textarea {
 @media (max-width: 375px) {
   .hero-section,
   .content-section,
-  .page-section {
+  .page-section,
+  .application-ready-section {
     padding-inline: 0.75rem;
   }
 
@@ -2993,7 +3019,8 @@ textarea {
 @media (max-width: 320px) {
   .hero-section,
   .content-section,
-  .page-section {
+  .page-section,
+  .application-ready-section {
     padding-inline: 0.65rem;
   }
 
