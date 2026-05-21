@@ -4,6 +4,7 @@ import { LockKeyhole, MailCheck, ShieldCheck } from "lucide-react";
 import { forgotPassword, resetPassword } from "../services/authApi.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { allowedPhoneCountries, getAllowedPhoneCountry, getCountryFlag } from "../data/phoneCountries.js";
+import { getApprovedHomeImages } from "../data/homeImages.js";
 
 const cleanPhone = (value = "") => value.replace(/[^\d]/g, "");
 
@@ -29,8 +30,13 @@ export default function AuthPage({ mode }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   const returnTo = useMemo(() => params.get("returnTo") || "/", [params]);
+  const authLogo = useMemo(
+    () => getApprovedHomeImages().find((image) => image.id === "official-portrait")?.imageUrl || "/logo.svg",
+    []
+  );
   const selectedCountry = getAllowedPhoneCountry(form.countryIso);
   const phoneIdentifier = `${selectedCountry.callingCode}${cleanPhone(form.phone)}`;
   const selectedIdentifier = method === "sms" ? phoneIdentifier : form.email.trim();
@@ -146,7 +152,7 @@ export default function AuthPage({ mode }) {
     <section className="auth-page">
       <div className="auth-card">
         <div className="auth-brand-mini" aria-hidden="true">
-          <img src="/logo.svg" alt="" />
+          {logoFailed ? <img src="/logo.svg" alt="" /> : <img src={authLogo} alt="" onError={() => setLogoFailed(true)} />}
         </div>
         <div className="auth-heading">
           <span className="eyebrow">Secure Account</span>
@@ -181,7 +187,7 @@ export default function AuthPage({ mode }) {
                 />
               </label>
               <PhoneField form={form} updateField={updateField} />
-              <MethodTabs label="Verify account by" method={method} setMethod={setMethod} emailLabel="Email OTP" smsLabel="SMS OTP" />
+              <MethodTabs label="Choose verification method" method={method} setMethod={setMethod} emailLabel="Email OTP" smsLabel="SMS OTP" />
             </>
           ) : null}
 
@@ -292,10 +298,20 @@ function MethodTabs({ label, method, setMethod, emailLabel, smsLabel }) {
     <div className="auth-method-group">
       <span>{label}</span>
       <div className="auth-tabs" role="tablist" aria-label={label}>
-        <button className={method === "email" ? "active" : ""} type="button" onClick={() => setMethod("email")}>
+        <button
+          className={method === "email" ? "active" : ""}
+          type="button"
+          onClick={() => setMethod("email")}
+          aria-pressed={method === "email"}
+        >
           {emailLabel}
         </button>
-        <button className={method === "sms" ? "active" : ""} type="button" onClick={() => setMethod("sms")}>
+        <button
+          className={method === "sms" ? "active" : ""}
+          type="button"
+          onClick={() => setMethod("sms")}
+          aria-pressed={method === "sms"}
+        >
           {smsLabel}
         </button>
       </div>
@@ -330,9 +346,16 @@ function PhoneField({ form, updateField }) {
       Phone Number
       <div className="phone-input-row" ref={wrapperRef} onBlur={handleBlur}>
         <div className="country-select">
-          <button className="country-select-trigger" type="button" onClick={() => setOpen((value) => !value)}>
+          <button
+            className="country-select-trigger"
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-label="Select country code"
+            aria-expanded={open}
+          >
             <span>{getCountryFlag(selectedCountry.iso)}</span>
             <strong>{selectedCountry.callingCode}</strong>
+            <small aria-hidden="true">⌄</small>
           </button>
           {open ? (
             <div className="country-menu">
@@ -366,7 +389,7 @@ function PhoneField({ form, updateField }) {
           id="phone"
           required
           inputMode="tel"
-          placeholder="555 123 4567"
+          placeholder="Phone number"
           value={form.phone}
           onChange={(event) => updateField("phone", event.target.value)}
         />

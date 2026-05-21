@@ -300,26 +300,22 @@ button:disabled {
 
 .auth-brand-mini {
   display: grid;
-  width: 2.55rem;
-  height: 2.55rem;
+  width: 2.7rem;
+  height: 2.7rem;
   place-items: center;
-  border: 1px solid rgba(244, 216, 139, 0.52);
+  border: 1px solid rgba(244, 216, 139, 0.58);
   border-radius: 50%;
   margin-bottom: 0.9rem;
-  background: linear-gradient(145deg, rgba(244, 216, 139, 0.18), rgba(0, 0, 0, 0.35));
-  color: var(--gold-light);
-  font-family: "Playfair Display", Georgia, serif;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  background: rgba(0, 0, 0, 0.35);
   overflow: hidden;
-  box-shadow: 0 0.7rem 1.5rem rgba(0, 0, 0, 0.28), 0 0 1rem rgba(244, 216, 139, 0.12);
+  box-shadow: 0 0.65rem 1.3rem rgba(0, 0, 0, 0.28), 0 0 0.9rem rgba(244, 216, 139, 0.1);
 }
 
 .auth-brand-mini img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(0.94) contrast(1.04);
 }
 
 .auth-heading {
@@ -395,8 +391,8 @@ button:disabled {
 }
 
 .auth-method-group > span {
-  color: var(--muted);
-  font-size: 0.76rem;
+  color: rgba(247, 243, 234, 0.88);
+  font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.05em;
 }
@@ -405,38 +401,53 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.35rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.28);
-  padding: 0.25rem;
+  border: 1px solid rgba(244, 216, 139, 0.16);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0.3rem;
 }
 
 .auth-tabs button {
-  min-height: 2.25rem;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
+  min-height: 2.48rem;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(247, 243, 234, 0.78);
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 900;
-  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
 
 .auth-tabs button.active {
   background: linear-gradient(135deg, rgba(244, 216, 139, 0.96), rgba(201, 157, 67, 0.92));
   color: #100d08;
-  box-shadow: 0 0.55rem 1.2rem rgba(201, 157, 67, 0.16);
+  border-color: rgba(244, 216, 139, 0.65);
+  box-shadow: 0 0.55rem 1.2rem rgba(201, 157, 67, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
 
 .auth-tabs button:hover {
   transform: translateY(-1px);
+  border-color: rgba(244, 216, 139, 0.34);
+  color: var(--ink);
 }
 
 .phone-input-row {
   display: grid;
-  grid-template-columns: minmax(7.5rem, 0.42fr) minmax(0, 1fr);
-  gap: 0.45rem;
+  grid-template-columns: minmax(7.15rem, auto) minmax(0, 1fr);
+  gap: 0;
+  min-height: 2.8rem;
+  overflow: visible;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.phone-input-row:focus-within {
+  border-color: rgba(244, 216, 139, 0.62);
+  background: rgba(0, 0, 0, 0.38);
+  box-shadow: 0 0 0 3px rgba(201, 157, 67, 0.09);
 }
 
 .country-select {
@@ -450,20 +461,20 @@ button:disabled {
   min-height: 2.8rem;
   align-items: center;
   justify-content: center;
-  gap: 0.42rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.28);
+  gap: 0.36rem;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  background: transparent;
   color: var(--ink);
   cursor: pointer;
-  padding: 0 0.62rem;
+  padding: 0 0.58rem;
   transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
 .country-select-trigger:hover,
 .country-select:focus-within .country-select-trigger {
-  border-color: rgba(244, 216, 139, 0.5);
-  background: rgba(0, 0, 0, 0.42);
+  background: rgba(244, 216, 139, 0.07);
 }
 
 .country-select-trigger span {
@@ -472,6 +483,26 @@ button:disabled {
 
 .country-select-trigger strong {
   font-size: 0.88rem;
+}
+
+.country-select-trigger small {
+  color: var(--gold-light);
+  font-size: 0.85rem;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.phone-input-row > input {
+  min-height: 2.8rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.phone-input-row > input:focus {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .country-menu {
@@ -3404,7 +3435,7 @@ textarea {
   }
 
   .phone-input-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(6.9rem, auto) minmax(0, 1fr);
   }
 
   .country-menu {
