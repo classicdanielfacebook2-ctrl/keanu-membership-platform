@@ -358,10 +358,14 @@ function PhoneField({ form, updateField }) {
             <small aria-hidden="true">⌄</small>
           </button>
           {open ? (
-            <div className="country-menu">
+            <div className="country-menu-backdrop" aria-hidden="true" onMouseDown={() => setOpen(false)} />
+          ) : null}
+          {open ? (
+            <div className="country-menu" role="dialog" aria-label="Select country code">
+              <div className="country-menu-handle" aria-hidden="true" />
               <input
                 aria-label="Search country"
-                placeholder="Search country"
+                placeholder="Search country or code"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 autoFocus
