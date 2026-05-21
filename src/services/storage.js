@@ -44,12 +44,15 @@ export const updateApplication = (id, updates) => {
 
 export const getSupportMessages = () => read(SUPPORT_KEY, []);
 
+export const createCaseId = () => `KR-${Math.floor(10000 + Math.random() * 90000)}`;
+
 export const saveSupportMessage = (message) => {
   const messages = getSupportMessages();
   const next = [
     {
       ...message,
       id: crypto.randomUUID(),
+      caseId: createCaseId(),
       createdAt: new Date().toISOString(),
       status: "Open"
     },
@@ -60,13 +63,6 @@ export const saveSupportMessage = (message) => {
 };
 
 export const protectionStatuses = ["Submitted", "Under Review", "Evidence Required", "Escalated", "Resolved", "Closed"];
-
-const createCaseId = () => {
-  const date = new Date();
-  const stamp = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-  const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
-  return `KRC-${stamp}-${suffix}`;
-};
 
 export const getProtectionReports = () => read(PROTECTION_REPORTS_KEY, []);
 

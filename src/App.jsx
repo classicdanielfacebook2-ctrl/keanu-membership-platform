@@ -209,10 +209,10 @@ export default function App() {
         </div>
         <div className="footer-stack">
           <div className="footer-links">
-            <NavLink to="/journey">Keanu Reeves Journey</NavLink>
             <NavLink to="/terms">Terms</NavLink>
-            <NavLink to="/privacy">Privacy Policy</NavLink>
-            <NavLink to="/refund">Refund Policy</NavLink>
+            <NavLink to="/privacy">Privacy</NavLink>
+            <NavLink to="/refund">Refund Review Policy</NavLink>
+            <NavLink to="/protection">Security Policy</NavLink>
           </div>
           <div className="social-links" aria-label="Social media placeholders">
             <span>IG</span>

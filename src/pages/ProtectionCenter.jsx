@@ -50,6 +50,7 @@ export default function ProtectionCenter() {
   const [evidence, setEvidence] = useState([]);
   const [submittedCase, setSubmittedCase] = useState(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
+  const [emailStatus, setEmailStatus] = useState("");
 
   const updateField = (field, value) => setReport((current) => ({ ...current, [field]: value }));
 
@@ -66,12 +67,32 @@ export default function ProtectionCenter() {
     }
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const saved = saveProtectionReport({ ...report, evidence });
     setSubmittedCase(saved);
     setReport(emptyReport);
     setEvidence([]);
+    setEmailStatus("Confirmation email pending.");
+
+    try {
+      const response = await fetch("/api/protection/confirmation-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: saved.email,
+          fullName: saved.fullName,
+          caseId: saved.caseId,
+          timestamp: saved.createdAt,
+          reportType: saved.incidentType,
+          supportReference: "Member Protection Center"
+        })
+      });
+      if (!response.ok) throw new Error("Confirmation email could not be sent.");
+      setEmailStatus("Confirmation email sent.");
+    } catch {
+      setEmailStatus("Confirmation email could not be sent. Your case was still recorded.");
+    }
   };
 
   return (
@@ -91,7 +112,11 @@ export default function ProtectionCenter() {
           <p>Submit details clearly so the security team can review the report and request additional evidence if needed.</p>
           <div className="protection-note">
             <LockKeyhole size={17} />
-            <span>Verified cases may be reviewed for possible assistance or refund consideration after investigation.</span>
+            <span>Eligible cases may qualify for reimbursement review following internal investigation and verification.</span>
+          </div>
+          <div className="protection-note">
+            <LockKeyhole size={17} />
+            <span>Submitting a report does not guarantee compensation approval.</span>
           </div>
           <div className="protection-warning">
             <AlertTriangle size={17} />
@@ -104,6 +129,7 @@ export default function ProtectionCenter() {
             <div className="case-confirmation">
               <strong>Your report has been received and will be reviewed by the security team.</strong>
               <span>Case ID: {submittedCase.caseId}</span>
+              {emailStatus ? <small>{emailStatus}</small> : null}
             </div>
           ) : null}
 

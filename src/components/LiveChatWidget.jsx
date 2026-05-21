@@ -32,8 +32,8 @@ const readFileAttachment = (file) =>
   });
 
 const needsHumanAgent = (text = "") =>
-  /\b(human|agent|support|representative|person|staff|unresolved)\b/i.test(text) ||
-  /\b(still|cannot|can't|failed|broken|not working|no code|no otp)\b/i.test(text);
+  /\b(human|agent|support|representative|person|staff|unresolved|fraud|scam|refund|urgent)\b/i.test(text) ||
+  /\b(still|cannot|can't|failed|broken|not working|no code|no otp|payment issue|payment problem|unauthorized payment|impersonation)\b/i.test(text);
 
 const getAssistantReply = async (history) => {
   const response = await fetch("/api/support/assistant", {
@@ -191,7 +191,9 @@ export default function LiveChatWidget() {
       });
       window.setTimeout(async () => {
         try {
-          const reply = await getAssistantReply(assistantHistory);
+          const reply = transferNeeded
+            ? "Your request has been escalated for manual review."
+            : await getAssistantReply(assistantHistory);
           const botMessage = await insertMessage({ conversationId: conversation.id, role: "bot", text: reply });
           setMessages((current) => mergeById(current, [botMessage]));
           const afterBot = await updateConversation(conversation.id, {
@@ -259,6 +261,7 @@ export default function LiveChatWidget() {
               <span className={connected ? "support-dot online" : "support-dot"} />
               {connected ? (agentOnline ? "Concierge specialist online" : "Concierge assistant online") : "Support initializing"}
             </p>
+            {conversation?.caseId ? <span className="chat-case-id">Case {conversation.caseId}</span> : null}
           </div>
           <button className="icon-button" type="button" onClick={() => setOpen(false)} aria-label="Close live support">
             <X size={18} />

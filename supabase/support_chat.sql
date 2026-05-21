@@ -2,6 +2,7 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.support_conversations (
   id uuid primary key default gen_random_uuid(),
+  case_id text unique,
   visitor_id text not null unique,
   status text not null default 'bot',
   assigned_agent text default '',
@@ -12,6 +13,13 @@ create table if not exists public.support_conversations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.support_conversations
+  add column if not exists case_id text;
+
+create unique index if not exists support_conversations_case_id_idx
+  on public.support_conversations (case_id)
+  where case_id is not null;
 
 create table if not exists public.support_messages (
   id uuid primary key default gen_random_uuid(),

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Mail, MessageCircle, Send, Sparkles } from "lucide-react";
+import { BadgeCheck, ChevronDown, Clock, CreditCard, Fingerprint, LockKeyhole, Mail, MessageCircle, RotateCcw, Send, ShieldAlert, Sparkles } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { saveSupportMessage } from "../services/storage.js";
 
@@ -12,18 +12,33 @@ const supportItems = [
   ["Payment Support", "Review payment status and next steps through approved payment channels."]
 ];
 
+const trustItems = ["SSL Secured Communication", "Verified Support Channel", "Encrypted Case Review", "Privacy Protected"];
+
+const protectionCards = [
+  ["Report Fraud", "Submit impersonation, scam, or unauthorized seller concerns.", ShieldAlert],
+  ["Refund Review", "Request investigation for eligible payment-related cases.", RotateCcw],
+  ["Identity Impersonation", "Report fake profiles or identity misuse connected to membership.", Fingerprint],
+  ["Payment Investigation", "Share transaction details for secure review.", CreditCard]
+];
+
+const reviewTimes = [
+  ["Live Support", "under 10 minutes"],
+  ["Fraud Review", "24-72 hours"],
+  ["Refund Investigation", "3-7 business days"]
+];
+
 export default function Support() {
   const [form, setForm] = useState(emptyMessage);
-  const [sent, setSent] = useState(false);
+  const [submittedCase, setSubmittedCase] = useState(null);
   const [openItem, setOpenItem] = useState("OTP & Verification");
 
   const updateField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    saveSupportMessage(form);
+    const saved = saveSupportMessage(form);
     setForm(emptyMessage);
-    setSent(true);
+    setSubmittedCase(saved);
   };
 
   return (
@@ -33,6 +48,20 @@ export default function Support() {
         title="Member Services"
         copy="Private assistance for membership, verification, and account support."
       />
+
+      <div className="official-support-badge">
+        <BadgeCheck size={17} />
+        Official Member Support
+      </div>
+
+      <div className="support-trust-bar" aria-label="Security and trust indicators">
+        {trustItems.map((item) => (
+          <span key={item}>
+            <LockKeyhole size={14} />
+            {item}
+          </span>
+        ))}
+      </div>
 
       <div className="support-center-grid">
         <aside className="member-support-card">
@@ -59,6 +88,18 @@ export default function Support() {
             <Mail size={15} />
             support@keanureeves.company
           </a>
+
+          <div className="review-time-card">
+            <Clock size={16} />
+            <div>
+              <strong>Estimated review times</strong>
+              {reviewTimes.map(([label, time]) => (
+                <span key={label}>
+                  {label}: {time}
+                </span>
+              ))}
+            </div>
+          </div>
         </aside>
 
         <div className="support-content-stack">
@@ -84,7 +125,12 @@ export default function Support() {
               <h3>Contact Member Services</h3>
               <p>Send a concise request and the support team will review it.</p>
             </div>
-            {sent ? <div className="notice success">Request received.</div> : null}
+            {submittedCase ? (
+              <div className="notice success case-notice">
+                <strong>Request received.</strong>
+                <span>Case ID: {submittedCase.caseId}</span>
+              </div>
+            ) : null}
             <div className="form-grid support-form-grid">
               <label htmlFor="supportName">
                 Name
@@ -137,6 +183,26 @@ export default function Support() {
           </form>
         </div>
       </div>
+
+      <section className="security-protection-section" aria-labelledby="securityProtectionTitle">
+        <div>
+          <span className="mini-eyebrow">Security & Trust</span>
+          <h2 id="securityProtectionTitle">Security & Fraud Protection</h2>
+          <p>
+            Eligible cases may qualify for reimbursement review following internal investigation and verification.
+            Submitting a report does not guarantee compensation approval.
+          </p>
+        </div>
+        <div className="security-card-grid">
+          {protectionCards.map(([title, copy, Icon]) => (
+            <article className="security-trust-card" key={title}>
+              <Icon size={19} />
+              <h3>{title}</h3>
+              <p>{copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
     </section>
   );
 }

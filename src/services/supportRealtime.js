@@ -32,10 +32,13 @@ export const supportVisitorId = () => {
   return value;
 };
 
+const createConversationCaseId = () => `KR-${Math.floor(10000 + Math.random() * 90000)}`;
+
 export const toConversation = (row) =>
   row
     ? {
         id: row.id,
+        caseId: row.case_id || "",
         visitorId: row.visitor_id,
         status: row.status || "bot",
         assignedAgent: row.assigned_agent || "",
@@ -85,17 +88,32 @@ export const getOrCreateConversation = async (visitorId) => {
     .maybeSingle();
 
   if (selectError) throw selectError;
-  if (existing) return toConversation(existing);
+  if (existing?.case_id) return toConversation(existing);
+  if (existing) {
+    const { data: updated, error: updateError } = await supabase
+      .from("support_conversations")
+      .update({ case_id: createConversationCaseId(), updated_at: new Date().toISOString() })
+      .eq("id", existing.id)
+      .select()
+      .single();
+    if (updateError) return toConversation(existing);
+    return toConversation(updated);
+  }
 
-  const { data, error } = await supabase
-    .from("support_conversations")
-    .insert({
-      visitor_id: visitorId,
-      status: "bot",
-      last_message: "Conversation opened"
-    })
-    .select()
-    .single();
+  const newConversation = {
+    case_id: createConversationCaseId(),
+    visitor_id: visitorId,
+    status: "bot",
+    last_message: "Conversation opened"
+  };
+  let { data, error } = await supabase.from("support_conversations").insert(newConversation).select().single();
+  if (error && String(error.message || "").includes("case_id")) {
+    ({ data, error } = await supabase
+      .from("support_conversations")
+      .insert({ visitor_id: visitorId, status: "bot", last_message: "Conversation opened" })
+      .select()
+      .single());
+  }
   if (error) throw error;
   return toConversation(data);
 };
