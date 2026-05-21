@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Keanu Reeves Company KR Logo</title>
+  <desc id="desc">A square black and gold KR monogram logo for Keanu Reeves Company.</desc>
+  <rect width="512" height="512" fill="#050505"/>
+  <rect x="32" y="32" width="448" height="448" fill="none" stroke="#C99D43" stroke-width="16"/>
+  <rect x="56" y="56" width="400" height="400" fill="none" stroke="#F4D88B" stroke-opacity="0.45" stroke-width="4"/>
+  <path d="M112 128h48v112l100-112h60L210 250l120 134h-64L160 264v120h-48V128Z" fill="#F4D88B"/>
+  <path d="M330 128h46c54 0 86 27 86 72 0 31-17 55-47 66l58 118h-55l-51-108h-37v108h-48V128Zm48 108c23 0 36-12 36-34 0-21-13-33-36-33h-48v67h48Z" fill="#C99D43"/>
+  <path d="M96 414h320" stroke="#F4D88B" stroke-opacity="0.68" stroke-width="6"/>
+</svg>
