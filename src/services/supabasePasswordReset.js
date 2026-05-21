@@ -27,6 +27,11 @@ export const getSupabasePasswordClient = () => {
 };
 
 export const preparePasswordRecoverySession = async () => {
+  const fallbackToken = new URLSearchParams(window.location.search).get("recovery_token");
+  if (fallbackToken) {
+    return { access_token: fallbackToken, fallback: true };
+  }
+
   const supabase = getSupabasePasswordClient();
   const code = new URLSearchParams(window.location.search).get("code");
 
@@ -46,19 +51,23 @@ export const preparePasswordRecoverySession = async () => {
 };
 
 export const updateRecoveredPassword = async ({ password }) => {
-  const supabase = getSupabasePasswordClient();
   const session = await preparePasswordRecoverySession();
-  const { error } = await supabase.auth.updateUser({ password });
+  let accessToken = session.access_token;
 
-  if (error) {
-    const message = /expired|invalid/i.test(error.message)
-      ? "Recovery link expired. Please request a new password recovery email."
-      : error.message || "Password could not be updated.";
-    throw new Error(message);
+  if (!session.fallback) {
+    const supabase = getSupabasePasswordClient();
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      const message = /expired|invalid/i.test(error.message)
+        ? "Recovery link expired. Please request a new password recovery email."
+        : error.message || "Password could not be updated.";
+      throw new Error(message);
+    }
+
+    const { data: refreshed } = await supabase.auth.getSession();
+    accessToken = refreshed?.session?.access_token || session.access_token;
   }
-
-  const { data: refreshed } = await supabase.auth.getSession();
-  const accessToken = refreshed?.session?.access_token || session.access_token;
 
   const data = await authRequest("/api/auth/supabase-reset-password", {
     method: "POST",
@@ -66,6 +75,8 @@ export const updateRecoveredPassword = async ({ password }) => {
     body: JSON.stringify({ password })
   });
 
-  await supabase.auth.signOut().catch(() => {});
+  if (!session.fallback) {
+    await getSupabasePasswordClient().auth.signOut().catch(() => {});
+  }
   return data;
 };
