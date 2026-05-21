@@ -8,9 +8,15 @@ export async function authRequest(path, options = {}) {
     ...options
   });
 
-  const data = await response.json().catch(() => ({}));
+  const contentType = response.headers.get("content-type") || "";
+  const rawText = contentType.includes("application/json") ? "" : await response.text().catch(() => "");
+  const data = contentType.includes("application/json")
+    ? await response.json().catch(() => ({}))
+    : { error: rawText && !rawText.trim().startsWith("<") ? rawText : "" };
+
   if (!response.ok) {
-    const error = new Error(data.error || "Authentication request failed.");
+    const fallback = `Authentication API failed (${response.status} ${response.statusText}).`;
+    const error = new Error(data.error || fallback);
     Object.assign(error, data);
     throw error;
   }
