@@ -28,6 +28,7 @@ export default async function handler(req, res) {
       return sendJson(res, 400, { error: "A valid email address is required for account verification." });
     }
 
+    // Connect before registration work so deployment config problems surface clearly in Vercel logs.
     const users = await getUsersCollection();
     const existing = await users.findOne({ identifier });
     if (existing) {

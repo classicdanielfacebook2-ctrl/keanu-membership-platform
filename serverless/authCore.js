@@ -9,6 +9,7 @@ const OTP_EXPIRES_MINUTES = 10;
 const isProduction = process.env.NODE_ENV === "production";
 
 let mongoClientPromise;
+let mongoUriLogged = false;
 
 export const normalizeIdentifier = (value = "") => value.trim().toLowerCase();
 export const isEmailIdentifier = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -22,7 +23,21 @@ const requiredEnv = (name) => {
 };
 
 const getMongoClient = () => {
-  const uri = requiredEnv("MONGODB_URI");
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    console.error("[mongodb/config]", { message: "MONGODB_URI is missing from backend environment." });
+    throw new Error("MONGODB_URI is missing. Add it in Vercel Project Settings > Environment Variables.");
+  }
+
+  if (!mongoUriLogged) {
+    console.log("[mongodb/config]", {
+      message: "MongoDB URI found",
+      length: uri.length,
+      scheme: uri.startsWith("mongodb+srv://") ? "mongodb+srv" : uri.startsWith("mongodb://") ? "mongodb" : "unknown"
+    });
+    mongoUriLogged = true;
+  }
+
   if (!mongoClientPromise) {
     mongoClientPromise = new MongoClient(uri).connect();
   }
@@ -30,11 +45,19 @@ const getMongoClient = () => {
 };
 
 export const getUsersCollection = async () => {
-  const client = await getMongoClient();
-  const db = client.db(process.env.MONGODB_DB || "keanu_membership_platform");
-  const users = db.collection("users");
-  await users.createIndex({ identifier: 1 }, { unique: true });
-  return users;
+  try {
+    const client = await getMongoClient();
+    const db = client.db(process.env.MONGODB_DB || "keanu_membership_platform");
+    const users = db.collection("users");
+    await users.createIndex({ identifier: 1 }, { unique: true });
+    return users;
+  } catch (error) {
+    console.error("[mongodb/connect]", {
+      message: error?.message,
+      name: error?.name
+    });
+    throw error;
+  }
 };
 
 export const logApiError = (scope, error) => {
