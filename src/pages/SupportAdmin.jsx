@@ -34,6 +34,12 @@ export default function SupportAdmin() {
   }, [activeId]);
 
   useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const supabase = getSupportRealtimeClient();
 
@@ -67,6 +73,12 @@ export default function SupportAdmin() {
           return [payload.conversation, ...without].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
         });
         if (payload.conversation.id === activeIdRef.current) setActiveConversation(payload.conversation);
+        if ("Notification" in window && payload.conversation.id !== activeIdRef.current && Notification.permission === "granted") {
+          new Notification("New support message", {
+            body: payload.conversation.lastMessage || "A visitor needs support.",
+            tag: payload.conversation.id
+          });
+        }
       })
       .subscribe((status) => {
         setConnected(status === "SUBSCRIBED");

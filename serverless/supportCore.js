@@ -1,10 +1,12 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { MongoClient } from "mongodb";
 
 let mongoClientPromise;
 let mongoLogged = false;
 
 const dbName = process.env.MONGODB_DB || "keanu_membership_platform";
+const SUPPORT_COOKIE_NAME = "kr_support_session";
+const isProduction = process.env.NODE_ENV === "production";
 
 const getMongoClient = () => {
   if (!process.env.MONGODB_URI) {
@@ -41,7 +43,50 @@ export const handleSupportError = (res, scope, error) => {
 };
 
 const now = () => new Date();
-const iso = (date = now()) => date.toISOString();
+
+const supportSecret = () => process.env.AUTH_JWT_SECRET || process.env.SUPPORT_SESSION_SECRET || "local-support-session-secret";
+
+const getCookie = (req, name) => {
+  const header = req.headers.cookie || "";
+  return header
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${name}=`))
+    ?.slice(name.length + 1);
+};
+
+const signSessionId = (sessionId) => createHmac("sha256", supportSecret()).update(sessionId).digest("base64url");
+
+const signedSessionValue = (sessionId) => `${sessionId}.${signSessionId(sessionId)}`;
+
+const verifySignedSession = (value = "") => {
+  const [sessionId, signature] = value.split(".");
+  if (!sessionId || !signature) return "";
+  const expected = signSessionId(sessionId);
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (signatureBuffer.length !== expectedBuffer.length) return "";
+  return timingSafeEqual(signatureBuffer, expectedBuffer) ? sessionId : "";
+};
+
+const setSupportCookie = (res, sessionId) => {
+  const secure = isProduction ? " Secure;" : "";
+  res.setHeader(
+    "Set-Cookie",
+    `${SUPPORT_COOKIE_NAME}=${signedSessionValue(sessionId)}; HttpOnly; SameSite=Lax;${secure} Path=/; Max-Age=${60 * 60 * 24 * 30}`
+  );
+};
+
+export const getSupportSessionId = (req) => verifySignedSession(getCookie(req, SUPPORT_COOKIE_NAME));
+
+export const getOrCreateSupportSessionId = (req, res, fallbackId = "") => {
+  const existing = getSupportSessionId(req);
+  if (existing) return existing;
+  const cleanFallback = String(fallbackId || "").replace(/[^\w-]/g, "").slice(0, 120);
+  const sessionId = cleanFallback || randomUUID();
+  setSupportCookie(res, sessionId);
+  return sessionId;
+};
 
 const cleanConversation = (conversation) =>
   conversation
@@ -95,6 +140,19 @@ export const getConversationHistory = async (conversationId) => {
   const conversation = await conversations.findOne({ id: conversationId });
   const history = await messages.find({ conversationId }).sort({ createdAt: 1 }).limit(250).toArray();
   return { conversation: cleanConversation(conversation), messages: history.map(cleanMessage) };
+};
+
+export const assertSupportSessionAccess = ({ sessionId, conversation }) => {
+  if (!conversation) {
+    const error = new Error("Support conversation not found.");
+    error.status = 404;
+    throw error;
+  }
+  if (!sessionId || conversation.visitorId !== sessionId) {
+    const error = new Error("Support session does not have access to this conversation.");
+    error.status = 403;
+    throw error;
+  }
 };
 
 const cleanMessage = (message) => ({
