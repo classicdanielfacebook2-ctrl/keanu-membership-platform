@@ -3,9 +3,15 @@ import { Bell, CheckCheck, Headset, MessageSquareText, Send, UserCheck, UsersRou
 import SectionHeader from "../components/SectionHeader.jsx";
 import {
   getSupportRealtimeClient,
+  hasSupabaseConfig,
+  insertMessage,
+  listConversations,
+  loadMessages,
+  markMessagesSeen,
   mergeById,
-  supportApi,
-  supportChannelName
+  supportAgentsChannel,
+  toMessage,
+  updateConversation
 } from "../services/supportRealtime.js";
 
 const statusLabel = {
@@ -18,7 +24,6 @@ const statusLabel = {
 export default function SupportAdmin() {
   const scrollRef = useRef(null);
   const queueChannelRef = useRef(null);
-  const chatChannelRef = useRef(null);
   const activeIdRef = useRef("");
   const [connected, setConnected] = useState(false);
   const [conversations, setConversations] = useState([]);
@@ -45,48 +50,52 @@ export default function SupportAdmin() {
 
     const loadQueue = async () => {
       try {
-        const data = await supportApi("conversations");
+        const items = await listConversations();
         if (cancelled) return;
-        setConversations(data.conversations || []);
-        if (!activeIdRef.current && data.conversations?.length) setActiveId(data.conversations[0].id);
+        setConversations(items);
+        if (!activeIdRef.current && items.length) setActiveId(items[0].id);
       } catch (requestError) {
         setError(requestError.message);
       }
     };
 
-    loadQueue();
-    if (!supabase) {
-      setError("Supabase Realtime environment variables are missing.");
+    if (!hasSupabaseConfig() || !supabase) {
+      setError("Supabase environment variables are missing. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
       return () => {
         cancelled = true;
       };
     }
 
-    const queue = supabase.channel("support:agents", {
-      config: { broadcast: { self: false }, presence: { key: "admin-agent" } }
+    loadQueue();
+    const queue = supabase.channel("support_dashboard_messages", {
+      config: { presence: { key: "admin-agent" } }
     });
     queue
-      .on("broadcast", { event: "conversation" }, ({ payload }) => {
-        if (!payload.conversation) return;
-        setConversations((current) => {
-          const without = current.filter((item) => item.id !== payload.conversation.id);
-          return [payload.conversation, ...without].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-        });
-        if (payload.conversation.id === activeIdRef.current) setActiveConversation(payload.conversation);
-        if ("Notification" in window && payload.conversation.id !== activeIdRef.current && Notification.permission === "granted") {
-          new Notification("New support message", {
-            body: payload.conversation.lastMessage || "A visitor needs support.",
-            tag: payload.conversation.id
-          });
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "support_messages" },
+        async ({ new: row }) => {
+          const message = toMessage(row);
+          if (message.conversationId === activeIdRef.current) {
+            setMessages((current) => mergeById(current, [message]));
+          }
+          await loadQueue();
+          if ("Notification" in window && message.role === "user" && message.conversationId !== activeIdRef.current && Notification.permission === "granted") {
+            new Notification("New support message", {
+              body: message.text || "A visitor sent an attachment.",
+              tag: message.conversationId
+            });
+          }
         }
+      )
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        if (payload.conversationId === activeIdRef.current && payload.role === "user") setTyping(Boolean(payload.typing));
       })
       .subscribe((status) => {
         setConnected(status === "SUBSCRIBED");
         if (status === "SUBSCRIBED") {
           setError("");
           queue.track({ role: "agent", onlineAt: new Date().toISOString() });
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setError("Realtime support is reconnecting.");
         }
       });
     queueChannelRef.current = queue;
@@ -96,52 +105,31 @@ export default function SupportAdmin() {
       cancelled = true;
       window.clearInterval(interval);
       if (queueChannelRef.current) supabase.removeChannel(queueChannelRef.current);
-      if (chatChannelRef.current) supabase.removeChannel(chatChannelRef.current);
     };
   }, []);
 
   useEffect(() => {
     if (!activeId) return;
     let cancelled = false;
-    const supabase = getSupportRealtimeClient();
-
     const loadConversation = async () => {
       try {
-        const data = await supportApi(`conversation?conversationId=${encodeURIComponent(activeId)}`);
+        const items = await listConversations();
+        const active = items.find((item) => item.id === activeId);
+        const history = await loadMessages(activeId);
         if (cancelled) return;
-        setActiveConversation(data.conversation);
-        setMessages(data.messages || []);
-        await supportApi("seen", {
-          method: "POST",
-          body: JSON.stringify({ conversationId: activeId, viewerRole: "agent" })
-        });
+        setActiveConversation(active || null);
+        setConversations(items);
+        setMessages(history);
+        await markMessagesSeen(activeId, ["user"]);
+        if (active) {
+          const updated = await updateConversation(activeId, { unread_for_agent: 0 });
+          setActiveConversation(updated);
+        }
       } catch (requestError) {
         setError(requestError.message);
       }
     };
-
     loadConversation();
-    if (!supabase) return () => { cancelled = true; };
-
-    if (chatChannelRef.current) supabase.removeChannel(chatChannelRef.current);
-    const channel = supabase.channel(supportChannelName(activeId), {
-      config: { broadcast: { self: false }, presence: { key: "admin-agent" } }
-    });
-    channel
-      .on("broadcast", { event: "message" }, ({ payload }) => {
-        setMessages((current) => mergeById(current, [payload.message, payload.botMessage]));
-      })
-      .on("broadcast", { event: "conversation" }, ({ payload }) => {
-        if (payload.conversation) setActiveConversation(payload.conversation);
-      })
-      .on("broadcast", { event: "typing" }, ({ payload }) => {
-        if (payload.role === "user") setTyping(Boolean(payload.typing));
-      })
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") channel.track({ role: "agent", onlineAt: new Date().toISOString() });
-      });
-    chatChannelRef.current = channel;
-
     return () => {
       cancelled = true;
     };
@@ -161,35 +149,44 @@ export default function SupportAdmin() {
     [conversations]
   );
 
-  const publishConversation = async (conversation) => {
-    await chatChannelRef.current?.send({ type: "broadcast", event: "conversation", payload: { conversation } });
-    await queueChannelRef.current?.send({ type: "broadcast", event: "conversation", payload: { conversation } });
-  };
-
   const takeover = async () => {
     if (!activeId) return;
-    const result = await supportApi("takeover", {
-      method: "POST",
-      body: JSON.stringify({ conversationId: activeId })
+    const updated = await updateConversation(activeId, {
+      status: "agent",
+      agent_requested: false,
+      assigned_agent: "admin"
     });
-    setActiveConversation(result.conversation);
-    setMessages((current) => mergeById(current, [result.systemMessage]));
-    await publishConversation(result.conversation);
-    await chatChannelRef.current?.send({ type: "broadcast", event: "message", payload: { message: result.systemMessage } });
+    const systemMessage = await insertMessage({
+      conversationId: activeId,
+      role: "system",
+      author: "System",
+      text: "A support agent has joined the conversation."
+    });
+    setActiveConversation(updated);
+    setMessages((current) => mergeById(current, [systemMessage]));
   };
 
   const sendReply = async () => {
-    const text = reply.trim();
-    if (!text || !activeId) return;
+    const body = reply.trim();
+    if (!body || !activeId) return;
     setReply("");
-    const result = await supportApi("message", {
-      method: "POST",
-      body: JSON.stringify({ conversationId: activeId, role: "agent", text })
+    const message = await insertMessage({ conversationId: activeId, role: "agent", text: body });
+    const updated = await updateConversation(activeId, {
+      status: "agent",
+      last_message: body,
+      unread_for_visitor: Number(activeConversation?.unreadForVisitor || 0) + 1
     });
-    setActiveConversation(result.conversation);
-    setMessages((current) => mergeById(current, [result.message]));
-    await publishConversation(result.conversation);
-    await chatChannelRef.current?.send({ type: "broadcast", event: "message", payload: result });
+    setActiveConversation(updated);
+    setMessages((current) => mergeById(current, [message]));
+  };
+
+  const handleTyping = (value) => {
+    setReply(value);
+    queueChannelRef.current?.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { conversationId: activeId, role: "agent", typing: Boolean(value) }
+    });
   };
 
   return (
@@ -283,7 +280,7 @@ export default function SupportAdmin() {
           <footer className="agent-reply-bar">
             <input
               value={reply}
-              onChange={(event) => setReply(event.target.value)}
+              onChange={(event) => handleTyping(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") sendReply();
               }}

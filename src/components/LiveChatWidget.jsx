@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, CheckCheck, Headset, ImagePlus, Loader2, Paperclip, Send, Sparkles, X } from "lucide-react";
 import {
+  getOrCreateConversation,
   getSupportRealtimeClient,
   hasSupabaseConfig,
+  insertMessage,
+  loadMessages,
+  markMessagesSeen,
   mergeById,
-  supportApi,
-  supportChannelName,
-  supportVisitorId
+  supportAgentsChannel,
+  supportMessagesChannel,
+  supportVisitorId,
+  toMessage,
+  updateConversation
 } from "../services/supportRealtime.js";
 
 const starterPrompts = ["OTP issue", "Password reset", "Membership question", "Payment support", "Human agent"];
@@ -25,10 +31,34 @@ const readFileAttachment = (file) =>
     reader.readAsDataURL(file);
   });
 
+const needsHumanAgent = (text = "") =>
+  /\b(human|agent|support|representative|person|staff|unresolved)\b/i.test(text) ||
+  /\b(still|cannot|can't|failed|broken|not working|no code|no otp)\b/i.test(text);
+
+const botReply = (text = "") => {
+  const normalized = text.toLowerCase();
+  if (needsHumanAgent(normalized)) {
+    return "I will connect you with a support agent. Please keep this chat open while the team reviews your message.";
+  }
+  if (/\botp|verification|code\b/.test(normalized)) {
+    return "For verification code issues, confirm the selected email or phone number, then use Resend Code. If it still does not arrive, request a support agent here.";
+  }
+  if (/password|reset|login|sign in/.test(normalized)) {
+    return "For password recovery, open Forgot password, choose email or SMS, enter the code, and set a new password. I can transfer this chat if it does not work.";
+  }
+  if (/membership|card|silver|gold|vip|premium|apply/.test(normalized)) {
+    return "Membership applications begin from the Apply page. Choose a card level, complete your details, and continue through the guided application flow.";
+  }
+  if (/payment|pay|stripe|paypal|purchase|paid/.test(normalized)) {
+    return "Payments should only be completed through an approved secure payment provider. Do not enter card details manually on the review site.";
+  }
+  return "I can help with verification, password recovery, membership cards, and payment questions. If this needs a person, type agent and I will transfer the conversation.";
+};
+
 export default function LiveChatWidget() {
   const scrollRef = useRef(null);
   const fileRef = useRef(null);
-  const channelRef = useRef(null);
+  const messageChannelRef = useRef(null);
   const agentChannelRef = useRef(null);
   const openRef = useRef(false);
   const visitorId = useMemo(() => supportVisitorId(), []);
@@ -49,58 +79,50 @@ export default function LiveChatWidget() {
     openRef.current = open;
   }, [open]);
 
-  const publish = async (event, payload, channel = channelRef.current) => {
-    if (!channel) return;
-    await channel.send({ type: "broadcast", event, payload });
-  };
-
   useEffect(() => {
     let cancelled = false;
     const supabase = getSupportRealtimeClient();
 
     const start = async () => {
+      if (!hasSupabaseConfig() || !supabase) {
+        setError("Supabase environment variables are missing. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+        setConnected(false);
+        return;
+      }
+
       try {
-        const initial = await supportApi("conversation", {
-          method: "POST",
-          body: JSON.stringify({ visitorId })
-        });
+        const activeConversation = await getOrCreateConversation(visitorId);
         if (cancelled) return;
-        setConversation(initial.conversation);
-        setMessages(initial.messages || []);
+        setConversation(activeConversation);
+        setMessages(await loadMessages(activeConversation.id));
 
-        if (!supabase) {
-          setConnected(false);
-          setError("Realtime support is waiting for Supabase configuration.");
-          return;
-        }
-
-        const chatChannel = supabase.channel(supportChannelName(initial.conversation.id), {
-          config: { broadcast: { self: false }, presence: { key: visitorId } }
-        });
-        chatChannel
-          .on("broadcast", { event: "message" }, ({ payload }) => {
-            setMessages((current) => mergeById(current, [payload.message, payload.botMessage]));
-            if (!openRef.current && payload.message?.role !== "user") setUnread((count) => count + 1);
-          })
-          .on("broadcast", { event: "conversation" }, ({ payload }) => {
-            if (payload.conversation) setConversation(payload.conversation);
-          })
+        const messageChannel = supabase.channel(supportMessagesChannel(activeConversation.id));
+        messageChannel
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "support_messages",
+              filter: `conversation_id=eq.${activeConversation.id}`
+            },
+            ({ new: row }) => {
+              const message = toMessage(row);
+              setMessages((current) => mergeById(current, [message]));
+              if (!openRef.current && message.role !== "user") setUnread((count) => count + 1);
+            }
+          )
           .on("broadcast", { event: "typing" }, ({ payload }) => {
             if (payload.role !== "user") setTyping(payload.typing ? payload.role : "");
           })
           .subscribe((status) => {
             setConnected(status === "SUBSCRIBED");
-            if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-              setError("Realtime support is reconnecting.");
-            } else if (status === "SUBSCRIBED") {
-              setError("");
-              chatChannel.track({ role: "visitor", onlineAt: new Date().toISOString() });
-            }
+            if (status === "SUBSCRIBED") setError("");
           });
-        channelRef.current = chatChannel;
+        messageChannelRef.current = messageChannel;
 
-        const agentsChannel = supabase.channel("support:agents", {
-          config: { presence: { key: visitorId }, broadcast: { self: false } }
+        const agentsChannel = supabase.channel(supportAgentsChannel, {
+          config: { presence: { key: visitorId } }
         });
         agentsChannel.on("presence", { event: "sync" }, () => {
           const state = agentsChannel.presenceState();
@@ -116,7 +138,7 @@ export default function LiveChatWidget() {
     start();
     return () => {
       cancelled = true;
-      if (channelRef.current) supabase?.removeChannel(channelRef.current);
+      if (messageChannelRef.current) supabase?.removeChannel(messageChannelRef.current);
       if (agentChannelRef.current) supabase?.removeChannel(agentChannelRef.current);
     };
   }, [visitorId]);
@@ -130,16 +152,8 @@ export default function LiveChatWidget() {
   useEffect(() => {
     if (!open || !conversation?.id) return;
     setUnread(0);
-    supportApi("seen", {
-      method: "POST",
-      body: JSON.stringify({ conversationId: conversation.id, viewerRole: "visitor" })
-    })
-      .then((data) => {
-        setConversation(data.conversation);
-        setMessages(data.messages || []);
-        publish("conversation", { conversation: data.conversation });
-      })
-      .catch(() => {});
+    markMessagesSeen(conversation.id, ["agent", "bot"]).catch(() => {});
+    updateConversation(conversation.id, { unread_for_visitor: 0 }).then(setConversation).catch(() => {});
   }, [conversation?.id, open]);
 
   useEffect(() => {
@@ -148,28 +162,53 @@ export default function LiveChatWidget() {
 
   const sendMessage = async (overrideText = "") => {
     const body = (overrideText || text).trim();
-    if ((!body && !attachments.length) || sending) return;
+    if ((!body && !attachments.length) || sending || !conversation?.id) return;
     setSending(true);
     setText("");
     const outgoingAttachments = attachments;
     setAttachments([]);
 
     try {
-      const result = await supportApi("message", {
-        method: "POST",
-        body: JSON.stringify({
-          conversationId: conversation?.id,
-          visitorId,
-          role: "user",
-          text: body,
-          attachments: outgoingAttachments
-        })
+      const userMessage = await insertMessage({
+        conversationId: conversation.id,
+        role: "user",
+        text: body,
+        attachments: outgoingAttachments
       });
-      setConversation(result.conversation);
-      setMessages((current) => mergeById(current, [result.message, result.botMessage]));
-      await publish("message", result);
-      await publish("conversation", { conversation: result.conversation });
-      await agentChannelRef.current?.send({ type: "broadcast", event: "conversation", payload: { conversation: result.conversation } });
+      setMessages((current) => mergeById(current, [userMessage]));
+
+      const transferNeeded = needsHumanAgent(body);
+      const updated = await updateConversation(conversation.id, {
+        last_message: body || (outgoingAttachments.length ? "File attachment" : ""),
+        status: transferNeeded ? "waiting_agent" : conversation.status || "bot",
+        agent_requested: transferNeeded || conversation.agentRequested,
+        unread_for_agent: Number(conversation.unreadForAgent || 0) + 1
+      });
+      setConversation(updated);
+
+      await messageChannelRef.current?.send({
+        type: "broadcast",
+        event: "typing",
+        payload: { conversationId: conversation.id, role: "bot", typing: true }
+      });
+      window.setTimeout(async () => {
+        try {
+          const reply = botReply(body);
+          const botMessage = await insertMessage({ conversationId: conversation.id, role: "bot", text: reply });
+          setMessages((current) => mergeById(current, [botMessage]));
+          const afterBot = await updateConversation(conversation.id, {
+            last_message: reply,
+            unread_for_visitor: Number(updated.unreadForVisitor || 0) + 1
+          });
+          setConversation(afterBot);
+        } finally {
+          messageChannelRef.current?.send({
+            type: "broadcast",
+            event: "typing",
+            payload: { conversationId: conversation.id, role: "bot", typing: false }
+          });
+        }
+      }, 450);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -179,7 +218,11 @@ export default function LiveChatWidget() {
 
   const handleTyping = (value) => {
     setText(value);
-    publish("typing", { conversationId: conversation?.id, role: "user", typing: Boolean(value) });
+    messageChannelRef.current?.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { conversationId: conversation?.id, role: "user", typing: Boolean(value) }
+    });
   };
 
   const handleFiles = async (event) => {
@@ -209,8 +252,8 @@ export default function LiveChatWidget() {
             <span className="mini-eyebrow">Concierge Support</span>
             <h2>Keanu Reeves Company</h2>
             <p>
-              <span className={agentOnline ? "support-dot online" : "support-dot"} />
-              {agentOnline ? "Agent available" : connected || hasSupabaseConfig() ? "AI support available" : "Realtime setup required"}
+              <span className={connected ? "support-dot online" : "support-dot"} />
+              {connected ? (agentOnline ? "Agent available" : "Online support available") : "Support initializing"}
             </p>
           </div>
           <button className="icon-button" type="button" onClick={() => setOpen(false)} aria-label="Close live support">
@@ -296,7 +339,7 @@ export default function LiveChatWidget() {
             onKeyDown={(event) => {
               if (event.key === "Enter") sendMessage();
             }}
-            placeholder={connected ? "Type your message" : "Connecting to support"}
+            placeholder="Type your message..."
           />
           <button className="send-chat" type="button" onClick={() => sendMessage()} aria-label="Send message" disabled={sending}>
             {sending ? <Loader2 className="spin" size={18} /> : <Send size={18} />}
