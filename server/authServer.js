@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isAllowedPhoneCountry, isAllowedPhoneNumber } from "../src/data/phoneCountries.js";
+import { generateSupportAssistantReply } from "../serverless/supportAssistant.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
@@ -671,6 +672,16 @@ app.post("/api/auth/reset-password", async (req, res) => {
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.post("/api/support/assistant", async (req, res) => {
+  try {
+    const reply = await generateSupportAssistantReply({ messages: req.body?.messages || [] });
+    return res.json({ reply });
+  } catch (error) {
+    console.error("[support/assistant]", { message: error?.message });
+    return res.status(500).json({ reply: "A concierge specialist can assist further." });
+  }
 });
 
 await seedAdminFromEnvironment();

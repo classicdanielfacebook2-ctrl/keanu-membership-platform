@@ -35,24 +35,20 @@ const needsHumanAgent = (text = "") =>
   /\b(human|agent|support|representative|person|staff|unresolved)\b/i.test(text) ||
   /\b(still|cannot|can't|failed|broken|not working|no code|no otp)\b/i.test(text);
 
-const botReply = (text = "") => {
-  const normalized = text.toLowerCase();
-  if (needsHumanAgent(normalized)) {
-    return "A concierge specialist can assist further.";
-  }
-  if (/\botp|verification|code\b/.test(normalized)) {
-    return "Your verification request has been received.";
-  }
-  if (/password|reset|login|sign in/.test(normalized)) {
-    return "Please confirm the registered contact method.";
-  }
-  if (/membership|card|silver|gold|vip|premium|apply/.test(normalized)) {
-    return "We’re checking that for you.";
-  }
-  if (/payment|pay|stripe|paypal|purchase|paid/.test(normalized)) {
-    return "Your payment inquiry is noted.";
-  }
-  return "Your account status appears active.";
+const getAssistantReply = async (history) => {
+  const response = await fetch("/api/support/assistant", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: history.slice(-14).map((message) => ({
+        role: message.role,
+        text: message.text
+      }))
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error || "Concierge assistant is unavailable.");
+  return data?.reply || "A concierge specialist can assist further.";
 };
 
 export default function LiveChatWidget() {
@@ -175,6 +171,7 @@ export default function LiveChatWidget() {
         text: body,
         attachments: outgoingAttachments
       });
+      const assistantHistory = mergeById(messages, [userMessage]);
       setMessages((current) => mergeById(current, [userMessage]));
 
       const transferNeeded = needsHumanAgent(body);
@@ -194,7 +191,7 @@ export default function LiveChatWidget() {
       });
       window.setTimeout(async () => {
         try {
-          const reply = botReply(body);
+          const reply = await getAssistantReply(assistantHistory);
           const botMessage = await insertMessage({ conversationId: conversation.id, role: "bot", text: reply });
           setMessages((current) => mergeById(current, [botMessage]));
           const afterBot = await updateConversation(conversation.id, {
@@ -202,6 +199,11 @@ export default function LiveChatWidget() {
             unread_for_visitor: Number(updated.unreadForVisitor || 0) + 1
           });
           setConversation(afterBot);
+        } catch {
+          const fallback = "A concierge specialist can assist further.";
+          const botMessage = await insertMessage({ conversationId: conversation.id, role: "bot", text: fallback });
+          setMessages((current) => mergeById(current, [botMessage]));
+          setConversation(await updateConversation(conversation.id, { last_message: fallback }));
         } finally {
           setTyping("");
           messageChannelRef.current?.send({
@@ -210,7 +212,7 @@ export default function LiveChatWidget() {
             payload: { conversationId: conversation.id, role: "bot", typing: false }
           });
         }
-      }, 450);
+      }, 650);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
