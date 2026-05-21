@@ -22,18 +22,21 @@ export default async function handler(req, res) {
 
   try {
     const fullName = String(req.body?.fullName || "").trim();
-    const identifier = normalizeAuthIdentifier(req.body?.identifier);
+    const email = normalizeAuthIdentifier(req.body?.email || req.body?.identifier);
+    const phone = normalizeAuthIdentifier(req.body?.phone);
+    const verificationMethod = req.body?.verificationMethod === "sms" ? "sms" : "email";
+    const identifier = verificationMethod === "sms" ? phone : email;
     const password = String(req.body?.password || "");
 
-    if (!fullName || !identifier || password.length < 8) {
+    if (!fullName || !email || !phone || password.length < 8) {
       return sendJson(res, 400, {
-        error: "Full name, email or phone number, and a password of at least 8 characters are required."
+        error: "Full name, email address, phone number, and a password of at least 8 characters are required."
       });
     }
 
-    if (!isEmailIdentifier(identifier) && !isPhoneIdentifier(identifier)) {
+    if (!isEmailIdentifier(email) || !isPhoneIdentifier(phone)) {
       return sendJson(res, 400, {
-        error: "Enter a valid email address or an international phone number starting with +."
+        error: "Enter a valid email address and an international phone number starting with +."
       });
     }
 
@@ -43,7 +46,7 @@ export default async function handler(req, res) {
     await cleanupExpiredOtpUsers(users);
     await cleanupExpiredRegistrationIntents(intents);
 
-    const existing = await users.findOne({ identifier });
+    const existing = await users.findOne({ $or: [{ identifier }, { email }, { phone }] });
     if (isUserVerified(existing)) {
       return sendJson(res, 409, { error: "An account already exists for that email or phone number." });
     }
@@ -52,11 +55,13 @@ export default async function handler(req, res) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const channel = getVerificationChannel(identifier);
+    const channel = verificationMethod === "sms" ? "sms" : getVerificationChannel(identifier);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     const pendingRegistration = {
       fullName,
       identifier,
+      email,
+      phone,
       passwordHash,
       role: "user",
       channel,

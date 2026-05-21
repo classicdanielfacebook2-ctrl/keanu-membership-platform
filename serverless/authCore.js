@@ -131,6 +131,8 @@ export const publicUser = (user) =>
         id: String(user._id),
         fullName: user.fullName,
         identifier: user.identifier,
+        email: user.email,
+        phone: user.phone,
         role: user.role,
         verified: isUserVerified(user),
         isVerified: isUserVerified(user)

@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     }
 
     const users = await getUsersCollection();
-    const user = await users.findOne({ identifier });
+    const user = await users.findOne({ $or: [{ identifier }, { email: identifier }, { phone: identifier }] });
     const channel = getVerificationChannel(identifier);
 
     if (!user) {
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
         return sendJson(res, 401, { error: "Invalid reset code." });
       }
     } else {
-      const verification = await checkTwilioSmsOtp({ to: user.identifier, code: resetCode });
+      const verification = await checkTwilioSmsOtp({ to: identifier, code: resetCode });
       if (verification.status !== "approved") {
         return sendJson(res, 401, { error: "Invalid reset code." });
       }

@@ -59,6 +59,8 @@ export default async function handler(req, res) {
     const result = await users.insertOne({
       fullName: pending.fullName,
       identifier: pending.identifier,
+      email: pending.email,
+      phone: pending.phone,
       passwordHash: pending.passwordHash,
       role: pending.role || "user",
       verified: true,

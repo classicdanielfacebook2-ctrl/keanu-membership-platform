@@ -26,14 +26,14 @@ export default async function handler(req, res) {
 
     if (identifier && (isEmail || isPhone)) {
       const users = await getUsersCollection();
-      const user = await users.findOne({ identifier });
+      const user = await users.findOne({ $or: [{ identifier }, { email: identifier }, { phone: identifier }] });
 
       if (user) {
         const channel = getVerificationChannel(identifier);
 
         try {
           if (channel === "sms") {
-            await sendTwilioSmsOtp({ to: user.identifier });
+            await sendTwilioSmsOtp({ to: identifier });
           } else {
             const resetFields = await createPasswordResetFields();
             await users.updateOne(

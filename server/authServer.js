@@ -33,6 +33,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     full_name TEXT NOT NULL,
     identifier TEXT NOT NULL UNIQUE,
+    email TEXT,
+    phone TEXT,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user',
     verified INTEGER NOT NULL DEFAULT 0,
@@ -49,6 +51,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     full_name TEXT NOT NULL,
     identifier TEXT NOT NULL UNIQUE,
+    email TEXT,
+    phone TEXT,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user',
     channel TEXT NOT NULL,
@@ -67,12 +71,16 @@ const ensureColumn = (table, column, definition) => {
 };
 
 ensureColumn("users", "verified", "INTEGER NOT NULL DEFAULT 0");
+ensureColumn("users", "email", "TEXT");
+ensureColumn("users", "phone", "TEXT");
 ensureColumn("users", "otp_hash", "TEXT");
 ensureColumn("users", "otp_expires_at", "TEXT");
 ensureColumn("users", "otp_attempts", "INTEGER NOT NULL DEFAULT 0");
 ensureColumn("users", "reset_code_hash", "TEXT");
 ensureColumn("users", "reset_expires_at", "TEXT");
 ensureColumn("users", "reset_attempts", "INTEGER NOT NULL DEFAULT 0");
+ensureColumn("registration_intents", "email", "TEXT");
+ensureColumn("registration_intents", "phone", "TEXT");
 
 const JWT_SECRET = process.env.AUTH_JWT_SECRET || "replace-this-secret-before-production";
 const COOKIE_NAME = "kr_membership_session";
@@ -111,6 +119,8 @@ const publicUser = (user) =>
         id: user.id,
         fullName: user.full_name,
         identifier: user.identifier,
+        email: user.email,
+        phone: user.phone,
         role: user.role,
         verified: Boolean(user.verified)
       }
@@ -141,7 +151,7 @@ const clearSessionCookie = (res) => {
 };
 
 const findUserByIdentifier = (identifier) =>
-  db.prepare("SELECT * FROM users WHERE identifier = ?").get(identifier);
+  db.prepare("SELECT * FROM users WHERE identifier = ? OR email = ? OR phone = ?").get(identifier, identifier, identifier);
 
 const findUserById = (id) => db.prepare("SELECT * FROM users WHERE id = ?").get(id);
 const findRegistrationIntent = (identifier) =>
@@ -385,18 +395,21 @@ const requireAuth = (req, res, next) => {
 
 app.post("/api/auth/register", async (req, res) => {
   const fullName = String(req.body.fullName || "").trim();
-  const identifier = normalizeAuthIdentifier(req.body.identifier);
+  const email = normalizeAuthIdentifier(req.body.email || req.body.identifier);
+  const phone = normalizeAuthIdentifier(req.body.phone);
+  const verificationMethod = req.body.verificationMethod === "sms" ? "sms" : "email";
+  const identifier = verificationMethod === "sms" ? phone : email;
   const password = String(req.body.password || "");
 
-  if (!fullName || !identifier || password.length < 8) {
+  if (!fullName || !email || !phone || password.length < 8) {
     return res.status(400).json({
-      error: "Full name, email or phone, and a password of at least 8 characters are required."
+      error: "Full name, email address, phone number, and a password of at least 8 characters are required."
     });
   }
 
-  if (!isEmailIdentifier(identifier) && !isPhoneIdentifier(identifier)) {
+  if (!isEmailIdentifier(email) || !isPhoneIdentifier(phone)) {
     return res.status(400).json({
-      error: "Enter a valid email address or an international phone number starting with +."
+      error: "Enter a valid email address and an international phone number starting with +."
     });
   }
 
@@ -411,7 +424,7 @@ app.post("/api/auth/register", async (req, res) => {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const channel = getVerificationChannel(identifier);
+  const channel = verificationMethod === "sms" ? "sms" : getVerificationChannel(identifier);
   let expiresAt = new Date(Date.now() + OTP_EXPIRES_MINUTES * 60 * 1000).toISOString();
   let otpHash = null;
   let otp = "";
@@ -423,8 +436,8 @@ app.post("/api/auth/register", async (req, res) => {
 
   db.prepare("DELETE FROM registration_intents WHERE identifier = ?").run(identifier);
   db.prepare(
-    "INSERT INTO registration_intents (full_name, identifier, password_hash, role, channel, otp_hash, otp_attempts, expires_at) VALUES (?, ?, ?, 'user', ?, ?, 0, ?)"
-  ).run(fullName, identifier, passwordHash, channel, otpHash, expiresAt);
+    "INSERT INTO registration_intents (full_name, identifier, email, phone, password_hash, role, channel, otp_hash, otp_attempts, expires_at) VALUES (?, ?, ?, ?, ?, 'user', ?, ?, 0, ?)"
+  ).run(fullName, identifier, email, phone, passwordHash, channel, otpHash, expiresAt);
 
   try {
     if (channel === "sms") {
@@ -511,8 +524,8 @@ app.post("/api/auth/verify-otp", async (req, res) => {
   }
 
   const result = db
-    .prepare("INSERT INTO users (full_name, identifier, password_hash, role, verified) VALUES (?, ?, ?, ?, 1)")
-    .run(pending.full_name, pending.identifier, pending.password_hash, pending.role || "user");
+    .prepare("INSERT INTO users (full_name, identifier, email, phone, password_hash, role, verified) VALUES (?, ?, ?, ?, ?, ?, 1)")
+    .run(pending.full_name, pending.identifier, pending.email, pending.phone, pending.password_hash, pending.role || "user");
   db.prepare("DELETE FROM registration_intents WHERE id = ?").run(pending.id);
   const verifiedUser = findUserById(result.lastInsertRowid);
   const token = signToken(verifiedUser);
@@ -568,7 +581,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
       const channel = getVerificationChannel(identifier);
       try {
         if (channel === "sms") {
-          await sendTwilioSmsOtp({ to: user.identifier });
+          await sendTwilioSmsOtp({ to: identifier });
         } else {
           const { resetCode } = await createPasswordResetForUser(user.id);
           await sendPasswordResetEmail({ to: user.identifier, fullName: user.full_name, resetCode });
@@ -620,7 +633,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
       return res.status(401).json({ error: "Invalid reset code." });
     }
   } else {
-    const verification = await checkTwilioSmsOtp({ to: user.identifier, code: resetCode });
+    const verification = await checkTwilioSmsOtp({ to: identifier, code: resetCode });
     if (verification.status !== "approved") {
       return res.status(401).json({ error: "Invalid reset code." });
     }

@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     const identifier = normalizeAuthIdentifier(req.body?.identifier);
     const password = String(req.body?.password || "");
     const users = await getUsersCollection();
-    const user = await users.findOne({ identifier });
+    const user = await users.findOne({ $or: [{ identifier }, { email: identifier }, { phone: identifier }] });
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       return sendJson(res, 401, { error: "Invalid email/phone or password." });
