@@ -114,6 +114,16 @@ const findUserByIdentifier = (identifier) =>
 
 const findUserById = (id) => db.prepare("SELECT * FROM users WHERE id = ?").get(id);
 
+const cleanupExpiredOtpUsers = () => {
+  const result = db
+    .prepare("DELETE FROM users WHERE verified = 0 AND otp_expires_at IS NOT NULL AND otp_expires_at < ?")
+    .run(new Date().toISOString());
+
+  if (result.changes > 0) {
+    console.log(`Removed ${result.changes} expired unverified registration draft(s).`);
+  }
+};
+
 const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
 const escapeHtml = (value = "") =>
   String(value).replace(/[&<>"']/g, (character) => {
@@ -254,8 +264,13 @@ app.post("/api/auth/register", async (req, res) => {
     return res.status(400).json({ error: "A valid email address is required for account verification." });
   }
 
-  if (findUserByIdentifier(identifier)) {
+  cleanupExpiredOtpUsers();
+  const existing = findUserByIdentifier(identifier);
+  if (existing?.verified) {
     return res.status(409).json({ error: "An account already exists for that email or phone." });
+  }
+  if (existing) {
+    db.prepare("DELETE FROM users WHERE id = ?").run(existing.id);
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -324,7 +339,8 @@ app.post("/api/auth/verify-otp", async (req, res) => {
   }
 
   if (Date.now() > Date.parse(user.otp_expires_at)) {
-    return res.status(400).json({ error: "Verification code expired. Request a new code." });
+    db.prepare("DELETE FROM users WHERE id = ?").run(user.id);
+    return res.status(400).json({ error: "Verification code expired. Please register again to receive a new code." });
   }
 
   if (user.otp_attempts >= 5) {

@@ -3,6 +3,7 @@ import {
   getUsersCollection,
   handleApiError,
   isEmailIdentifier,
+  isUserVerified,
   methodNotAllowed,
   normalizeIdentifier,
   sendJson,
@@ -18,7 +19,7 @@ export default async function handler(req, res) {
     const user = await users.findOne({ identifier });
 
     if (!user) return sendJson(res, 404, { error: "Account not found." });
-    if (user.verified) return sendJson(res, 200, { ok: true, message: "Account is already verified." });
+    if (isUserVerified(user)) return sendJson(res, 200, { ok: true, message: "Account is already verified." });
     if (!isEmailIdentifier(user.identifier)) {
       return sendJson(res, 400, { error: "A valid email address is required for verification." });
     }

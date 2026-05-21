@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import {
   getUsersCollection,
   handleApiError,
+  isUserVerified,
   methodNotAllowed,
   normalizeIdentifier,
   publicUser,
@@ -23,7 +24,7 @@ export default async function handler(req, res) {
       return sendJson(res, 401, { error: "Invalid email/phone or password." });
     }
 
-    if (!user.verified) {
+    if (!isUserVerified(user)) {
       return sendJson(res, 403, {
         error: "Please verify your email before logging in.",
         verificationRequired: true,

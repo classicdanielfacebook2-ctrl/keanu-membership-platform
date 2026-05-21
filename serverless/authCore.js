@@ -60,6 +60,19 @@ export const getUsersCollection = async () => {
   }
 };
 
+export const isUserVerified = (user) => Boolean(user?.isVerified || user?.verified);
+
+export const cleanupExpiredOtpUsers = async (users) => {
+  const result = await users.deleteMany({
+    otpExpiresAt: { $lt: new Date() },
+    $or: [{ isVerified: false }, { isVerified: { $exists: false }, verified: { $ne: true } }]
+  });
+
+  if (result.deletedCount > 0) {
+    console.log("[auth/cleanup]", { expiredUnverifiedUsersDeleted: result.deletedCount });
+  }
+};
+
 export const logApiError = (scope, error) => {
   console.error(`[${scope}]`, {
     message: error?.message,
@@ -91,7 +104,8 @@ export const publicUser = (user) =>
         fullName: user.fullName,
         identifier: user.identifier,
         role: user.role,
-        verified: Boolean(user.verified)
+        verified: isUserVerified(user),
+        isVerified: isUserVerified(user)
       }
     : null;
 

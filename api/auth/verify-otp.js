@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import {
   getUsersCollection,
   handleApiError,
+  isUserVerified,
   methodNotAllowed,
   normalizeIdentifier,
   publicUser,
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
 
     if (!user) return sendJson(res, 404, { error: "Account not found." });
 
-    if (user.verified) {
+    if (isUserVerified(user)) {
       setSessionCookie(res, signToken(user));
       return sendJson(res, 200, { user: publicUser(user), message: "Account already verified." });
     }
@@ -31,7 +32,10 @@ export default async function handler(req, res) {
     }
 
     if (Date.now() > new Date(user.otpExpiresAt).getTime()) {
-      return sendJson(res, 400, { error: "Verification code expired. Request a new code." });
+      await users.deleteOne({ _id: user._id });
+      return sendJson(res, 400, {
+        error: "Verification code expired. Please register again to receive a new code."
+      });
     }
 
     if ((user.otpAttempts || 0) >= 5) {
@@ -46,7 +50,7 @@ export default async function handler(req, res) {
 
     await users.updateOne(
       { _id: user._id },
-      { $set: { verified: true, otpAttempts: 0 }, $unset: { otpHash: "", otpExpiresAt: "" } }
+      { $set: { verified: true, isVerified: true, otpAttempts: 0 }, $unset: { otpHash: "", otpExpiresAt: "" } }
     );
     const verifiedUser = await users.findOne({ _id: user._id });
     setSessionCookie(res, signToken(verifiedUser));
