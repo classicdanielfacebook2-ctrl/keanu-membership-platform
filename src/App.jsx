@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   MessagesSquare,
+  ShieldAlert,
   Sparkles,
   ShieldCheck,
   X
@@ -22,6 +23,8 @@ import Payment from "./pages/Payment.jsx";
 import Support from "./pages/Support.jsx";
 import Admin from "./pages/Admin.jsx";
 import SupportAdmin from "./pages/SupportAdmin.jsx";
+import ProtectionCenter from "./pages/ProtectionCenter.jsx";
+import ProtectionAdmin from "./pages/ProtectionAdmin.jsx";
 import PolicyPage from "./pages/PolicyPage.jsx";
 import Journey from "./pages/Journey.jsx";
 import MediaReview from "./pages/MediaReview.jsx";
@@ -37,12 +40,14 @@ const navItems = [
   { to: "/cards", label: "Cards", icon: CreditCard },
   { to: "/apply", label: "Apply", icon: FileText },
   { to: "/payment", label: "Payment", icon: ShieldCheck },
-  { to: "/support", label: "Support", icon: Headset }
+  { to: "/support", label: "Support", icon: Headset },
+  { to: "/protection", label: "Protection", icon: ShieldAlert }
 ];
 
 const adminNavItems = [
   { to: "/admin", label: "Admin", icon: LayoutDashboard },
   { to: "/admin/support", label: "Support Desk", icon: MessagesSquare },
+  { to: "/admin/protection", label: "Protection", icon: ShieldAlert },
   { to: "/media-review", label: "Media", icon: Image }
 ];
 
@@ -146,6 +151,7 @@ export default function App() {
           <Route path="/apply" element={<Apply />} />
           <Route path="/payment" element={<Payment />} />
           <Route path="/support" element={<Support />} />
+          <Route path="/protection" element={<ProtectionCenter />} />
           <Route
             path="/admin"
             element={
@@ -159,6 +165,14 @@ export default function App() {
             element={
               <ProtectedRoute adminOnly>
                 <SupportAdmin />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/protection"
+            element={
+              <ProtectedRoute adminOnly>
+                <ProtectionAdmin />
               </ProtectedRoute>
             }
           />
