@@ -2,6 +2,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { createClient } from "@supabase/supabase-js";
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -98,6 +99,7 @@ const RESET_EXPIRES_MINUTES = 15;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const OTP_FROM_EMAIL = "verification@keanureeves.company";
 const COMPANY_NAME = "Keanu Reeves Company";
+const PASSWORD_RECOVERY_REDIRECT = "https://www.keanureeves.company/reset-password/update";
 
 if (isProduction && !process.env.AUTH_JWT_SECRET) {
   throw new Error("AUTH_JWT_SECRET must be set before running authentication in production.");
@@ -345,6 +347,17 @@ const sendPasswordResetEmail = async ({ to, fullName, resetCode }) => {
   return data;
 };
 
+const getSupabaseAuthClient = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  if (!url || !anonKey) {
+    throw new Error("Supabase Auth environment variables are not configured.");
+  }
+  return createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+};
+
 const seedAdminFromEnvironment = async () => {
   const fullName = String(process.env.ADMIN_FULL_NAME || "Management Admin").trim();
   const identifier = normalizeIdentifier(process.env.ADMIN_IDENTIFIER);
@@ -589,31 +602,74 @@ app.get("/api/auth/me", requireAuth, (req, res) => {
 
 app.post("/api/auth/forgot-password", async (req, res) => {
   const identifier = normalizeAuthIdentifier(req.body.identifier);
-  const isEmail = isEmailIdentifier(identifier);
-  const isPhone = isPhoneIdentifier(identifier);
-  const neutralMessage = isPhone
-    ? "If this phone number is registered, we sent a reset code by SMS."
-    : "If this email is registered, we sent a reset link/code to your email address.";
 
-  if (identifier && (isEmail || (isPhone && isAllowedPhoneNumber(identifier)))) {
-    const user = findUserByIdentifier(identifier);
-    if (user) {
-      const channel = getVerificationChannel(identifier);
-      try {
-        if (channel === "sms") {
-          await sendTwilioSmsOtp({ to: identifier });
-        } else {
-          const { resetCode } = await createPasswordResetForUser(user.id);
-          await sendPasswordResetEmail({ to: user.identifier, fullName: user.full_name, resetCode });
-        }
-        console.log("Password reset email sent");
-      } catch (error) {
-        console.error("Password reset email failed", { message: error.message });
-      }
-    }
+  if (!isEmailIdentifier(identifier)) {
+    return res.status(400).json({ error: "Enter a valid email address." });
   }
 
-  return res.json({ ok: true, message: neutralMessage });
+  const user = findUserByIdentifier(identifier);
+  if (!user) {
+    return res.status(404).json({ error: "No account was found for that email address." });
+  }
+
+  try {
+    const supabase = getSupabaseAuthClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(identifier, {
+      redirectTo: PASSWORD_RECOVERY_REDIRECT
+    });
+    if (error) {
+      return res.status(error.status === 429 ? 429 : 400).json({
+        error:
+          error.status === 429
+            ? "Too many recovery requests. Please wait before trying again."
+            : error.message || "Password recovery could not be started."
+      });
+    }
+    console.log("Password reset email sent");
+    return res.json({
+      ok: true,
+      message: "A secure password recovery link has been sent to your registered email address."
+    });
+  } catch (error) {
+    console.error("Password reset email failed", { message: error.message });
+    return res.status(500).json({ error: error.message || "Password recovery could not be started." });
+  }
+});
+
+app.post("/api/auth/supabase-reset-password", async (req, res) => {
+  const authorization = req.headers.authorization || "";
+  const accessToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  const password = String(req.body?.password || "");
+
+  if (!accessToken) {
+    return res.status(401).json({ error: "Recovery session is missing or expired." });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ error: "Enter a new password with at least 8 characters." });
+  }
+
+  try {
+    const supabase = getSupabaseAuthClient();
+    const { data, error } = await supabase.auth.getUser(accessToken);
+    if (error || !data?.user?.email) {
+      return res.status(401).json({ error: "Recovery link expired. Please request a new password recovery email." });
+    }
+
+    const email = normalizeAuthIdentifier(data.user.email);
+    const user = findUserByIdentifier(email);
+    if (!user) {
+      return res.status(404).json({ error: "Account not found for this recovery link." });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    db.prepare(
+      "UPDATE users SET password_hash = ?, reset_code_hash = NULL, reset_expires_at = NULL, reset_attempts = 0 WHERE id = ?"
+    ).run(passwordHash, user.id);
+    return res.json({ ok: true, message: "Password updated. You can now sign in." });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Password could not be updated." });
+  }
 });
 
 app.post("/api/auth/reset-password", async (req, res) => {

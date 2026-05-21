@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { forgotPassword, resetPassword } from "../services/authApi.js";
+import { preparePasswordRecoverySession, updateRecoveredPassword } from "../services/supabasePasswordReset.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { allowedPhoneCountries, getAllowedPhoneCountry, getCountryFlag } from "../data/phoneCountries.js";
 import { getApprovedHomeImages } from "../data/homeImages.js";
@@ -11,6 +12,7 @@ export default function AuthPage({ mode }) {
   const isRegister = mode === "register";
   const isForgot = mode === "forgot";
   const isReset = mode === "reset";
+  const isUpdatePassword = mode === "updatePassword";
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const auth = useAuth();
@@ -20,7 +22,8 @@ export default function AuthPage({ mode }) {
     phone: "",
     countryIso: "US",
     recoveryIdentifier: "",
-    password: ""
+    password: "",
+    confirmPassword: ""
   });
   const [method, setMethod] = useState("email");
   const [otp, setOtp] = useState("");
@@ -40,6 +43,28 @@ export default function AuthPage({ mode }) {
   const selectedCountry = getAllowedPhoneCountry(form.countryIso);
   const phoneIdentifier = `${selectedCountry.callingCode}${cleanPhone(form.phone)}`;
   const selectedIdentifier = isForgot ? form.recoveryIdentifier.trim() : method === "sms" ? phoneIdentifier : form.email.trim();
+
+  useEffect(() => {
+    if (!isUpdatePassword) return;
+    let cancelled = false;
+    setSubmitting(true);
+    setError("");
+
+    preparePasswordRecoverySession()
+      .then(() => {
+        if (!cancelled) setMessage("Recovery link verified. Enter a new password to continue.");
+      })
+      .catch((requestError) => {
+        if (!cancelled) setError(requestError.message);
+      })
+      .finally(() => {
+        if (!cancelled) setSubmitting(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isUpdatePassword]);
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -67,6 +92,14 @@ export default function AuthPage({ mode }) {
       if (isForgot) {
         const data = await forgotPassword({ identifier: selectedIdentifier });
         setMessage(data.message);
+      } else if (isUpdatePassword) {
+        if (form.password !== form.confirmPassword) {
+          throw new Error("Passwords do not match.");
+        }
+        const data = await updateRecoveredPassword({ password: form.password });
+        setMessage(data.message || "Password updated. You can now sign in.");
+        updateField("password", "");
+        updateField("confirmPassword", "");
       } else if (isReset) {
         const data = await resetPassword({ identifier: selectedIdentifier, resetCode: otp, password: form.password });
         setMessage(data.message || "Password updated.");
@@ -132,7 +165,7 @@ export default function AuthPage({ mode }) {
     }
   };
 
-  const pageCopy = getAuthCopy({ isRegister, isForgot, isReset, verificationPending });
+  const pageCopy = getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending });
 
   return (
     <section className="auth-page">
@@ -185,12 +218,12 @@ export default function AuthPage({ mode }) {
 
           {!verificationPending && isForgot ? (
             <label htmlFor="recoveryIdentifier">
-              Account Contact
+              Email Address
               <input
                 id="recoveryIdentifier"
                 required
-                type="text"
-                placeholder="Email address or phone number"
+                type="email"
+                placeholder="Enter your email address"
                 value={form.recoveryIdentifier}
                 onChange={(event) => updateField("recoveryIdentifier", event.target.value)}
               />
@@ -215,7 +248,36 @@ export default function AuthPage({ mode }) {
             <PhoneField form={form} updateField={updateField} placeholder="Enter your phone number" />
           ) : null}
 
-          {!verificationPending && !isForgot ? (
+          {!verificationPending && isUpdatePassword ? (
+            <>
+              <label htmlFor="password">
+                New Password
+                <input
+                  id="password"
+                  required
+                  minLength="8"
+                  type="password"
+                  placeholder="Enter your new password"
+                  value={form.password}
+                  onChange={(event) => updateField("password", event.target.value)}
+                />
+              </label>
+              <label htmlFor="confirmPassword">
+                Confirm Password
+                <input
+                  id="confirmPassword"
+                  required
+                  minLength="8"
+                  type="password"
+                  placeholder="Confirm your new password"
+                  value={form.confirmPassword}
+                  onChange={(event) => updateField("confirmPassword", event.target.value)}
+                />
+              </label>
+            </>
+          ) : null}
+
+          {!verificationPending && !isForgot && !isUpdatePassword ? (
             <label htmlFor="password">
               {isReset ? "New Password" : "Password"}
               <input
@@ -257,7 +319,7 @@ export default function AuthPage({ mode }) {
                 ? "Verify Account"
                 : isForgot
                   ? "Continue"
-                  : isReset
+                  : isUpdatePassword || isReset
                     ? "Update Password"
                     : isRegister
                       ? "Create Account"
@@ -285,7 +347,7 @@ export default function AuthPage({ mode }) {
               {isForgot ? (
                 <Link to="/login">Back to sign in</Link>
               ) : null}
-              {isReset ? (
+              {isReset || isUpdatePassword ? (
                 <>
                   <Link to="/forgot-password">Reset password</Link>
                   <Link to="/login">Back to sign in</Link>
@@ -408,7 +470,7 @@ function PhoneField({ form, updateField, placeholder = "Phone number" }) {
   );
 }
 
-function getAuthCopy({ isRegister, isForgot, isReset, verificationPending }) {
+function getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending }) {
   if (verificationPending) {
     return {
       label: "ACCOUNT VERIFICATION",
@@ -429,7 +491,15 @@ function getAuthCopy({ isRegister, isForgot, isReset, verificationPending }) {
     return {
       label: "ACCOUNT RECOVERY",
       heading: "Reset your password",
-      subtitle: "Enter your email address or phone number to continue."
+      subtitle: "Enter your email address to receive a secure recovery link."
+    };
+  }
+
+  if (isUpdatePassword) {
+    return {
+      label: "ACCOUNT RECOVERY",
+      heading: "Create a new password",
+      subtitle: "Enter and confirm your new password to restore account access."
     };
   }
 

@@ -188,6 +188,7 @@ export default function App() {
           <Route path="/register" element={<AuthPage mode="register" />} />
           <Route path="/forgot-password" element={<AuthPage mode="forgot" />} />
           <Route path="/reset-password" element={<AuthPage mode="reset" />} />
+          <Route path="/reset-password/update" element={<AuthPage mode="updatePassword" />} />
           <Route path="/terms" element={<PolicyPage type="terms" />} />
           <Route path="/privacy" element={<PolicyPage type="privacy" />} />
           <Route path="/refund" element={<PolicyPage type="refund" />} />
