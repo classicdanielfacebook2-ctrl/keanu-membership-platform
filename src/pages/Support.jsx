@@ -1,117 +1,141 @@
 import { useState } from "react";
-import { Clock, Mail, MessageCircle, Send, Signal } from "lucide-react";
+import { ChevronDown, Mail, MessageCircle, Send, Sparkles } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { saveSupportMessage } from "../services/storage.js";
 
 const emptyMessage = { name: "", email: "", subject: "", message: "" };
 
-const faqs = [
-  ["How do I get OTP help?", "Open live support and choose OTP issue. The assistant will guide you first, then transfer the chat if needed."],
-  ["Can support help with password reset?", "Yes. Choose password reset in live support or send an email request with the account contact method."],
-  ["Can I speak with a person?", "Yes. Type agent, human, or support in the live chat to request a support takeover."]
+const supportItems = [
+  ["OTP & Verification", "Receive calm guidance for verification codes and account confirmation."],
+  ["Account Recovery", "Reset access with a registered email address or phone number."],
+  ["Membership Assistance", "Get help choosing a card tier or continuing an application."],
+  ["Payment Support", "Review payment status and next steps through approved payment channels."]
 ];
 
 export default function Support() {
   const [form, setForm] = useState(emptyMessage);
   const [sent, setSent] = useState(false);
+  const [openItem, setOpenItem] = useState("OTP & Verification");
 
   const updateField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    // Backend later: route support inquiries to CRM, live chat, or email provider.
     saveSupportMessage(form);
     setForm(emptyMessage);
     setSent(true);
   };
 
   return (
-    <section className="page-section support-page">
+    <section className="page-section support-page support-center">
       <SectionHeader
         eyebrow="Support"
-        title="Premium support for applicants and reviewers."
-        copy="Start with instant AI assistance, then continue with a human support agent when your request needs personal attention."
+        title="Member Services"
+        copy="Private assistance for membership, verification, and account support."
       />
-      <div className="support-layout">
-        <aside className="chat-panel premium-panel">
-          <div className="agent-status">
+
+      <div className="support-center-grid">
+        <aside className="member-support-card">
+          <div className="support-status-bar">
             <span className="status-dot" />
-            <Signal size={17} />
-            Live support desk
+            <strong>Concierge online</strong>
+            <small>Priority assistance available.</small>
           </div>
-          <MessageCircle size={38} />
-          <h3>Speak with an Agent</h3>
-          <p>Average response time: under 10 minutes during support hours.</p>
+
+          <div className="support-preview-mini">
+            <MessageCircle size={20} />
+            <div>
+              <h3>Open Member Support</h3>
+              <p>Start a private conversation with the concierge assistant.</p>
+            </div>
+          </div>
+
           <button className="button primary" type="button" onClick={() => window.dispatchEvent(new Event("open-live-chat"))}>
-            Open Live Chat
+            <Sparkles size={16} />
+            Open Member Support
           </button>
-          <div className="chat-preview" aria-label="Live chat preview placeholder">
-            <div className="chat-preview-header">
-              <span className="status-dot" />
-              <strong>Support Desk</strong>
-              <small>Online</small>
-            </div>
-            <div className="chat-bubble agent">Welcome. I can help with OTP, reset, membership, and payment questions.</div>
-            <div className="chat-bubble user">I need help with my membership card application.</div>
-            <div className="typing-dots" aria-label="Agent typing">
-              <span />
-              <span />
-              <span />
-            </div>
-          </div>
-          <div className="support-meta">
-            <span>
-              <Clock size={16} />
-              Priority review queue
-            </span>
-            <span>
-              <Mail size={16} />
-              support@keanureeves.company
-            </span>
-          </div>
+
+          <a className="support-email-link" href="mailto:support@keanureeves.company">
+            <Mail size={15} />
+            support@keanureeves.company
+          </a>
         </aside>
 
-        <form className="form-panel premium-panel" onSubmit={handleSubmit}>
-          {sent ? <div className="notice success">Support message saved for review.</div> : null}
-          <div className="form-grid">
-            <label htmlFor="supportName">
-              Name
-              <input id="supportName" required value={form.name} onChange={(e) => updateField("name", e.target.value)} />
-            </label>
-            <label htmlFor="supportEmail">
-              Email
-              <input
-                id="supportEmail"
-                required
-                inputMode="email"
-                pattern="[^@\s]+@[^@\s]+\.[^@\s]+"
-                value={form.email}
-                onChange={(e) => updateField("email", e.target.value)}
-              />
-            </label>
-            <label className="wide" htmlFor="supportSubject">
-              Subject
-              <input id="supportSubject" required value={form.subject} onChange={(e) => updateField("subject", e.target.value)} />
-            </label>
-            <label className="wide" htmlFor="supportMessage">
-              Message
-              <textarea id="supportMessage" required rows="6" value={form.message} onChange={(e) => updateField("message", e.target.value)} />
-            </label>
+        <div className="support-content-stack">
+          <div className="support-accordion">
+            {supportItems.map(([title, copy]) => {
+              const active = openItem === title;
+              return (
+                <article className={active ? "support-accordion-item open" : "support-accordion-item"} key={title}>
+                  <button type="button" onClick={() => setOpenItem(active ? "" : title)}>
+                    <span>{title}</span>
+                    <ChevronDown size={17} />
+                  </button>
+                  <div className="support-accordion-copy">
+                    <p>{copy}</p>
+                  </div>
+                </article>
+              );
+            })}
           </div>
-          <button className="button primary submit-button" type="submit">
-            <Send size={17} />
-            Send Message
-          </button>
-        </form>
-      </div>
 
-      <div className="faq-grid">
-        {faqs.map(([question, answer]) => (
-          <article className="faq-item" key={question}>
-            <h3>{question}</h3>
-            <p>{answer}</p>
-          </article>
-        ))}
+          <form className="support-request-form" onSubmit={handleSubmit}>
+            <div className="support-form-head">
+              <h3>Contact Member Services</h3>
+              <p>Send a concise request and the support team will review it.</p>
+            </div>
+            {sent ? <div className="notice success">Request received.</div> : null}
+            <div className="form-grid support-form-grid">
+              <label htmlFor="supportName">
+                Name
+                <input
+                  id="supportName"
+                  required
+                  placeholder="Your name"
+                  value={form.name}
+                  onChange={(event) => updateField("name", event.target.value)}
+                />
+              </label>
+              <label htmlFor="supportEmail">
+                Email
+                <input
+                  id="supportEmail"
+                  required
+                  inputMode="email"
+                  pattern="[^@\s]+@[^@\s]+\.[^@\s]+"
+                  placeholder="Email address"
+                  value={form.email}
+                  onChange={(event) => updateField("email", event.target.value)}
+                />
+              </label>
+              <label className="wide" htmlFor="supportSubject">
+                Subject
+                <input
+                  id="supportSubject"
+                  required
+                  placeholder="How can we help?"
+                  value={form.subject}
+                  onChange={(event) => updateField("subject", event.target.value)}
+                />
+              </label>
+              <label className="wide" htmlFor="supportMessage">
+                Message
+                <textarea
+                  id="supportMessage"
+                  required
+                  rows="4"
+                  placeholder="Share a brief note"
+                  value={form.message}
+                  onChange={(event) => updateField("message", event.target.value)}
+                />
+              </label>
+            </div>
+            <button className="button primary submit-button" type="submit">
+              <Send size={16} />
+              Submit Request
+            </button>
+          </form>
+        </div>
       </div>
     </section>
   );
