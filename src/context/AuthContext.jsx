@@ -35,8 +35,18 @@ export function AuthProvider({ children }) {
       },
       async register(payload) {
         const data = await authApi.register(payload);
+        if (data.user) {
+          setUser(data.user);
+        }
+        return data;
+      },
+      async verifyOtp(payload) {
+        const data = await authApi.verifyOtp(payload);
         setUser(data.user);
         return data.user;
+      },
+      async resendOtp(payload) {
+        return authApi.resendOtp(payload);
       },
       async logout() {
         await authApi.logout();

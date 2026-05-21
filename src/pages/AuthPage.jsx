@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { LockKeyhole, ShieldCheck } from "lucide-react";
+import { LockKeyhole, MailCheck, ShieldCheck } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { forgotPassword } from "../services/authApi.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -12,6 +12,9 @@ export default function AuthPage({ mode }) {
   const navigate = useNavigate();
   const auth = useAuth();
   const [form, setForm] = useState({ fullName: "", identifier: "", password: "" });
+  const [otp, setOtp] = useState("");
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [verificationIdentifier, setVerificationIdentifier] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -45,12 +48,49 @@ export default function AuthPage({ mode }) {
         const data = await forgotPassword({ identifier: form.identifier });
         setMessage(data.message);
       } else if (isRegister) {
-        await auth.register(form);
-        completeAuth();
+        const data = await auth.register(form);
+        setVerificationPending(Boolean(data.verificationRequired));
+        setVerificationIdentifier(data.identifier || form.identifier);
+        setMessage(data.message || "A verification code has been sent to your email.");
       } else {
         await auth.login({ identifier: form.identifier, password: form.password });
         completeAuth();
       }
+    } catch (requestError) {
+      if (requestError.verificationRequired) {
+        setVerificationPending(true);
+        setVerificationIdentifier(requestError.identifier || form.identifier);
+      }
+      setError(requestError.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerifyOtp = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await auth.verifyOtp({ identifier: verificationIdentifier || form.identifier, otp });
+      completeAuth();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setSubmitting(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const data = await auth.resendOtp({ identifier: verificationIdentifier || form.identifier });
+      setMessage(data.message || "A new verification code has been sent.");
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -65,21 +105,27 @@ export default function AuthPage({ mode }) {
         title={isForgot ? "Reset account access." : isRegister ? "Create your membership account." : "Sign in to continue."}
         copy={
           isForgot
-            ? "Request a secure reset link or verification code. Email/SMS delivery is a production integration placeholder."
-            : "Authentication is handled through a backend API with bcrypt password hashing and a secure httpOnly session cookie."
+            ? "Request a secure reset link or verification code."
+            : "Authentication uses bcrypt password hashing, httpOnly session cookies, and email verification before account access."
         }
       />
 
-      <form className="form-panel premium-panel auth-form" onSubmit={handleSubmit}>
+      <form className="form-panel premium-panel auth-form" onSubmit={verificationPending ? handleVerifyOtp : handleSubmit}>
         <div className="secure-box">
-          {isForgot ? <ShieldCheck size={28} /> : <LockKeyhole size={28} />}
+          {verificationPending ? <MailCheck size={28} /> : isForgot ? <ShieldCheck size={28} /> : <LockKeyhole size={28} />}
           <div>
-            <h3>{isForgot ? "Verification placeholder" : "Protected login session"}</h3>
-            <p>{isForgot ? "Reset delivery will connect to email or SMS." : "Passwords are never stored in plain text."}</p>
+            <h3>{verificationPending ? "Verify your email" : isForgot ? "Secure reset request" : "Protected login session"}</h3>
+            <p>
+              {verificationPending
+                ? `Enter the 6-digit code sent to ${verificationIdentifier || form.identifier}.`
+                : isForgot
+                  ? "Reset delivery will use the configured account contact method."
+                  : "Passwords are never stored in plain text."}
+            </p>
           </div>
         </div>
 
-        {isRegister ? (
+        {!verificationPending && isRegister ? (
           <label htmlFor="fullName">
             Full name
             <input
@@ -91,17 +137,20 @@ export default function AuthPage({ mode }) {
           </label>
         ) : null}
 
-        <label htmlFor="identifier">
-          Email or phone number
-          <input
-            id="identifier"
-            required
-            value={form.identifier}
-            onChange={(event) => updateField("identifier", event.target.value)}
-          />
-        </label>
+        {!verificationPending ? (
+          <label htmlFor="identifier">
+            {isRegister ? "Email address" : "Email or phone number"}
+            <input
+              id="identifier"
+              required
+              type={isRegister ? "email" : "text"}
+              value={form.identifier}
+              onChange={(event) => updateField("identifier", event.target.value)}
+            />
+          </label>
+        ) : null}
 
-        {!isForgot ? (
+        {!verificationPending && !isForgot ? (
           <label htmlFor="password">
             Password
             <input
@@ -115,22 +164,55 @@ export default function AuthPage({ mode }) {
           </label>
         ) : null}
 
+        {verificationPending ? (
+          <label htmlFor="otp">
+            Verification code
+            <input
+              id="otp"
+              required
+              inputMode="numeric"
+              maxLength="6"
+              minLength="6"
+              pattern="[0-9]{6}"
+              value={otp}
+              onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            />
+          </label>
+        ) : null}
+
         {error ? <div className="notice warning">{error}</div> : null}
         {message ? <div className="notice success">{message}</div> : null}
 
         <button className="button primary" type="submit" disabled={submitting}>
-          {submitting ? "Please wait..." : isForgot ? "Request Reset" : isRegister ? "Create Account" : "Login"}
+          {submitting
+            ? "Please wait..."
+            : verificationPending
+              ? "Verify Account"
+              : isForgot
+                ? "Request Reset"
+                : isRegister
+                  ? "Create Account"
+                  : "Login"}
         </button>
 
+        {verificationPending ? (
+          <button className="button secondary" type="button" onClick={handleResendOtp} disabled={submitting}>
+            Resend Code
+          </button>
+        ) : null}
+
         <div className="auth-links">
-          {isRegister ? <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`}>Already have an account?</Link> : null}
-          {!isRegister && !isForgot ? (
+          {verificationPending ? <Link to="/login">Back to login</Link> : null}
+          {!verificationPending && isRegister ? (
+            <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`}>Already have an account?</Link>
+          ) : null}
+          {!verificationPending && !isRegister && !isForgot ? (
             <>
               <Link to={`/register?returnTo=${encodeURIComponent(returnTo)}`}>Create account</Link>
               <Link to="/forgot-password">Forgot password?</Link>
             </>
           ) : null}
-          {isForgot ? <Link to="/login">Back to login</Link> : null}
+          {!verificationPending && isForgot ? <Link to="/login">Back to login</Link> : null}
         </div>
       </form>
     </section>
