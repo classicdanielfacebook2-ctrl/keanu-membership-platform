@@ -1,9 +1,11 @@
 import bcrypt from "bcryptjs";
 import {
+  checkTwilioSmsOtp,
+  getVerificationChannel,
   getUsersCollection,
   handleApiError,
   methodNotAllowed,
-  normalizeIdentifier,
+  normalizeAuthIdentifier,
   sendJson
 } from "../../serverless/authCore.js";
 
@@ -11,7 +13,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
 
   try {
-    const identifier = normalizeIdentifier(req.body?.identifier);
+    const identifier = normalizeAuthIdentifier(req.body?.identifier);
     const resetCode = String(req.body?.resetCode || "").trim();
     const password = String(req.body?.password || "");
 
@@ -21,27 +23,39 @@ export default async function handler(req, res) {
 
     const users = await getUsersCollection();
     const user = await users.findOne({ identifier });
+    const channel = getVerificationChannel(identifier);
 
-    if (!user || !user.resetCodeHash || !user.resetExpiresAt) {
+    if (!user) {
       return sendJson(res, 400, { error: "Invalid or expired reset code." });
     }
 
-    if (Date.now() > new Date(user.resetExpiresAt).getTime()) {
-      await users.updateOne(
-        { _id: user._id },
-        { $unset: { resetCodeHash: "", resetExpiresAt: "" }, $set: { resetAttempts: 0 } }
-      );
-      return sendJson(res, 400, { error: "Reset code expired. Request a new code." });
-    }
+    if (channel === "email") {
+      if (!user.resetCodeHash || !user.resetExpiresAt) {
+        return sendJson(res, 400, { error: "Invalid or expired reset code." });
+      }
 
-    if ((user.resetAttempts || 0) >= 5) {
-      return sendJson(res, 429, { error: "Too many reset attempts. Request a new code." });
-    }
+      if (Date.now() > new Date(user.resetExpiresAt).getTime()) {
+        await users.updateOne(
+          { _id: user._id },
+          { $unset: { resetCodeHash: "", resetExpiresAt: "" }, $set: { resetAttempts: 0 } }
+        );
+        return sendJson(res, 400, { error: "Reset code expired. Request a new code." });
+      }
 
-    const validCode = await bcrypt.compare(resetCode, user.resetCodeHash);
-    if (!validCode) {
-      await users.updateOne({ _id: user._id }, { $inc: { resetAttempts: 1 } });
-      return sendJson(res, 401, { error: "Invalid reset code." });
+      if ((user.resetAttempts || 0) >= 5) {
+        return sendJson(res, 429, { error: "Too many reset attempts. Request a new code." });
+      }
+
+      const validCode = await bcrypt.compare(resetCode, user.resetCodeHash);
+      if (!validCode) {
+        await users.updateOne({ _id: user._id }, { $inc: { resetAttempts: 1 } });
+        return sendJson(res, 401, { error: "Invalid reset code." });
+      }
+    } else {
+      const verification = await checkTwilioSmsOtp({ to: user.identifier, code: resetCode });
+      if (verification.status !== "approved") {
+        return sendJson(res, 401, { error: "Invalid reset code." });
+      }
     }
 
     const passwordHash = await bcrypt.hash(password, 12);

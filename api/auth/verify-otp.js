@@ -1,10 +1,12 @@
 import bcrypt from "bcryptjs";
 import {
+  checkTwilioSmsOtp,
+  getRegistrationIntentsCollection,
   getUsersCollection,
   handleApiError,
   isUserVerified,
   methodNotAllowed,
-  normalizeIdentifier,
+  normalizeAuthIdentifier,
   publicUser,
   sendJson,
   setSessionCookie,
@@ -15,44 +17,56 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
 
   try {
-    const identifier = normalizeIdentifier(req.body?.identifier);
+    const identifier = normalizeAuthIdentifier(req.body?.identifier);
     const otp = String(req.body?.otp || "").trim();
     const users = await getUsersCollection();
+    const intents = await getRegistrationIntentsCollection();
     const user = await users.findOne({ identifier });
-
-    if (!user) return sendJson(res, 404, { error: "Account not found." });
 
     if (isUserVerified(user)) {
       setSessionCookie(res, signToken(user));
       return sendJson(res, 200, { user: publicUser(user), message: "Account already verified." });
     }
 
-    if (!/^\d{6}$/.test(otp) || !user.otpHash || !user.otpExpiresAt) {
-      return sendJson(res, 400, { error: "Enter the 6-digit verification code sent to your email." });
+    const pending = await intents.findOne({ identifier });
+    if (!pending) return sendJson(res, 404, { error: "No pending verification found. Please register again." });
+
+    if (!/^\d{6}$/.test(otp)) {
+      return sendJson(res, 400, { error: "Enter the 6-digit verification code sent to you." });
     }
 
-    if (Date.now() > new Date(user.otpExpiresAt).getTime()) {
-      await users.deleteOne({ _id: user._id });
+    if (Date.now() > new Date(pending.expiresAt).getTime()) {
+      await intents.deleteOne({ _id: pending._id });
       return sendJson(res, 400, {
         error: "Verification code expired. Please register again to receive a new code."
       });
     }
 
-    if ((user.otpAttempts || 0) >= 5) {
+    if ((pending.otpAttempts || 0) >= 5) {
       return sendJson(res, 429, { error: "Too many verification attempts. Request a new code." });
     }
 
-    const validOtp = await bcrypt.compare(otp, user.otpHash);
+    const validOtp =
+      pending.channel === "sms"
+        ? (await checkTwilioSmsOtp({ to: pending.identifier, code: otp })).status === "approved"
+        : pending.otpHash && (await bcrypt.compare(otp, pending.otpHash));
+
     if (!validOtp) {
-      await users.updateOne({ _id: user._id }, { $inc: { otpAttempts: 1 } });
+      await intents.updateOne({ _id: pending._id }, { $inc: { otpAttempts: 1 } });
       return sendJson(res, 401, { error: "Invalid verification code." });
     }
 
-    await users.updateOne(
-      { _id: user._id },
-      { $set: { verified: true, isVerified: true, otpAttempts: 0 }, $unset: { otpHash: "", otpExpiresAt: "" } }
-    );
-    const verifiedUser = await users.findOne({ _id: user._id });
+    const result = await users.insertOne({
+      fullName: pending.fullName,
+      identifier: pending.identifier,
+      passwordHash: pending.passwordHash,
+      role: pending.role || "user",
+      verified: true,
+      isVerified: true,
+      createdAt: new Date()
+    });
+    await intents.deleteOne({ _id: pending._id });
+    const verifiedUser = await users.findOne({ _id: result.insertedId });
     setSessionCookie(res, signToken(verifiedUser));
     return sendJson(res, 200, { user: publicUser(verifiedUser), message: "Account verified successfully." });
   } catch (error) {

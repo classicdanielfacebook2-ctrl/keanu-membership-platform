@@ -1,45 +1,48 @@
 import {
   createOtpFields,
-  getUsersCollection,
+  getRegistrationIntentsCollection,
   handleApiError,
-  isEmailIdentifier,
-  isUserVerified,
   methodNotAllowed,
-  normalizeIdentifier,
+  normalizeAuthIdentifier,
   sendJson,
-  sendOtpEmail
+  sendOtpEmail,
+  sendTwilioSmsOtp
 } from "../../serverless/authCore.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
 
   try {
-    const identifier = normalizeIdentifier(req.body?.identifier);
-    const users = await getUsersCollection();
-    const user = await users.findOne({ identifier });
+    const identifier = normalizeAuthIdentifier(req.body?.identifier);
+    const intents = await getRegistrationIntentsCollection();
+    const pending = await intents.findOne({ identifier });
 
-    if (!user) return sendJson(res, 404, { error: "Account not found." });
-    if (isUserVerified(user)) return sendJson(res, 200, { ok: true, message: "Account is already verified." });
-    if (!isEmailIdentifier(user.identifier)) {
-      return sendJson(res, 400, { error: "A valid email address is required for verification." });
+    if (!pending) return sendJson(res, 404, { error: "No pending verification found. Please register again." });
+
+    if (pending.channel === "sms") {
+      await sendTwilioSmsOtp({ to: pending.identifier });
+      return sendJson(res, 200, {
+        ok: true,
+        message: "A new verification code has been sent to your phone number."
+      });
     }
 
     const otpFields = await createOtpFields();
-    await users.updateOne(
-      { _id: user._id },
+    await intents.updateOne(
+      { _id: pending._id },
       {
         $set: {
           otpHash: otpFields.otpHash,
-          otpExpiresAt: otpFields.otpExpiresAt,
+          expiresAt: otpFields.otpExpiresAt,
           otpAttempts: 0
         }
       }
     );
-    await sendOtpEmail({ to: user.identifier, fullName: user.fullName, otp: otpFields.otp });
+    await sendOtpEmail({ to: pending.identifier, fullName: pending.fullName, otp: otpFields.otp });
     return sendJson(res, 200, {
       ok: true,
       expiresAt: otpFields.otpExpiresAt.toISOString(),
-      message: "A new verification code has been sent."
+      message: "A new verification code has been sent to your email."
     });
   } catch (error) {
     return handleApiError(res, "auth/resend-otp", error);

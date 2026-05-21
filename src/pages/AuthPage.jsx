@@ -119,10 +119,10 @@ export default function AuthPage({ mode }) {
         }
         copy={
           isForgot
-            ? "Request a secure reset link or verification code."
+            ? "Request a secure reset code by email or SMS."
             : isReset
-              ? "Enter the reset code sent to your email and choose a new password."
-            : "Authentication uses bcrypt password hashing, httpOnly session cookies, and email verification before account access."
+              ? "Enter the reset code sent to your email or phone and choose a new password."
+            : "Authentication uses bcrypt password hashing, httpOnly session cookies, and OTP verification before account access."
         }
       />
 
@@ -143,9 +143,9 @@ export default function AuthPage({ mode }) {
               {verificationPending
                 ? `Enter the 6-digit code sent to ${verificationIdentifier || form.identifier}.`
                 : isForgot
-                  ? "If the email is registered, a reset code will be delivered privately."
+                  ? "If the contact method is registered, a reset code will be delivered privately."
                   : isReset
-                    ? "Use the 6-digit code from your email to protect your account."
+                    ? "Use the 6-digit code from your email or phone to protect your account."
                   : "Passwords are never stored in plain text."}
             </p>
           </div>
@@ -165,11 +165,12 @@ export default function AuthPage({ mode }) {
 
         {!verificationPending ? (
           <label htmlFor="identifier">
-            {isRegister || isForgot || isReset ? "Email address" : "Email or phone number"}
+            Email or phone number
             <input
               id="identifier"
               required
-              type={isRegister || isForgot || isReset ? "email" : "text"}
+              type="text"
+              placeholder="name@example.com or +15551234567"
               value={form.identifier}
               onChange={(event) => updateField("identifier", event.target.value)}
             />

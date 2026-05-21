@@ -14,6 +14,17 @@ let mongoUriLogged = false;
 
 export const normalizeIdentifier = (value = "") => value.trim().toLowerCase();
 export const isEmailIdentifier = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+export const normalizePhoneIdentifier = (value = "") => {
+  const trimmed = String(value).trim();
+  if (!trimmed.startsWith("+")) return trimmed.replace(/[\s().-]/g, "");
+  return `+${trimmed.slice(1).replace(/[^\d]/g, "")}`;
+};
+export const isPhoneIdentifier = (value = "") => /^\+[1-9]\d{7,14}$/.test(normalizePhoneIdentifier(value));
+export const normalizeAuthIdentifier = (value = "") => {
+  const trimmed = String(value).trim();
+  return isEmailIdentifier(trimmed) ? normalizeIdentifier(trimmed) : normalizePhoneIdentifier(trimmed);
+};
+export const getVerificationChannel = (identifier = "") => (isEmailIdentifier(identifier) ? "email" : "sms");
 
 const requiredEnv = (name) => {
   const value = process.env[name];
@@ -61,6 +72,15 @@ export const getUsersCollection = async () => {
   }
 };
 
+export const getRegistrationIntentsCollection = async () => {
+  const client = await getMongoClient();
+  const db = client.db(process.env.MONGODB_DB || "keanu_membership_platform");
+  const intents = db.collection("registrationIntents");
+  await intents.createIndex({ identifier: 1 }, { unique: true });
+  await intents.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+  return intents;
+};
+
 export const isUserVerified = (user) => Boolean(user?.isVerified || user?.verified);
 
 export const cleanupExpiredOtpUsers = async (users) => {
@@ -71,6 +91,13 @@ export const cleanupExpiredOtpUsers = async (users) => {
 
   if (result.deletedCount > 0) {
     console.log("[auth/cleanup]", { expiredUnverifiedUsersDeleted: result.deletedCount });
+  }
+};
+
+export const cleanupExpiredRegistrationIntents = async (intents) => {
+  const result = await intents.deleteMany({ expiresAt: { $lt: new Date() } });
+  if (result.deletedCount > 0) {
+    console.log("[auth/cleanup]", { expiredRegistrationIntentsDeleted: result.deletedCount });
   }
 };
 
@@ -246,6 +273,39 @@ export const sendOtpEmail = async ({ to, fullName, otp }) => {
   }
   return data;
 };
+
+const twilioRequest = async (path, body) => {
+  const accountSid = requiredEnv("TWILIO_ACCOUNT_SID");
+  const authToken = requiredEnv("TWILIO_AUTH_TOKEN");
+  const serviceSid = requiredEnv("TWILIO_VERIFY_SERVICE_SID");
+  const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+  const response = await fetch(`https://verify.twilio.com/v2/Services/${serviceSid}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams(body).toString()
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.message || "Twilio Verify request failed.");
+  }
+  return data;
+};
+
+export const sendTwilioSmsOtp = async ({ to }) =>
+  twilioRequest("/Verifications", {
+    To: normalizePhoneIdentifier(to),
+    Channel: "sms"
+  });
+
+export const checkTwilioSmsOtp = async ({ to, code }) =>
+  twilioRequest("/VerificationCheck", {
+    To: normalizePhoneIdentifier(to),
+    Code: code
+  });
 
 export const sendPasswordResetEmail = async ({ to, fullName, resetCode }) => {
   const apiKey = requiredEnv("RESEND_API_KEY");

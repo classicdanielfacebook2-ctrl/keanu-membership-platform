@@ -4,7 +4,7 @@ import {
   handleApiError,
   isUserVerified,
   methodNotAllowed,
-  normalizeIdentifier,
+  normalizeAuthIdentifier,
   publicUser,
   sendJson,
   setSessionCookie,
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
 
   try {
-    const identifier = normalizeIdentifier(req.body?.identifier);
+    const identifier = normalizeAuthIdentifier(req.body?.identifier);
     const password = String(req.body?.password || "");
     const users = await getUsersCollection();
     const user = await users.findOne({ identifier });

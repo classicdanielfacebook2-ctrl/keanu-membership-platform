@@ -44,6 +44,19 @@ db.exec(`
     reset_attempts INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS registration_intents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    full_name TEXT NOT NULL,
+    identifier TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'user',
+    channel TEXT NOT NULL,
+    otp_hash TEXT,
+    otp_attempts INTEGER NOT NULL DEFAULT 0,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 const ensureColumn = (table, column, definition) => {
@@ -81,6 +94,17 @@ app.use(cookieParser());
 
 const normalizeIdentifier = (value = "") => value.trim().toLowerCase();
 const isEmailIdentifier = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const normalizePhoneIdentifier = (value = "") => {
+  const trimmed = String(value).trim();
+  if (!trimmed.startsWith("+")) return trimmed.replace(/[\s().-]/g, "");
+  return `+${trimmed.slice(1).replace(/[^\d]/g, "")}`;
+};
+const isPhoneIdentifier = (value = "") => /^\+[1-9]\d{7,14}$/.test(normalizePhoneIdentifier(value));
+const normalizeAuthIdentifier = (value = "") => {
+  const trimmed = String(value).trim();
+  return isEmailIdentifier(trimmed) ? normalizeIdentifier(trimmed) : normalizePhoneIdentifier(trimmed);
+};
+const getVerificationChannel = (identifier = "") => (isEmailIdentifier(identifier) ? "email" : "sms");
 const publicUser = (user) =>
   user
     ? {
@@ -120,6 +144,8 @@ const findUserByIdentifier = (identifier) =>
   db.prepare("SELECT * FROM users WHERE identifier = ?").get(identifier);
 
 const findUserById = (id) => db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+const findRegistrationIntent = (identifier) =>
+  db.prepare("SELECT * FROM registration_intents WHERE identifier = ?").get(identifier);
 
 const cleanupExpiredOtpUsers = () => {
   const result = db
@@ -128,6 +154,13 @@ const cleanupExpiredOtpUsers = () => {
 
   if (result.changes > 0) {
     console.log(`Removed ${result.changes} expired unverified registration draft(s).`);
+  }
+};
+
+const cleanupExpiredRegistrationIntents = () => {
+  const result = db.prepare("DELETE FROM registration_intents WHERE expires_at < ?").run(new Date().toISOString());
+  if (result.changes > 0) {
+    console.log(`Removed ${result.changes} expired registration intent(s).`);
   }
 };
 
@@ -226,6 +259,44 @@ const sendOtpEmail = async ({ to, fullName, otp }) => {
   return data;
 };
 
+const twilioRequest = async (path, body) => {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID || "";
+  const authToken = process.env.TWILIO_AUTH_TOKEN || "";
+  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID || "";
+
+  if (!accountSid || !authToken || !serviceSid) {
+    throw new Error("Twilio Verify environment variables are not configured.");
+  }
+
+  const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+  const response = await fetch(`https://verify.twilio.com/v2/Services/${serviceSid}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams(body).toString()
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.message || "Twilio Verify request failed.");
+  }
+  return data;
+};
+
+const sendTwilioSmsOtp = ({ to }) =>
+  twilioRequest("/Verifications", {
+    To: normalizePhoneIdentifier(to),
+    Channel: "sms"
+  });
+
+const checkTwilioSmsOtp = ({ to, code }) =>
+  twilioRequest("/VerificationCheck", {
+    To: normalizePhoneIdentifier(to),
+    Code: code
+  });
+
 const sendPasswordResetEmail = async ({ to, fullName, resetCode }) => {
   if (!RESEND_API_KEY) {
     if (isProduction) {
@@ -314,7 +385,7 @@ const requireAuth = (req, res, next) => {
 
 app.post("/api/auth/register", async (req, res) => {
   const fullName = String(req.body.fullName || "").trim();
-  const identifier = normalizeIdentifier(req.body.identifier);
+  const identifier = normalizeAuthIdentifier(req.body.identifier);
   const password = String(req.body.password || "");
 
   if (!fullName || !identifier || password.length < 8) {
@@ -323,11 +394,14 @@ app.post("/api/auth/register", async (req, res) => {
     });
   }
 
-  if (!isEmailIdentifier(identifier)) {
-    return res.status(400).json({ error: "A valid email address is required for account verification." });
+  if (!isEmailIdentifier(identifier) && !isPhoneIdentifier(identifier)) {
+    return res.status(400).json({
+      error: "Enter a valid email address or an international phone number starting with +."
+    });
   }
 
   cleanupExpiredOtpUsers();
+  cleanupExpiredRegistrationIntents();
   const existing = findUserByIdentifier(identifier);
   if (existing?.verified) {
     return res.status(409).json({ error: "An account already exists for that email or phone." });
@@ -337,31 +411,46 @@ app.post("/api/auth/register", async (req, res) => {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const role = "user";
+  const channel = getVerificationChannel(identifier);
+  let expiresAt = new Date(Date.now() + OTP_EXPIRES_MINUTES * 60 * 1000).toISOString();
+  let otpHash = null;
+  let otp = "";
 
-  const result = db
-    .prepare("INSERT INTO users (full_name, identifier, password_hash, role, verified) VALUES (?, ?, ?, ?, 0)")
-    .run(fullName, identifier, passwordHash, role);
-  const user = findUserById(result.lastInsertRowid);
-  const { otp, expiresAt } = await createOtpForUser(user.id);
+  if (channel === "email") {
+    otp = generateOtp();
+    otpHash = await bcrypt.hash(otp, 12);
+  }
+
+  db.prepare("DELETE FROM registration_intents WHERE identifier = ?").run(identifier);
+  db.prepare(
+    "INSERT INTO registration_intents (full_name, identifier, password_hash, role, channel, otp_hash, otp_attempts, expires_at) VALUES (?, ?, ?, 'user', ?, ?, 0, ?)"
+  ).run(fullName, identifier, passwordHash, channel, otpHash, expiresAt);
 
   try {
-    await sendOtpEmail({ to: identifier, fullName, otp });
+    if (channel === "sms") {
+      await sendTwilioSmsOtp({ to: identifier });
+    } else {
+      await sendOtpEmail({ to: identifier, fullName, otp });
+    }
   } catch (error) {
-    db.prepare("DELETE FROM users WHERE id = ?").run(user.id);
+    db.prepare("DELETE FROM registration_intents WHERE identifier = ?").run(identifier);
     return res.status(502).json({ error: error.message });
   }
 
   return res.status(201).json({
     verificationRequired: true,
     identifier,
+    channel,
     expiresAt,
-    message: "A verification code has been sent to your email."
+    message:
+      channel === "sms"
+        ? "A verification code has been sent to your phone number."
+        : "A verification code has been sent to your email."
   });
 });
 
 app.post("/api/auth/login", async (req, res) => {
-  const identifier = normalizeIdentifier(req.body.identifier);
+  const identifier = normalizeAuthIdentifier(req.body.identifier);
   const password = String(req.body.password || "");
   const user = findUserByIdentifier(identifier);
 
@@ -383,67 +472,77 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 app.post("/api/auth/verify-otp", async (req, res) => {
-  const identifier = normalizeIdentifier(req.body.identifier);
+  const identifier = normalizeAuthIdentifier(req.body.identifier);
   const otp = String(req.body.otp || "").trim();
   const user = findUserByIdentifier(identifier);
 
-  if (!user) {
-    return res.status(404).json({ error: "Account not found." });
-  }
-
-  if (user.verified) {
+  if (user?.verified) {
     const token = signToken(user);
     setSessionCookie(res, token);
     return res.json({ user: publicUser(user), message: "Account already verified." });
   }
 
-  if (!/^\d{6}$/.test(otp) || !user.otp_hash || !user.otp_expires_at) {
-    return res.status(400).json({ error: "Enter the 6-digit verification code sent to your email." });
+  const pending = findRegistrationIntent(identifier);
+  if (!pending) {
+    return res.status(404).json({ error: "No pending verification found. Please register again." });
   }
 
-  if (Date.now() > Date.parse(user.otp_expires_at)) {
-    db.prepare("DELETE FROM users WHERE id = ?").run(user.id);
+  if (!/^\d{6}$/.test(otp)) {
+    return res.status(400).json({ error: "Enter the 6-digit verification code sent to you." });
+  }
+
+  if (Date.now() > Date.parse(pending.expires_at)) {
+    db.prepare("DELETE FROM registration_intents WHERE id = ?").run(pending.id);
     return res.status(400).json({ error: "Verification code expired. Please register again to receive a new code." });
   }
 
-  if (user.otp_attempts >= 5) {
+  if (pending.otp_attempts >= 5) {
     return res.status(429).json({ error: "Too many verification attempts. Request a new code." });
   }
 
-  const validOtp = await bcrypt.compare(otp, user.otp_hash);
+  const validOtp =
+    pending.channel === "sms"
+      ? (await checkTwilioSmsOtp({ to: pending.identifier, code: otp })).status === "approved"
+      : pending.otp_hash && (await bcrypt.compare(otp, pending.otp_hash));
+
   if (!validOtp) {
-    db.prepare("UPDATE users SET otp_attempts = otp_attempts + 1 WHERE id = ?").run(user.id);
+    db.prepare("UPDATE registration_intents SET otp_attempts = otp_attempts + 1 WHERE id = ?").run(pending.id);
     return res.status(401).json({ error: "Invalid verification code." });
   }
 
-  db.prepare("UPDATE users SET verified = 1, otp_hash = NULL, otp_expires_at = NULL, otp_attempts = 0 WHERE id = ?").run(
-    user.id
-  );
-  const verifiedUser = findUserById(user.id);
+  const result = db
+    .prepare("INSERT INTO users (full_name, identifier, password_hash, role, verified) VALUES (?, ?, ?, ?, 1)")
+    .run(pending.full_name, pending.identifier, pending.password_hash, pending.role || "user");
+  db.prepare("DELETE FROM registration_intents WHERE id = ?").run(pending.id);
+  const verifiedUser = findUserById(result.lastInsertRowid);
   const token = signToken(verifiedUser);
   setSessionCookie(res, token);
   return res.json({ user: publicUser(verifiedUser), message: "Account verified successfully." });
 });
 
 app.post("/api/auth/resend-otp", async (req, res) => {
-  const identifier = normalizeIdentifier(req.body.identifier);
-  const user = findUserByIdentifier(identifier);
+  const identifier = normalizeAuthIdentifier(req.body.identifier);
+  const pending = findRegistrationIntent(identifier);
 
-  if (!user) {
-    return res.status(404).json({ error: "Account not found." });
+  if (!pending) {
+    return res.status(404).json({ error: "No pending verification found. Please register again." });
   }
 
-  if (user.verified) {
-    return res.json({ ok: true, message: "Account is already verified." });
+  if (pending.channel === "sms") {
+    await sendTwilioSmsOtp({ to: pending.identifier });
+    return res.json({ ok: true, message: "A new verification code has been sent to your phone number." });
   }
 
-  if (!isEmailIdentifier(user.identifier)) {
-    return res.status(400).json({ error: "A valid email address is required for verification." });
-  }
-
-  const { otp, expiresAt } = await createOtpForUser(user.id);
-  await sendOtpEmail({ to: user.identifier, fullName: user.full_name, otp });
-  return res.json({ ok: true, expiresAt, message: "A new verification code has been sent." });
+  const otp = generateOtp();
+  const otpHash = await bcrypt.hash(otp, 12);
+  const expiresAt = new Date(Date.now() + OTP_EXPIRES_MINUTES * 60 * 1000).toISOString();
+  db.prepare("UPDATE registration_intents SET otp_hash = ?, expires_at = ?, otp_attempts = 0 WHERE id = ?").run(
+    otpHash,
+    expiresAt,
+    pending.id
+  );
+  await sendOtpEmail({ to: pending.identifier, fullName: pending.full_name, otp });
+  return res.json({ ok: true, expiresAt, message: "A new verification code has been sent to your email." });
 });
 
 app.post("/api/auth/logout", (_req, res) => {
@@ -456,15 +555,24 @@ app.get("/api/auth/me", requireAuth, (req, res) => {
 });
 
 app.post("/api/auth/forgot-password", async (req, res) => {
-  const identifier = normalizeIdentifier(req.body.identifier);
-  const neutralMessage = "If this email is registered, we sent a reset link/code to your email address.";
+  const identifier = normalizeAuthIdentifier(req.body.identifier);
+  const isEmail = isEmailIdentifier(identifier);
+  const isPhone = isPhoneIdentifier(identifier);
+  const neutralMessage = isPhone
+    ? "If this phone number is registered, we sent a reset code by SMS."
+    : "If this email is registered, we sent a reset link/code to your email address.";
 
-  if (identifier && isEmailIdentifier(identifier)) {
+  if (identifier && (isEmail || isPhone)) {
     const user = findUserByIdentifier(identifier);
     if (user) {
-      const { resetCode } = await createPasswordResetForUser(user.id);
+      const channel = getVerificationChannel(identifier);
       try {
-        await sendPasswordResetEmail({ to: user.identifier, fullName: user.full_name, resetCode });
+        if (channel === "sms") {
+          await sendTwilioSmsOtp({ to: user.identifier });
+        } else {
+          const { resetCode } = await createPasswordResetForUser(user.id);
+          await sendPasswordResetEmail({ to: user.identifier, fullName: user.full_name, resetCode });
+        }
         console.log("Password reset email sent");
       } catch (error) {
         console.error("Password reset email failed", { message: error.message });
@@ -476,7 +584,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
 });
 
 app.post("/api/auth/reset-password", async (req, res) => {
-  const identifier = normalizeIdentifier(req.body.identifier);
+  const identifier = normalizeAuthIdentifier(req.body.identifier);
   const resetCode = String(req.body.resetCode || "").trim();
   const password = String(req.body.password || "");
 
@@ -485,25 +593,37 @@ app.post("/api/auth/reset-password", async (req, res) => {
   }
 
   const user = findUserByIdentifier(identifier);
-  if (!user || !user.reset_code_hash || !user.reset_expires_at) {
+  if (!user) {
     return res.status(400).json({ error: "Invalid or expired reset code." });
   }
 
-  if (Date.now() > Date.parse(user.reset_expires_at)) {
-    db.prepare("UPDATE users SET reset_code_hash = NULL, reset_expires_at = NULL, reset_attempts = 0 WHERE id = ?").run(
-      user.id
-    );
-    return res.status(400).json({ error: "Reset code expired. Request a new code." });
-  }
+  const channel = getVerificationChannel(identifier);
+  if (channel === "email") {
+    if (!user.reset_code_hash || !user.reset_expires_at) {
+      return res.status(400).json({ error: "Invalid or expired reset code." });
+    }
 
-  if (user.reset_attempts >= 5) {
-    return res.status(429).json({ error: "Too many reset attempts. Request a new code." });
-  }
+    if (Date.now() > Date.parse(user.reset_expires_at)) {
+      db.prepare("UPDATE users SET reset_code_hash = NULL, reset_expires_at = NULL, reset_attempts = 0 WHERE id = ?").run(
+        user.id
+      );
+      return res.status(400).json({ error: "Reset code expired. Request a new code." });
+    }
 
-  const validCode = await bcrypt.compare(resetCode, user.reset_code_hash);
-  if (!validCode) {
-    db.prepare("UPDATE users SET reset_attempts = reset_attempts + 1 WHERE id = ?").run(user.id);
-    return res.status(401).json({ error: "Invalid reset code." });
+    if (user.reset_attempts >= 5) {
+      return res.status(429).json({ error: "Too many reset attempts. Request a new code." });
+    }
+
+    const validCode = await bcrypt.compare(resetCode, user.reset_code_hash);
+    if (!validCode) {
+      db.prepare("UPDATE users SET reset_attempts = reset_attempts + 1 WHERE id = ?").run(user.id);
+      return res.status(401).json({ error: "Invalid reset code." });
+    }
+  } else {
+    const verification = await checkTwilioSmsOtp({ to: user.identifier, code: resetCode });
+    if (verification.status !== "approved") {
+      return res.status(401).json({ error: "Invalid reset code." });
+    }
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
