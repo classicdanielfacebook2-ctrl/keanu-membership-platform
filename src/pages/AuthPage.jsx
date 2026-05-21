@@ -1,18 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { LockKeyhole, MailCheck, ShieldCheck } from "lucide-react";
 import { forgotPassword, resetPassword } from "../services/authApi.js";
 import { useAuth } from "../context/AuthContext.jsx";
-
-const countryCodes = [
-  { label: "US +1", value: "+1" },
-  { label: "UK +44", value: "+44" },
-  { label: "NG +234", value: "+234" },
-  { label: "CA +1", value: "+1" },
-  { label: "AU +61", value: "+61" },
-  { label: "FR +33", value: "+33" },
-  { label: "DE +49", value: "+49" }
-];
+import { allowedPhoneCountries, getAllowedPhoneCountry, getCountryFlag } from "../data/phoneCountries.js";
 
 const cleanPhone = (value = "") => value.replace(/[^\d]/g, "");
 
@@ -27,7 +18,7 @@ export default function AuthPage({ mode }) {
     fullName: "",
     email: "",
     phone: "",
-    countryCode: "+1",
+    countryIso: "US",
     password: ""
   });
   const [method, setMethod] = useState("email");
@@ -40,7 +31,8 @@ export default function AuthPage({ mode }) {
   const [submitting, setSubmitting] = useState(false);
 
   const returnTo = useMemo(() => params.get("returnTo") || "/", [params]);
-  const phoneIdentifier = `${form.countryCode}${cleanPhone(form.phone)}`;
+  const selectedCountry = getAllowedPhoneCountry(form.countryIso);
+  const phoneIdentifier = `${selectedCountry.callingCode}${cleanPhone(form.phone)}`;
   const selectedIdentifier = method === "sms" ? phoneIdentifier : form.email.trim();
 
   const updateField = (field, value) => {
@@ -79,6 +71,7 @@ export default function AuthPage({ mode }) {
           fullName: form.fullName,
           email: form.email,
           phone: phoneIdentifier,
+          phoneCountry: selectedCountry.iso,
           password: form.password,
           verificationMethod: method
         });
@@ -153,7 +146,7 @@ export default function AuthPage({ mode }) {
     <section className="auth-page">
       <div className="auth-card">
         <div className="auth-brand-mini" aria-hidden="true">
-          <span>KR</span>
+          <img src="/logo.svg" alt="" />
         </div>
         <div className="auth-heading">
           <span className="eyebrow">Secure Account</span>
@@ -311,17 +304,64 @@ function MethodTabs({ label, method, setMethod, emailLabel, smsLabel }) {
 }
 
 function PhoneField({ form, updateField }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapperRef = useRef(null);
+  const selectedCountry = getAllowedPhoneCountry(form.countryIso);
+  const countries = allowedPhoneCountries.filter((country) => {
+    const searchText = `${country.name} ${country.callingCode} ${country.iso}`.toLowerCase();
+    return searchText.includes(query.trim().toLowerCase());
+  });
+
+  const chooseCountry = (country) => {
+    updateField("countryIso", country.iso);
+    setQuery("");
+    setOpen(false);
+  };
+
+  const handleBlur = (event) => {
+    if (!wrapperRef.current?.contains(event.relatedTarget)) {
+      setOpen(false);
+    }
+  };
+
   return (
     <label htmlFor="phone">
       Phone Number
-      <div className="phone-input-row">
-        <select value={form.countryCode} onChange={(event) => updateField("countryCode", event.target.value)} aria-label="Country code">
-          {countryCodes.map((country) => (
-            <option key={`${country.label}-${country.value}`} value={country.value}>
-              {country.label}
-            </option>
-          ))}
-        </select>
+      <div className="phone-input-row" ref={wrapperRef} onBlur={handleBlur}>
+        <div className="country-select">
+          <button className="country-select-trigger" type="button" onClick={() => setOpen((value) => !value)}>
+            <span>{getCountryFlag(selectedCountry.iso)}</span>
+            <strong>{selectedCountry.callingCode}</strong>
+          </button>
+          {open ? (
+            <div className="country-menu">
+              <input
+                aria-label="Search country"
+                placeholder="Search country"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                autoFocus
+              />
+              <div className="country-options" role="listbox">
+                {countries.map((country) => (
+                  <button
+                    key={country.iso}
+                    type="button"
+                    className={country.iso === selectedCountry.iso ? "selected" : ""}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => chooseCountry(country)}
+                  >
+                    <span>{getCountryFlag(country.iso)}</span>
+                    <span>{country.name}</span>
+                    <strong>{country.callingCode}</strong>
+                  </button>
+                ))}
+                {countries.length === 0 ? <p>No matching country available.</p> : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
         <input
           id="phone"
           required

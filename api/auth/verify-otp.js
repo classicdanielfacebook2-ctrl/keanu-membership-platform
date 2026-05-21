@@ -61,6 +61,7 @@ export default async function handler(req, res) {
       identifier: pending.identifier,
       email: pending.email,
       phone: pending.phone,
+      phoneCountry: pending.phoneCountry,
       passwordHash: pending.passwordHash,
       role: pending.role || "user",
       verified: true,

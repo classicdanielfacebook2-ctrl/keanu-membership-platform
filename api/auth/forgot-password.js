@@ -1,3 +1,4 @@
+import { isAllowedPhoneNumber } from "../../src/data/phoneCountries.js";
 import {
   createPasswordResetFields,
   getVerificationChannel,
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
     const isEmail = isEmailIdentifier(identifier);
     const isPhone = isPhoneIdentifier(identifier);
 
-    if (identifier && (isEmail || isPhone)) {
+    if (identifier && (isEmail || (isPhone && isAllowedPhoneNumber(identifier)))) {
       const users = await getUsersCollection();
       const user = await users.findOne({ $or: [{ identifier }, { email: identifier }, { phone: identifier }] });
 

@@ -1,9 +1,12 @@
 import bcrypt from "bcryptjs";
+import { isAllowedPhoneNumber } from "../../src/data/phoneCountries.js";
 import {
   checkTwilioSmsOtp,
   getVerificationChannel,
   getUsersCollection,
   handleApiError,
+  isEmailIdentifier,
+  isPhoneIdentifier,
   methodNotAllowed,
   normalizeAuthIdentifier,
   sendJson
@@ -19,6 +22,10 @@ export default async function handler(req, res) {
 
     if (!identifier || !/^\d{6}$/.test(resetCode) || password.length < 8) {
       return sendJson(res, 400, { error: "Email, 6-digit reset code, and a new password are required." });
+    }
+
+    if (!isEmailIdentifier(identifier) && (!isPhoneIdentifier(identifier) || !isAllowedPhoneNumber(identifier))) {
+      return sendJson(res, 400, { error: "Enter an allowed email address or phone number." });
     }
 
     const users = await getUsersCollection();

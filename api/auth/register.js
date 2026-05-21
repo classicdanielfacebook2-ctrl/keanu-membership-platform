@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { isAllowedPhoneCountry, isAllowedPhoneNumber } from "../../src/data/phoneCountries.js";
 import {
   cleanupExpiredOtpUsers,
   cleanupExpiredRegistrationIntents,
@@ -24,6 +25,7 @@ export default async function handler(req, res) {
     const fullName = String(req.body?.fullName || "").trim();
     const email = normalizeAuthIdentifier(req.body?.email || req.body?.identifier);
     const phone = normalizeAuthIdentifier(req.body?.phone);
+    const phoneCountry = String(req.body?.phoneCountry || "").toUpperCase();
     const verificationMethod = req.body?.verificationMethod === "sms" ? "sms" : "email";
     const identifier = verificationMethod === "sms" ? phone : email;
     const password = String(req.body?.password || "");
@@ -34,9 +36,9 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!isEmailIdentifier(email) || !isPhoneIdentifier(phone)) {
+    if (!isEmailIdentifier(email) || !isPhoneIdentifier(phone) || !isAllowedPhoneCountry(phoneCountry) || !isAllowedPhoneNumber(phone)) {
       return sendJson(res, 400, {
-        error: "Enter a valid email address and an international phone number starting with +."
+        error: "Enter a valid email address and select an allowed phone country."
       });
     }
 
@@ -62,6 +64,7 @@ export default async function handler(req, res) {
       identifier,
       email,
       phone,
+      phoneCountry,
       passwordHash,
       role: "user",
       channel,

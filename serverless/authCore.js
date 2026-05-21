@@ -133,6 +133,7 @@ export const publicUser = (user) =>
         identifier: user.identifier,
         email: user.email,
         phone: user.phone,
+        phoneCountry: user.phoneCountry,
         role: user.role,
         verified: isUserVerified(user),
         isVerified: isUserVerified(user)

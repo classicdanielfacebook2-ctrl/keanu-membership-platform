@@ -1,7 +1,10 @@
 import bcrypt from "bcryptjs";
+import { isAllowedPhoneNumber } from "../../src/data/phoneCountries.js";
 import {
   getUsersCollection,
   handleApiError,
+  isEmailIdentifier,
+  isPhoneIdentifier,
   isUserVerified,
   methodNotAllowed,
   normalizeAuthIdentifier,
@@ -17,6 +20,9 @@ export default async function handler(req, res) {
   try {
     const identifier = normalizeAuthIdentifier(req.body?.identifier);
     const password = String(req.body?.password || "");
+    if (!isEmailIdentifier(identifier) && (!isPhoneIdentifier(identifier) || !isAllowedPhoneNumber(identifier))) {
+      return sendJson(res, 400, { error: "Enter an allowed email address or phone number." });
+    }
     const users = await getUsersCollection();
     const user = await users.findOne({ $or: [{ identifier }, { email: identifier }, { phone: identifier }] });
 

@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isAllowedPhoneCountry, isAllowedPhoneNumber } from "../src/data/phoneCountries.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
@@ -35,6 +36,7 @@ db.exec(`
     identifier TEXT NOT NULL UNIQUE,
     email TEXT,
     phone TEXT,
+    phone_country TEXT,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user',
     verified INTEGER NOT NULL DEFAULT 0,
@@ -53,6 +55,7 @@ db.exec(`
     identifier TEXT NOT NULL UNIQUE,
     email TEXT,
     phone TEXT,
+    phone_country TEXT,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user',
     channel TEXT NOT NULL,
@@ -73,6 +76,7 @@ const ensureColumn = (table, column, definition) => {
 ensureColumn("users", "verified", "INTEGER NOT NULL DEFAULT 0");
 ensureColumn("users", "email", "TEXT");
 ensureColumn("users", "phone", "TEXT");
+ensureColumn("users", "phone_country", "TEXT");
 ensureColumn("users", "otp_hash", "TEXT");
 ensureColumn("users", "otp_expires_at", "TEXT");
 ensureColumn("users", "otp_attempts", "INTEGER NOT NULL DEFAULT 0");
@@ -81,6 +85,7 @@ ensureColumn("users", "reset_expires_at", "TEXT");
 ensureColumn("users", "reset_attempts", "INTEGER NOT NULL DEFAULT 0");
 ensureColumn("registration_intents", "email", "TEXT");
 ensureColumn("registration_intents", "phone", "TEXT");
+ensureColumn("registration_intents", "phone_country", "TEXT");
 
 const JWT_SECRET = process.env.AUTH_JWT_SECRET || "replace-this-secret-before-production";
 const COOKIE_NAME = "kr_membership_session";
@@ -121,6 +126,7 @@ const publicUser = (user) =>
         identifier: user.identifier,
         email: user.email,
         phone: user.phone,
+        phoneCountry: user.phone_country,
         role: user.role,
         verified: Boolean(user.verified)
       }
@@ -397,6 +403,7 @@ app.post("/api/auth/register", async (req, res) => {
   const fullName = String(req.body.fullName || "").trim();
   const email = normalizeAuthIdentifier(req.body.email || req.body.identifier);
   const phone = normalizeAuthIdentifier(req.body.phone);
+  const phoneCountry = String(req.body.phoneCountry || "").toUpperCase();
   const verificationMethod = req.body.verificationMethod === "sms" ? "sms" : "email";
   const identifier = verificationMethod === "sms" ? phone : email;
   const password = String(req.body.password || "");
@@ -407,9 +414,9 @@ app.post("/api/auth/register", async (req, res) => {
     });
   }
 
-  if (!isEmailIdentifier(email) || !isPhoneIdentifier(phone)) {
+  if (!isEmailIdentifier(email) || !isPhoneIdentifier(phone) || !isAllowedPhoneCountry(phoneCountry) || !isAllowedPhoneNumber(phone)) {
     return res.status(400).json({
-      error: "Enter a valid email address and an international phone number starting with +."
+      error: "Enter a valid email address and select an allowed phone country."
     });
   }
 
@@ -436,8 +443,8 @@ app.post("/api/auth/register", async (req, res) => {
 
   db.prepare("DELETE FROM registration_intents WHERE identifier = ?").run(identifier);
   db.prepare(
-    "INSERT INTO registration_intents (full_name, identifier, email, phone, password_hash, role, channel, otp_hash, otp_attempts, expires_at) VALUES (?, ?, ?, ?, ?, 'user', ?, ?, 0, ?)"
-  ).run(fullName, identifier, email, phone, passwordHash, channel, otpHash, expiresAt);
+    "INSERT INTO registration_intents (full_name, identifier, email, phone, phone_country, password_hash, role, channel, otp_hash, otp_attempts, expires_at) VALUES (?, ?, ?, ?, ?, ?, 'user', ?, ?, 0, ?)"
+  ).run(fullName, identifier, email, phone, phoneCountry, passwordHash, channel, otpHash, expiresAt);
 
   try {
     if (channel === "sms") {
@@ -465,6 +472,9 @@ app.post("/api/auth/register", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   const identifier = normalizeAuthIdentifier(req.body.identifier);
   const password = String(req.body.password || "");
+  if (!isEmailIdentifier(identifier) && (!isPhoneIdentifier(identifier) || !isAllowedPhoneNumber(identifier))) {
+    return res.status(400).json({ error: "Enter an allowed email address or phone number." });
+  }
   const user = findUserByIdentifier(identifier);
 
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
@@ -524,8 +534,16 @@ app.post("/api/auth/verify-otp", async (req, res) => {
   }
 
   const result = db
-    .prepare("INSERT INTO users (full_name, identifier, email, phone, password_hash, role, verified) VALUES (?, ?, ?, ?, ?, ?, 1)")
-    .run(pending.full_name, pending.identifier, pending.email, pending.phone, pending.password_hash, pending.role || "user");
+    .prepare("INSERT INTO users (full_name, identifier, email, phone, phone_country, password_hash, role, verified) VALUES (?, ?, ?, ?, ?, ?, ?, 1)")
+    .run(
+      pending.full_name,
+      pending.identifier,
+      pending.email,
+      pending.phone,
+      pending.phone_country,
+      pending.password_hash,
+      pending.role || "user"
+    );
   db.prepare("DELETE FROM registration_intents WHERE id = ?").run(pending.id);
   const verifiedUser = findUserById(result.lastInsertRowid);
   const token = signToken(verifiedUser);
@@ -575,7 +593,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     ? "If this phone number is registered, we sent a reset code by SMS."
     : "If this email is registered, we sent a reset link/code to your email address.";
 
-  if (identifier && (isEmail || isPhone)) {
+  if (identifier && (isEmail || (isPhone && isAllowedPhoneNumber(identifier)))) {
     const user = findUserByIdentifier(identifier);
     if (user) {
       const channel = getVerificationChannel(identifier);
@@ -603,6 +621,10 @@ app.post("/api/auth/reset-password", async (req, res) => {
 
   if (!identifier || !/^\d{6}$/.test(resetCode) || password.length < 8) {
     return res.status(400).json({ error: "Email, 6-digit reset code, and a new password are required." });
+  }
+
+  if (!isEmailIdentifier(identifier) && (!isPhoneIdentifier(identifier) || !isAllowedPhoneNumber(identifier))) {
+    return res.status(400).json({ error: "Enter an allowed email address or phone number." });
   }
 
   const user = findUserByIdentifier(identifier);
