@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CheckCheck, Headset, MessageSquareText, Send, UserCheck, UsersRound } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
-import { createSupportSocket } from "../services/supportSocket.js";
+import {
+  getSupportRealtimeClient,
+  mergeById,
+  supportApi,
+  supportChannelName
+} from "../services/supportRealtime.js";
 
 const statusLabel = {
   bot: "AI assisting",
@@ -11,66 +16,123 @@ const statusLabel = {
 };
 
 export default function SupportAdmin() {
-  const socketRef = useRef(null);
   const scrollRef = useRef(null);
+  const queueChannelRef = useRef(null);
+  const chatChannelRef = useRef(null);
   const activeIdRef = useRef("");
   const [connected, setConnected] = useState(false);
-  const [agentOnline, setAgentOnline] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState("");
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [reply, setReply] = useState("");
   const [typing, setTyping] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
 
   useEffect(() => {
-    const socket = createSupportSocket("agent");
-    socketRef.current = socket;
+    let cancelled = false;
+    const supabase = getSupportRealtimeClient();
 
-    socket.on("connect", () => {
-      setConnected(true);
-      socket.emit("support:join");
-    });
-    socket.on("disconnect", () => setConnected(false));
-    socket.on("support:admin-state", ({ conversations: items, agentOnline: online }) => {
-      setConversations(items || []);
-      setAgentOnline(Boolean(online));
-      if (!activeIdRef.current && items?.length) setActiveId(items[0].id);
-    });
-    socket.on("support:history", ({ conversation, messages: history }) => {
-      setActiveConversation(conversation);
-      setMessages(history || []);
-    });
-    socket.on("support:message", (message) => {
-      if (message.conversationId === activeIdRef.current) {
-        setMessages((current) => (current.some((item) => item.id === message.id) ? current : [...current, message]));
+    const loadQueue = async () => {
+      try {
+        const data = await supportApi("conversations");
+        if (cancelled) return;
+        setConversations(data.conversations || []);
+        if (!activeIdRef.current && data.conversations?.length) setActiveId(data.conversations[0].id);
+      } catch (requestError) {
+        setError(requestError.message);
       }
-    });
-    socket.on("support:conversation", (conversation) => {
-      if (conversation?.id === activeIdRef.current) setActiveConversation(conversation);
-    });
-    socket.on("support:conversation-updated", (conversation) => {
-      setConversations((current) => {
-        const without = current.filter((item) => item.id !== conversation.id);
-        return [conversation, ...without].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-      });
-      if (conversation.id === activeIdRef.current) setActiveConversation(conversation);
-    });
-    socket.on("support:agent-status", ({ online }) => setAgentOnline(Boolean(online)));
-    socket.on("support:typing", ({ role, typing: isTyping }) => setTyping(role === "visitor" || role === "user" ? Boolean(isTyping) : false));
+    };
 
-    socket.connect();
-    return () => socket.disconnect();
+    loadQueue();
+    if (!supabase) {
+      setError("Supabase Realtime environment variables are missing.");
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const queue = supabase.channel("support:agents", {
+      config: { broadcast: { self: false }, presence: { key: "admin-agent" } }
+    });
+    queue
+      .on("broadcast", { event: "conversation" }, ({ payload }) => {
+        if (!payload.conversation) return;
+        setConversations((current) => {
+          const without = current.filter((item) => item.id !== payload.conversation.id);
+          return [payload.conversation, ...without].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+        });
+        if (payload.conversation.id === activeIdRef.current) setActiveConversation(payload.conversation);
+      })
+      .subscribe((status) => {
+        setConnected(status === "SUBSCRIBED");
+        if (status === "SUBSCRIBED") {
+          setError("");
+          queue.track({ role: "agent", onlineAt: new Date().toISOString() });
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setError("Realtime support is reconnecting.");
+        }
+      });
+    queueChannelRef.current = queue;
+
+    const interval = window.setInterval(loadQueue, 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      if (queueChannelRef.current) supabase.removeChannel(queueChannelRef.current);
+      if (chatChannelRef.current) supabase.removeChannel(chatChannelRef.current);
+    };
   }, []);
 
   useEffect(() => {
-    if (!activeId || !socketRef.current?.connected) return;
-    socketRef.current.emit("support:open-conversation", { conversationId: activeId });
-    socketRef.current.emit("support:seen", { conversationId: activeId });
+    if (!activeId) return;
+    let cancelled = false;
+    const supabase = getSupportRealtimeClient();
+
+    const loadConversation = async () => {
+      try {
+        const data = await supportApi(`conversation?conversationId=${encodeURIComponent(activeId)}`);
+        if (cancelled) return;
+        setActiveConversation(data.conversation);
+        setMessages(data.messages || []);
+        await supportApi("seen", {
+          method: "POST",
+          body: JSON.stringify({ conversationId: activeId, viewerRole: "agent" })
+        });
+      } catch (requestError) {
+        setError(requestError.message);
+      }
+    };
+
+    loadConversation();
+    if (!supabase) return () => { cancelled = true; };
+
+    if (chatChannelRef.current) supabase.removeChannel(chatChannelRef.current);
+    const channel = supabase.channel(supportChannelName(activeId), {
+      config: { broadcast: { self: false }, presence: { key: "admin-agent" } }
+    });
+    channel
+      .on("broadcast", { event: "message" }, ({ payload }) => {
+        setMessages((current) => mergeById(current, [payload.message, payload.botMessage]));
+      })
+      .on("broadcast", { event: "conversation" }, ({ payload }) => {
+        if (payload.conversation) setActiveConversation(payload.conversation);
+      })
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        if (payload.role === "user") setTyping(Boolean(payload.typing));
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") channel.track({ role: "agent", onlineAt: new Date().toISOString() });
+      });
+    chatChannelRef.current = channel;
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeId]);
 
   useEffect(() => {
@@ -87,16 +149,35 @@ export default function SupportAdmin() {
     [conversations]
   );
 
-  const takeover = () => {
-    if (!activeId) return;
-    socketRef.current?.emit("support:agent-takeover", { conversationId: activeId });
+  const publishConversation = async (conversation) => {
+    await chatChannelRef.current?.send({ type: "broadcast", event: "conversation", payload: { conversation } });
+    await queueChannelRef.current?.send({ type: "broadcast", event: "conversation", payload: { conversation } });
   };
 
-  const sendReply = () => {
+  const takeover = async () => {
+    if (!activeId) return;
+    const result = await supportApi("takeover", {
+      method: "POST",
+      body: JSON.stringify({ conversationId: activeId })
+    });
+    setActiveConversation(result.conversation);
+    setMessages((current) => mergeById(current, [result.systemMessage]));
+    await publishConversation(result.conversation);
+    await chatChannelRef.current?.send({ type: "broadcast", event: "message", payload: { message: result.systemMessage } });
+  };
+
+  const sendReply = async () => {
     const text = reply.trim();
     if (!text || !activeId) return;
-    socketRef.current?.emit("support:message", { conversationId: activeId, text });
     setReply("");
+    const result = await supportApi("message", {
+      method: "POST",
+      body: JSON.stringify({ conversationId: activeId, role: "agent", text })
+    });
+    setActiveConversation(result.conversation);
+    setMessages((current) => mergeById(current, [result.message]));
+    await publishConversation(result.conversation);
+    await chatChannelRef.current?.send({ type: "broadcast", event: "message", payload: result });
   };
 
   return (
@@ -117,11 +198,13 @@ export default function SupportAdmin() {
         ))}
       </div>
 
+      {error ? <div className="notice">{error}</div> : null}
+
       <div className="support-console premium-panel">
         <aside className="conversation-list">
           <div className="conversation-list-head">
             <h3>Live Queue</h3>
-            <span className={agentOnline && connected ? "support-dot online" : "support-dot"} />
+            <span className={connected ? "support-dot online" : "support-dot"} />
           </div>
           {conversations.length ? (
             conversations.map((conversation) => (

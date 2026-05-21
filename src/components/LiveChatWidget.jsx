@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, CheckCheck, Headset, ImagePlus, Loader2, Paperclip, Send, Sparkles, X } from "lucide-react";
-import { createSupportSocket, supportVisitorId } from "../services/supportSocket.js";
+import {
+  getSupportRealtimeClient,
+  hasSupabaseConfig,
+  mergeById,
+  supportApi,
+  supportChannelName,
+  supportVisitorId
+} from "../services/supportRealtime.js";
 
 const starterPrompts = ["OTP issue", "Password reset", "Membership question", "Payment support", "Human agent"];
 
@@ -19,9 +26,10 @@ const readFileAttachment = (file) =>
   });
 
 export default function LiveChatWidget() {
-  const socketRef = useRef(null);
   const scrollRef = useRef(null);
   const fileRef = useRef(null);
+  const channelRef = useRef(null);
+  const agentChannelRef = useRef(null);
   const openRef = useRef(false);
   const visitorId = useMemo(() => supportVisitorId(), []);
   const [open, setOpen] = useState(false);
@@ -34,42 +42,83 @@ export default function LiveChatWidget() {
   const [typing, setTyping] = useState("");
   const [unread, setUnread] = useState(0);
   const [sendingFile, setSendingFile] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     openRef.current = open;
   }, [open]);
 
+  const publish = async (event, payload, channel = channelRef.current) => {
+    if (!channel) return;
+    await channel.send({ type: "broadcast", event, payload });
+  };
+
   useEffect(() => {
-    const socket = createSupportSocket("visitor");
-    socketRef.current = socket;
+    let cancelled = false;
+    const supabase = getSupportRealtimeClient();
 
-    socket.on("connect", () => {
-      setConnected(true);
-      setError("");
-      socket.emit("support:join", { visitorId });
-    });
-    socket.on("disconnect", () => setConnected(false));
-    socket.on("connect_error", () => {
-      setConnected(false);
-      setError("Live support is reconnecting.");
-    });
-    socket.on("support:history", ({ conversation: activeConversation, messages: history, agentOnline: online }) => {
-      setConversation(activeConversation);
-      setMessages(history || []);
-      setAgentOnline(Boolean(online));
-    });
-    socket.on("support:message", (message) => {
-      setMessages((current) => (current.some((item) => item.id === message.id) ? current : [...current, message]));
-      if (!openRef.current && message.role !== "user") setUnread((count) => count + 1);
-    });
-    socket.on("support:conversation", setConversation);
-    socket.on("support:agent-status", ({ online }) => setAgentOnline(Boolean(online)));
-    socket.on("support:typing", ({ role, typing: isTyping }) => setTyping(isTyping ? role : ""));
-    socket.on("support:error", ({ error: message }) => setError(message || "Support connection failed."));
+    const start = async () => {
+      try {
+        const initial = await supportApi("conversation", {
+          method: "POST",
+          body: JSON.stringify({ visitorId })
+        });
+        if (cancelled) return;
+        setConversation(initial.conversation);
+        setMessages(initial.messages || []);
 
-    socket.connect();
-    return () => socket.disconnect();
+        if (!supabase) {
+          setConnected(false);
+          setError("Realtime support is waiting for Supabase configuration.");
+          return;
+        }
+
+        const chatChannel = supabase.channel(supportChannelName(initial.conversation.id), {
+          config: { broadcast: { self: false }, presence: { key: visitorId } }
+        });
+        chatChannel
+          .on("broadcast", { event: "message" }, ({ payload }) => {
+            setMessages((current) => mergeById(current, [payload.message, payload.botMessage]));
+            if (!openRef.current && payload.message?.role !== "user") setUnread((count) => count + 1);
+          })
+          .on("broadcast", { event: "conversation" }, ({ payload }) => {
+            if (payload.conversation) setConversation(payload.conversation);
+          })
+          .on("broadcast", { event: "typing" }, ({ payload }) => {
+            if (payload.role !== "user") setTyping(payload.typing ? payload.role : "");
+          })
+          .subscribe((status) => {
+            setConnected(status === "SUBSCRIBED");
+            if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+              setError("Realtime support is reconnecting.");
+            } else if (status === "SUBSCRIBED") {
+              setError("");
+              chatChannel.track({ role: "visitor", onlineAt: new Date().toISOString() });
+            }
+          });
+        channelRef.current = chatChannel;
+
+        const agentsChannel = supabase.channel("support:agents", {
+          config: { presence: { key: visitorId }, broadcast: { self: false } }
+        });
+        agentsChannel.on("presence", { event: "sync" }, () => {
+          const state = agentsChannel.presenceState();
+          setAgentOnline(Object.values(state).flat().some((item) => item.role === "agent"));
+        });
+        agentsChannel.subscribe();
+        agentChannelRef.current = agentsChannel;
+      } catch (requestError) {
+        if (!cancelled) setError(requestError.message);
+      }
+    };
+
+    start();
+    return () => {
+      cancelled = true;
+      if (channelRef.current) supabase?.removeChannel(channelRef.current);
+      if (agentChannelRef.current) supabase?.removeChannel(agentChannelRef.current);
+    };
   }, [visitorId]);
 
   useEffect(() => {
@@ -79,33 +128,58 @@ export default function LiveChatWidget() {
   }, []);
 
   useEffect(() => {
-    if (!open || !conversation?.id || !socketRef.current?.connected) return;
+    if (!open || !conversation?.id) return;
     setUnread(0);
-    socketRef.current.emit("support:seen", { conversationId: conversation.id });
-  }, [conversation?.id, messages.length, open]);
+    supportApi("seen", {
+      method: "POST",
+      body: JSON.stringify({ conversationId: conversation.id, viewerRole: "visitor" })
+    })
+      .then((data) => {
+        setConversation(data.conversation);
+        setMessages(data.messages || []);
+        publish("conversation", { conversation: data.conversation });
+      })
+      .catch(() => {});
+  }, [conversation?.id, open]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length, typing, open]);
 
-  const sendMessage = (overrideText = "") => {
+  const sendMessage = async (overrideText = "") => {
     const body = (overrideText || text).trim();
-    if (!body && !attachments.length) return;
-    socketRef.current?.emit("support:message", {
-      conversationId: conversation?.id,
-      visitorId,
-      text: body,
-      attachments
-    });
+    if ((!body && !attachments.length) || sending) return;
+    setSending(true);
     setText("");
+    const outgoingAttachments = attachments;
     setAttachments([]);
+
+    try {
+      const result = await supportApi("message", {
+        method: "POST",
+        body: JSON.stringify({
+          conversationId: conversation?.id,
+          visitorId,
+          role: "user",
+          text: body,
+          attachments: outgoingAttachments
+        })
+      });
+      setConversation(result.conversation);
+      setMessages((current) => mergeById(current, [result.message, result.botMessage]));
+      await publish("message", result);
+      await publish("conversation", { conversation: result.conversation });
+      await agentChannelRef.current?.send({ type: "broadcast", event: "conversation", payload: { conversation: result.conversation } });
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleTyping = (value) => {
     setText(value);
-    if (conversation?.id) {
-      socketRef.current?.emit("support:typing", { conversationId: conversation.id, typing: Boolean(value) });
-    }
+    publish("typing", { conversationId: conversation?.id, role: "user", typing: Boolean(value) });
   };
 
   const handleFiles = async (event) => {
@@ -136,7 +210,7 @@ export default function LiveChatWidget() {
             <h2>Keanu Reeves Company</h2>
             <p>
               <span className={agentOnline ? "support-dot online" : "support-dot"} />
-              {agentOnline ? "Agent available" : "AI support available"}
+              {agentOnline ? "Agent available" : connected || hasSupabaseConfig() ? "AI support available" : "Realtime setup required"}
             </p>
           </div>
           <button className="icon-button" type="button" onClick={() => setOpen(false)} aria-label="Close live support">
@@ -224,8 +298,8 @@ export default function LiveChatWidget() {
             }}
             placeholder={connected ? "Type your message" : "Connecting to support"}
           />
-          <button className="send-chat" type="button" onClick={() => sendMessage()} aria-label="Send message">
-            <Send size={18} />
+          <button className="send-chat" type="button" onClick={() => sendMessage()} aria-label="Send message" disabled={sending}>
+            {sending ? <Loader2 className="spin" size={18} /> : <Send size={18} />}
           </button>
         </footer>
       </aside>
