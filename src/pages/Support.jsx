@@ -6,9 +6,9 @@ import { saveSupportMessage } from "../services/storage.js";
 const emptyMessage = { name: "", email: "", subject: "", message: "" };
 
 const faqs = [
-  ["How long does approval take?", "Management review timing depends on application volume and verification needs."],
-  ["Can I pay on this review site?", "No. Payment buttons are placeholders until an approved provider is connected."],
-  ["Where will official media go?", "Approved videos and photos can replace the placeholder media blocks before launch."]
+  ["How do I get OTP help?", "Open live support and choose OTP issue. The assistant will guide you first, then transfer the chat if needed."],
+  ["Can support help with password reset?", "Yes. Choose password reset in live support or send an email request with the account contact method."],
+  ["Can I speak with a person?", "Yes. Type agent, human, or support in the live chat to request a support takeover."]
 ];
 
 export default function Support() {
@@ -30,20 +30,20 @@ export default function Support() {
       <SectionHeader
         eyebrow="Support"
         title="Premium support for applicants and reviewers."
-        copy="Live chat and email support are ready for approved production tools. Average response time: under 10 minutes during support hours."
+        copy="Start with instant AI assistance, then continue with a human support agent when your request needs personal attention."
       />
       <div className="support-layout">
         <aside className="chat-panel premium-panel">
           <div className="agent-status">
             <span className="status-dot" />
             <Signal size={17} />
-            Agent status: Online placeholder
+            Live support desk
           </div>
           <MessageCircle size={38} />
           <h3>Speak with an Agent</h3>
           <p>Average response time: under 10 minutes during support hours.</p>
-          <button className="button primary" type="button">
-            Open Chat Placeholder
+          <button className="button primary" type="button" onClick={() => window.dispatchEvent(new Event("open-live-chat"))}>
+            Open Live Chat
           </button>
           <div className="chat-preview" aria-label="Live chat preview placeholder">
             <div className="chat-preview-header">
@@ -51,7 +51,7 @@ export default function Support() {
               <strong>Support Desk</strong>
               <small>Online</small>
             </div>
-            <div className="chat-bubble agent">Welcome. An approved live chat tool will connect here.</div>
+            <div className="chat-bubble agent">Welcome. I can help with OTP, reset, membership, and payment questions.</div>
             <div className="chat-bubble user">I need help with my membership card application.</div>
             <div className="typing-dots" aria-label="Agent typing">
               <span />

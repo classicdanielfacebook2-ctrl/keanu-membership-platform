@@ -2,10 +2,14 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { MongoClient } from "mongodb";
+import { Server as SocketIOServer } from "socket.io";
 import { isAllowedPhoneCountry, isAllowedPhoneNumber } from "../src/data/phoneCountries.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -96,6 +100,7 @@ const RESET_EXPIRES_MINUTES = 15;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const OTP_FROM_EMAIL = "verification@keanureeves.company";
 const COMPANY_NAME = "Keanu Reeves Company";
+const SUPPORT_DB_NAME = process.env.MONGODB_DB || "keanu_membership_platform";
 
 if (isProduction && !process.env.AUTH_JWT_SECRET) {
   throw new Error("AUTH_JWT_SECRET must be set before running authentication in production.");
@@ -104,6 +109,18 @@ if (isProduction && !process.env.AUTH_JWT_SECRET) {
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
+
+const httpServer = createServer(app);
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: [
+      "http://127.0.0.1:4173",
+      "http://localhost:4173",
+      process.env.FRONTEND_ORIGIN || ""
+    ].filter(Boolean),
+    credentials: true
+  }
+});
 
 const normalizeIdentifier = (value = "") => value.trim().toLowerCase();
 const isEmailIdentifier = (value = "") => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -399,6 +416,365 @@ const requireAuth = (req, res, next) => {
   }
 };
 
+let supportMongoClientPromise = null;
+let supportMongoWarningShown = false;
+const onlineAgents = new Map();
+const supportMemory = {
+  conversations: new Map(),
+  messages: new Map()
+};
+
+const supportCollections = async () => {
+  if (!process.env.MONGODB_URI) {
+    if (!supportMongoWarningShown) {
+      console.warn("MONGODB_URI missing. Support chat will use temporary memory storage in local development.");
+      supportMongoWarningShown = true;
+    }
+    return null;
+  }
+
+  if (!supportMongoClientPromise) {
+    console.log("MongoDB URI found for support chat.");
+    supportMongoClientPromise = new MongoClient(process.env.MONGODB_URI).connect();
+  }
+
+  const client = await supportMongoClientPromise;
+  const database = client.db(SUPPORT_DB_NAME);
+  return {
+    conversations: database.collection("supportConversations"),
+    messages: database.collection("supportMessages")
+  };
+};
+
+const supportNow = () => new Date().toISOString();
+
+const defaultConversation = (visitorId) => ({
+  id: randomUUID(),
+  visitorId,
+  status: "bot",
+  assignedAgent: "",
+  agentRequested: false,
+  unreadForAgent: 0,
+  unreadForVisitor: 0,
+  lastMessage: "Conversation opened",
+  createdAt: supportNow(),
+  updatedAt: supportNow()
+});
+
+const normalizeConversation = (conversation) =>
+  conversation
+    ? {
+        id: conversation.id,
+        visitorId: conversation.visitorId,
+        status: conversation.status || "bot",
+        assignedAgent: conversation.assignedAgent || "",
+        agentRequested: Boolean(conversation.agentRequested),
+        unreadForAgent: Number(conversation.unreadForAgent || 0),
+        unreadForVisitor: Number(conversation.unreadForVisitor || 0),
+        lastMessage: conversation.lastMessage || "",
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt
+      }
+    : null;
+
+const getSupportConversationByVisitor = async (visitorId) => {
+  const collections = await supportCollections();
+  if (collections) {
+    const existing = await collections.conversations.findOne({ visitorId });
+    if (existing) return normalizeConversation(existing);
+  } else {
+    const existing = [...supportMemory.conversations.values()].find((item) => item.visitorId === visitorId);
+    if (existing) return normalizeConversation(existing);
+  }
+
+  const conversation = defaultConversation(visitorId);
+  await saveSupportConversation(conversation);
+  return conversation;
+};
+
+const getSupportConversationById = async (id) => {
+  const collections = await supportCollections();
+  if (collections) {
+    return normalizeConversation(await collections.conversations.findOne({ id }));
+  }
+  return normalizeConversation(supportMemory.conversations.get(id));
+};
+
+const saveSupportConversation = async (conversation) => {
+  const normalized = normalizeConversation({ ...conversation, updatedAt: supportNow() });
+  const collections = await supportCollections();
+  if (collections) {
+    await collections.conversations.updateOne({ id: normalized.id }, { $set: normalized }, { upsert: true });
+  } else {
+    supportMemory.conversations.set(normalized.id, normalized);
+  }
+  return normalized;
+};
+
+const listSupportConversations = async () => {
+  const collections = await supportCollections();
+  if (collections) {
+    const items = await collections.conversations.find({}).sort({ updatedAt: -1 }).limit(100).toArray();
+    return items.map(normalizeConversation);
+  }
+  return [...supportMemory.conversations.values()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+};
+
+const getSupportMessages = async (conversationId) => {
+  const collections = await supportCollections();
+  if (collections) {
+    return collections.messages.find({ conversationId }).sort({ createdAt: 1 }).limit(250).toArray();
+  }
+  return supportMemory.messages.get(conversationId) || [];
+};
+
+const saveSupportMessage = async ({ conversationId, role, text, attachments = [], status = "delivered", author = "" }) => {
+  const message = {
+    id: randomUUID(),
+    conversationId,
+    role,
+    author,
+    text: String(text || "").trim(),
+    attachments,
+    status,
+    createdAt: supportNow()
+  };
+  const collections = await supportCollections();
+  if (collections) {
+    await collections.messages.insertOne(message);
+  } else {
+    supportMemory.messages.set(conversationId, [...(supportMemory.messages.get(conversationId) || []), message]);
+  }
+  return message;
+};
+
+const markConversationMessagesSeen = async (conversationId, viewerRole) => {
+  const rolesToUpdate = viewerRole === "agent" ? ["user"] : ["agent", "bot"];
+  const collections = await supportCollections();
+  if (collections) {
+    await collections.messages.updateMany({ conversationId, role: { $in: rolesToUpdate } }, { $set: { status: "seen" } });
+  } else {
+    const messages = supportMemory.messages.get(conversationId) || [];
+    supportMemory.messages.set(
+      conversationId,
+      messages.map((message) => (rolesToUpdate.includes(message.role) ? { ...message, status: "seen" } : message))
+    );
+  }
+};
+
+const needsHumanAgent = (text = "") =>
+  /\b(human|agent|support|representative|person|staff|unresolved)\b/i.test(text) ||
+  /\b(still|cannot|can't|failed|broken|not working|no code|no otp)\b/i.test(text);
+
+const ruleBasedSupportReply = (text = "") => {
+  const normalized = text.toLowerCase();
+  if (/\botp|verification|code\b/.test(normalized)) {
+    return "For verification code issues, confirm the selected email or phone number, then use Resend Code. If the code still does not arrive, I can connect you with support.";
+  }
+  if (/password|reset|login|sign in/.test(normalized)) {
+    return "For password recovery, open Forgot password, choose email or SMS, enter the code you receive, and set a new password. I can transfer this chat if the reset is not working.";
+  }
+  if (/membership|card|silver|gold|vip|premium|apply/.test(normalized)) {
+    return "Membership applications begin from the Apply page. Choose a card level, complete your details, then continue through the guided application flow.";
+  }
+  if (/payment|pay|stripe|paypal|purchase|paid/.test(normalized)) {
+    return "Payments should only be completed through an approved secure payment provider. The current review site will not collect card details manually.";
+  }
+  return "I can help with verification, password recovery, membership cards, and payment questions. If this needs a person, type agent and I will transfer the conversation.";
+};
+
+const openAiSupportReply = async (text) => {
+  if (!process.env.OPENAI_API_KEY) return "";
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        temperature: 0.3,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are the premium support assistant for Keanu Reeves Company membership platform. Be concise, professional, and helpful. Help only with OTP, password reset, membership questions, and payment support. If a human is needed, say you will transfer the conversation."
+          },
+          { role: "user", content: text }
+        ]
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error?.message || "OpenAI support reply failed.");
+    }
+    return data?.choices?.[0]?.message?.content?.trim() || "";
+  } catch (error) {
+    console.error("OpenAI support reply failed", { message: error.message });
+    return "";
+  }
+};
+
+const sendAdminState = async () => {
+  io.to("support:agents").emit("support:admin-state", {
+    conversations: await listSupportConversations(),
+    agentOnline: onlineAgents.size > 0
+  });
+};
+
+const broadcastConversationUpdate = async (conversationId) => {
+  const conversation = await getSupportConversationById(conversationId);
+  io.to("support:agents").emit("support:conversation-updated", conversation);
+  io.to(`support:${conversationId}`).emit("support:conversation", conversation);
+};
+
+io.on("connection", (socket) => {
+  const role = socket.handshake.query.role === "agent" ? "agent" : "visitor";
+
+  if (role === "agent") {
+    onlineAgents.set(socket.id, true);
+    socket.join("support:agents");
+    io.emit("support:agent-status", { online: true, count: onlineAgents.size });
+    sendAdminState();
+  }
+
+  socket.on("support:join", async ({ visitorId } = {}) => {
+    try {
+      if (role === "agent") {
+        await sendAdminState();
+        return;
+      }
+
+      const safeVisitorId = String(visitorId || randomUUID()).slice(0, 120);
+      const conversation = await getSupportConversationByVisitor(safeVisitorId);
+      socket.join(`support:${conversation.id}`);
+      socket.emit("support:history", {
+        conversation,
+        messages: await getSupportMessages(conversation.id),
+        agentOnline: onlineAgents.size > 0
+      });
+    } catch (error) {
+      socket.emit("support:error", { error: error.message });
+    }
+  });
+
+  socket.on("support:open-conversation", async ({ conversationId } = {}) => {
+    if (role !== "agent" || !conversationId) return;
+    socket.join(`support:${conversationId}`);
+    socket.emit("support:history", {
+      conversation: await getSupportConversationById(conversationId),
+      messages: await getSupportMessages(conversationId),
+      agentOnline: onlineAgents.size > 0
+    });
+  });
+
+  socket.on("support:typing", ({ conversationId, typing }) => {
+    if (!conversationId) return;
+    socket.to(`support:${conversationId}`).emit("support:typing", { role, typing: Boolean(typing) });
+  });
+
+  socket.on("support:seen", async ({ conversationId } = {}) => {
+    if (!conversationId) return;
+    await markConversationMessagesSeen(conversationId, role);
+    const conversation = await getSupportConversationById(conversationId);
+    const patch =
+      role === "agent" ? { ...conversation, unreadForAgent: 0 } : { ...conversation, unreadForVisitor: 0 };
+    await saveSupportConversation(patch);
+    await broadcastConversationUpdate(conversationId);
+  });
+
+  socket.on("support:agent-takeover", async ({ conversationId } = {}) => {
+    if (role !== "agent" || !conversationId) return;
+    const conversation = await getSupportConversationById(conversationId);
+    if (!conversation) return;
+    const updated = await saveSupportConversation({
+      ...conversation,
+      status: "agent",
+      assignedAgent: socket.id,
+      agentRequested: false
+    });
+    const message = await saveSupportMessage({
+      conversationId,
+      role: "system",
+      text: "A support agent has joined the conversation.",
+      status: "delivered"
+    });
+    io.to(`support:${conversationId}`).emit("support:message", message);
+    io.to(`support:${conversationId}`).emit("support:conversation", updated);
+    await sendAdminState();
+  });
+
+  socket.on("support:message", async ({ conversationId, visitorId, text, attachments = [] } = {}) => {
+    try {
+      const conversation = conversationId
+        ? await getSupportConversationById(conversationId)
+        : await getSupportConversationByVisitor(String(visitorId || randomUUID()).slice(0, 120));
+
+      if (!conversation) return;
+      socket.join(`support:${conversation.id}`);
+
+      const messageRole = role === "agent" ? "agent" : "user";
+      const message = await saveSupportMessage({
+        conversationId: conversation.id,
+        role: messageRole,
+        author: role === "agent" ? "Support Agent" : "Visitor",
+        text,
+        // Production should move file payloads to Vercel Blob/S3 and store only signed URLs here.
+        attachments: Array.isArray(attachments) ? attachments.slice(0, 4) : []
+      });
+      io.to(`support:${conversation.id}`).emit("support:message", message);
+
+      const transferNeeded = messageRole === "user" && needsHumanAgent(text);
+      const updatedConversation = await saveSupportConversation({
+        ...conversation,
+        status: messageRole === "agent" ? "agent" : transferNeeded ? "waiting_agent" : conversation.status,
+        agentRequested: transferNeeded || conversation.agentRequested,
+        unreadForAgent: messageRole === "user" ? conversation.unreadForAgent + 1 : conversation.unreadForAgent,
+        unreadForVisitor: messageRole === "agent" ? conversation.unreadForVisitor + 1 : conversation.unreadForVisitor,
+        lastMessage: message.text || (message.attachments?.length ? "File attachment" : ""),
+        assignedAgent: messageRole === "agent" ? socket.id : conversation.assignedAgent
+      });
+      io.to(`support:${conversation.id}`).emit("support:conversation", updatedConversation);
+      await sendAdminState();
+
+      if (messageRole === "user" && updatedConversation.status !== "agent") {
+        io.to(`support:${conversation.id}`).emit("support:typing", { role: "bot", typing: true });
+        const aiReply =
+          transferNeeded
+            ? "I will connect you with a support agent. Please keep this chat open while the team reviews your message."
+            : (await openAiSupportReply(message.text)) || ruleBasedSupportReply(message.text);
+        const botMessage = await saveSupportMessage({
+          conversationId: conversation.id,
+          role: "bot",
+          author: "AI Support",
+          text: aiReply
+        });
+        const afterBot = await saveSupportConversation({
+          ...updatedConversation,
+          unreadForVisitor: updatedConversation.unreadForVisitor + 1,
+          lastMessage: aiReply
+        });
+        io.to(`support:${conversation.id}`).emit("support:typing", { role: "bot", typing: false });
+        io.to(`support:${conversation.id}`).emit("support:message", botMessage);
+        io.to(`support:${conversation.id}`).emit("support:conversation", afterBot);
+        await sendAdminState();
+      }
+    } catch (error) {
+      socket.emit("support:error", { error: error.message });
+    }
+  });
+
+  socket.on("disconnect", () => {
+    if (role === "agent") {
+      onlineAgents.delete(socket.id);
+      io.emit("support:agent-status", { online: onlineAgents.size > 0, count: onlineAgents.size });
+      sendAdminState();
+    }
+  });
+});
+
 app.post("/api/auth/register", async (req, res) => {
   const fullName = String(req.body.fullName || "").trim();
   const email = normalizeAuthIdentifier(req.body.email || req.body.identifier);
@@ -675,8 +1051,8 @@ app.get("/api/health", (_req, res) => {
 
 await seedAdminFromEnvironment();
 
-app.listen(PORT, "127.0.0.1", () => {
-  console.log(`Auth API running at http://127.0.0.1:${PORT}`);
+httpServer.listen(PORT, "127.0.0.1", () => {
+  console.log(`Auth and support API running at http://127.0.0.1:${PORT}`);
   if (JWT_SECRET === "replace-this-secret-before-production") {
     console.warn("AUTH_JWT_SECRET is using the development fallback. Set a strong secret before production.");
   }

@@ -9,6 +9,7 @@ import {
   LogIn,
   LogOut,
   Menu,
+  MessagesSquare,
   Sparkles,
   ShieldCheck,
   X
@@ -20,11 +21,13 @@ import Apply from "./pages/Apply.jsx";
 import Payment from "./pages/Payment.jsx";
 import Support from "./pages/Support.jsx";
 import Admin from "./pages/Admin.jsx";
+import SupportAdmin from "./pages/SupportAdmin.jsx";
 import PolicyPage from "./pages/PolicyPage.jsx";
 import Journey from "./pages/Journey.jsx";
 import MediaReview from "./pages/MediaReview.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import LiveChatWidget from "./components/LiveChatWidget.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
 import { getApprovedHomeImages } from "./data/homeImages.js";
 
@@ -39,6 +42,7 @@ const navItems = [
 
 const adminNavItems = [
   { to: "/admin", label: "Admin", icon: LayoutDashboard },
+  { to: "/admin/support", label: "Support Desk", icon: MessagesSquare },
   { to: "/media-review", label: "Media", icon: Image }
 ];
 
@@ -69,6 +73,7 @@ export default function App() {
   }, []);
 
   const showBrandImage = brandImage && !brandImageFailed;
+  const showLiveChat = !location.pathname.startsWith("/admin") && location.pathname !== "/media-review";
 
   return (
     <div className="app-shell">
@@ -150,6 +155,14 @@ export default function App() {
             }
           />
           <Route
+            path="/admin/support"
+            element={
+              <ProtectedRoute adminOnly>
+                <SupportAdmin />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/media-review"
             element={
               <ProtectedRoute adminOnly>
@@ -166,6 +179,8 @@ export default function App() {
           <Route path="/refund" element={<PolicyPage type="refund" />} />
         </Routes>
       </main>
+
+      {showLiveChat ? <LiveChatWidget /> : null}
 
       <footer className="site-footer">
         <div className="footer-brand">
