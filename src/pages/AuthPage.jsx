@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { LockKeyhole, MailCheck, ShieldCheck } from "lucide-react";
 import { forgotPassword, resetPassword } from "../services/authApi.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { allowedPhoneCountries, getAllowedPhoneCountry, getCountryFlag } from "../data/phoneCountries.js";
@@ -20,6 +19,7 @@ export default function AuthPage({ mode }) {
     email: "",
     phone: "",
     countryIso: "US",
+    recoveryIdentifier: "",
     password: ""
   });
   const [method, setMethod] = useState("email");
@@ -39,7 +39,7 @@ export default function AuthPage({ mode }) {
   );
   const selectedCountry = getAllowedPhoneCountry(form.countryIso);
   const phoneIdentifier = `${selectedCountry.callingCode}${cleanPhone(form.phone)}`;
-  const selectedIdentifier = method === "sms" ? phoneIdentifier : form.email.trim();
+  const selectedIdentifier = isForgot ? form.recoveryIdentifier.trim() : method === "sms" ? phoneIdentifier : form.email.trim();
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -69,7 +69,7 @@ export default function AuthPage({ mode }) {
         setMessage(data.message);
       } else if (isReset) {
         const data = await resetPassword({ identifier: selectedIdentifier, resetCode: otp, password: form.password });
-        setMessage(data.message || "Password updated. You can now log in.");
+        setMessage(data.message || "Password updated.");
         setOtp("");
         updateField("password", "");
       } else if (isRegister) {
@@ -84,7 +84,7 @@ export default function AuthPage({ mode }) {
         setVerificationPending(Boolean(data.verificationRequired));
         setVerificationIdentifier(data.identifier || selectedIdentifier);
         setVerificationChannel(data.channel || method);
-        setMessage(data.message || "A verification code has been sent.");
+        setMessage("");
       } else {
         await auth.login({ identifier: selectedIdentifier, password: form.password });
         completeAuth();
@@ -132,21 +132,7 @@ export default function AuthPage({ mode }) {
     }
   };
 
-  const title = isRegister
-    ? "Create account"
-    : isForgot
-      ? "Request reset"
-      : isReset
-        ? "Reset password"
-        : "Welcome back";
-
-  const subtitle = isRegister
-    ? "Apply with verified contact details before account activation."
-    : isForgot
-      ? "Choose where you want to receive your reset code."
-      : isReset
-        ? "Enter the code we sent and choose a new password."
-        : "Sign in with your preferred verified contact method.";
+  const pageCopy = getAuthCopy({ isRegister, isForgot, isReset, verificationPending });
 
   return (
     <section className="auth-page">
@@ -155,26 +141,23 @@ export default function AuthPage({ mode }) {
           {logoFailed ? <img src="/logo.svg" alt="" /> : <img src={authLogo} alt="" onError={() => setLogoFailed(true)} />}
         </div>
         <div className="auth-heading">
-          <span className="eyebrow">Secure Account</span>
-          <h1>{verificationPending ? "Verify code" : title}</h1>
-          <p>{verificationPending ? codeDestinationText(verificationChannel) : subtitle}</p>
+          <span className="eyebrow">{pageCopy.label}</span>
+          <h1>{pageCopy.heading}</h1>
+          <p>{pageCopy.subtitle}</p>
         </div>
 
         <form className="auth-form" onSubmit={verificationPending ? handleVerifyOtp : handleSubmit}>
-          <div className="auth-security-note">
-            {verificationPending ? <MailCheck size={17} /> : isForgot || isReset ? <ShieldCheck size={17} /> : <LockKeyhole size={17} />}
-            <span>
-              {verificationPending
-                ? `Code sent to ${verificationIdentifier}.`
-                : "Protected with encrypted passwords, secure sessions, and OTP verification."}
-            </span>
-          </div>
-
           {!verificationPending && isRegister ? (
             <>
               <label htmlFor="fullName">
                 Full Name
-                <input id="fullName" required value={form.fullName} onChange={(event) => updateField("fullName", event.target.value)} />
+                <input
+                  id="fullName"
+                  required
+                  placeholder="Enter your full name"
+                  value={form.fullName}
+                  onChange={(event) => updateField("fullName", event.target.value)}
+                />
               </label>
               <label htmlFor="email">
                 Email Address
@@ -182,35 +165,55 @@ export default function AuthPage({ mode }) {
                   id="email"
                   required
                   type="email"
+                  placeholder="Enter your email address"
                   value={form.email}
                   onChange={(event) => updateField("email", event.target.value)}
                 />
               </label>
-              <PhoneField form={form} updateField={updateField} />
-              <MethodTabs label="Choose verification method" method={method} setMethod={setMethod} emailLabel="Email OTP" smsLabel="SMS OTP" />
+              <PhoneField form={form} updateField={updateField} placeholder="Enter your phone number" />
+              <MethodTabs label="Verification method" method={method} setMethod={setMethod} emailLabel="Email OTP" smsLabel="SMS OTP" />
             </>
           ) : null}
 
           {!verificationPending && !isRegister && !isReset && !isForgot ? (
-            <MethodTabs label="Login method" method={method} setMethod={setMethod} emailLabel="Login with Email" smsLabel="Login with Phone" />
-          ) : null}
-
-          {!verificationPending && isForgot ? (
-            <MethodTabs label="Reset method" method={method} setMethod={setMethod} emailLabel="Reset by Email" smsLabel="Reset by SMS" />
+            <MethodTabs label="Continue with" method={method} setMethod={setMethod} emailLabel="Email" smsLabel="Phone" />
           ) : null}
 
           {!verificationPending && isReset ? (
-            <MethodTabs label="Code method" method={method} setMethod={setMethod} emailLabel="Email Code" smsLabel="SMS Code" />
+            <MethodTabs label="Continue with" method={method} setMethod={setMethod} emailLabel="Email" smsLabel="Phone" />
           ) : null}
 
-          {!verificationPending && !isRegister && method === "email" ? (
-            <label htmlFor="email">
-              Email Address
-              <input id="email" required type="email" value={form.email} onChange={(event) => updateField("email", event.target.value)} />
+          {!verificationPending && isForgot ? (
+            <label htmlFor="recoveryIdentifier">
+              Account Contact
+              <input
+                id="recoveryIdentifier"
+                required
+                type="text"
+                placeholder="Email address or phone number"
+                value={form.recoveryIdentifier}
+                onChange={(event) => updateField("recoveryIdentifier", event.target.value)}
+              />
             </label>
           ) : null}
 
-          {!verificationPending && !isRegister && method === "sms" ? <PhoneField form={form} updateField={updateField} /> : null}
+          {!verificationPending && !isRegister && !isForgot && method === "email" ? (
+            <label htmlFor="email">
+              Email Address
+              <input
+                id="email"
+                required
+                type="email"
+                placeholder="Enter your email address"
+                value={form.email}
+                onChange={(event) => updateField("email", event.target.value)}
+              />
+            </label>
+          ) : null}
+
+          {!verificationPending && !isRegister && !isForgot && method === "sms" ? (
+            <PhoneField form={form} updateField={updateField} placeholder="Enter your phone number" />
+          ) : null}
 
           {!verificationPending && !isForgot ? (
             <label htmlFor="password">
@@ -220,6 +223,7 @@ export default function AuthPage({ mode }) {
                 required
                 minLength="8"
                 type="password"
+                placeholder={isRegister || isReset ? "Create a secure password" : "Enter your password"}
                 value={form.password}
                 onChange={(event) => updateField("password", event.target.value)}
               />
@@ -236,6 +240,7 @@ export default function AuthPage({ mode }) {
                 maxLength="6"
                 minLength="6"
                 pattern="[0-9]{6}"
+                placeholder="Enter verification code"
                 value={otp}
                 onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
               />
@@ -251,42 +256,43 @@ export default function AuthPage({ mode }) {
               : verificationPending
                 ? "Verify Account"
                 : isForgot
-                  ? "Request Reset"
+                  ? "Continue"
                   : isReset
                     ? "Update Password"
                     : isRegister
                       ? "Create Account"
-                      : "Login"}
+                      : "Sign In"}
           </button>
 
           {verificationPending ? (
-            <button className="button secondary auth-submit" type="button" onClick={handleResendOtp} disabled={submitting}>
-              Resend Code
-            </button>
+            <div className="resend-code-row">
+              <span>Didn't receive the code?</span>
+              <button type="button" onClick={handleResendOtp} disabled={submitting}>
+                Resend Code
+              </button>
+            </div>
           ) : null}
 
-          <div className="auth-links">
-            {verificationPending ? <Link to="/login">Back to login</Link> : null}
-            {!verificationPending && isRegister ? <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`}>Already have an account?</Link> : null}
-            {!verificationPending && !isRegister && !isForgot && !isReset ? (
-              <>
-                <Link to={`/register?returnTo=${encodeURIComponent(returnTo)}`}>Create account</Link>
-                <Link to="/forgot-password">Forgot password?</Link>
-              </>
-            ) : null}
-            {!verificationPending && isForgot ? (
-              <>
-                <Link to="/reset-password">Enter reset code</Link>
-                <Link to="/login">Back to login</Link>
-              </>
-            ) : null}
-            {!verificationPending && isReset ? (
-              <>
-                <Link to="/forgot-password">Request a new code</Link>
-                <Link to="/login">Back to login</Link>
-              </>
-            ) : null}
-          </div>
+          {!verificationPending ? (
+            <div className="auth-links">
+              {isRegister ? <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`}>Already have an account?</Link> : null}
+              {!isRegister && !isForgot && !isReset ? (
+                <>
+                  <Link to={`/register?returnTo=${encodeURIComponent(returnTo)}`}>Create account</Link>
+                  <Link to="/forgot-password">Forgot password?</Link>
+                </>
+              ) : null}
+              {isForgot ? (
+                <Link to="/login">Back to sign in</Link>
+              ) : null}
+              {isReset ? (
+                <>
+                  <Link to="/forgot-password">Reset password</Link>
+                  <Link to="/login">Back to sign in</Link>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </form>
       </div>
     </section>
@@ -319,7 +325,7 @@ function MethodTabs({ label, method, setMethod, emailLabel, smsLabel }) {
   );
 }
 
-function PhoneField({ form, updateField }) {
+function PhoneField({ form, updateField, placeholder = "Phone number" }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapperRef = useRef(null);
@@ -393,7 +399,7 @@ function PhoneField({ form, updateField }) {
           id="phone"
           required
           inputMode="tel"
-          placeholder="Phone number"
+          placeholder={placeholder}
           value={form.phone}
           onChange={(event) => updateField("phone", event.target.value)}
         />
@@ -402,8 +408,42 @@ function PhoneField({ form, updateField }) {
   );
 }
 
-function codeDestinationText(channel) {
-  return channel === "sms"
-    ? "A verification code was sent to your phone number."
-    : "A verification code was sent to your email address.";
+function getAuthCopy({ isRegister, isForgot, isReset, verificationPending }) {
+  if (verificationPending) {
+    return {
+      label: "ACCOUNT VERIFICATION",
+      heading: "Verify your identity",
+      subtitle: "Enter the verification code sent to your contact method."
+    };
+  }
+
+  if (isRegister) {
+    return {
+      label: "MEMBERSHIP REGISTRATION",
+      heading: "Create your account",
+      subtitle: "Complete your details to activate your membership access."
+    };
+  }
+
+  if (isForgot) {
+    return {
+      label: "ACCOUNT RECOVERY",
+      heading: "Reset your password",
+      subtitle: "Enter your email address or phone number to continue."
+    };
+  }
+
+  if (isReset) {
+    return {
+      label: "ACCOUNT RECOVERY",
+      heading: "Reset your password",
+      subtitle: "Enter your verification code and new password."
+    };
+  }
+
+  return {
+    label: "MEMBER ACCESS",
+    heading: "Welcome back",
+    subtitle: "Sign in to continue to your account."
+  };
 }

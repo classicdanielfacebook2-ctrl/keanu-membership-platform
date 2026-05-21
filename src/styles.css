@@ -614,6 +614,31 @@ button:disabled {
   line-height: 1.45;
 }
 
+.resend-code-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  padding-top: 0.15rem;
+}
+
+.resend-code-row button {
+  border: 0;
+  background: transparent;
+  color: var(--gold-light);
+  cursor: pointer;
+  font-weight: 900;
+  padding: 0;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.resend-code-row button:hover {
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
 .auth-links {
   display: flex;
   flex-wrap: wrap;
