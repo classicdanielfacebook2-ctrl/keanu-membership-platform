@@ -358,6 +358,37 @@ const getSupabaseAuthClient = () => {
   });
 };
 
+const getSupabaseAdminClient = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!url || !serviceRoleKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required so password recovery can create or verify Supabase Auth users.");
+  }
+  return createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+};
+
+const createRecoveryPassword = () => `${crypto.randomUUID()}-${crypto.randomUUID()}-KR`;
+
+const ensureSupabaseAuthUser = async ({ email, user }) => {
+  const admin = getSupabaseAdminClient();
+  const { error } = await admin.auth.admin.createUser({
+    email,
+    password: createRecoveryPassword(),
+    email_confirm: true,
+    user_metadata: {
+      full_name: user.full_name || "",
+      sqlite_user_id: String(user.id || ""),
+      source: "keanu-membership-platform-dev"
+    }
+  });
+
+  if (error && !/already|registered|exists|duplicate/i.test(error.message || "")) {
+    throw error;
+  }
+};
+
 const seedAdminFromEnvironment = async () => {
   const fullName = String(process.env.ADMIN_FULL_NAME || "Management Admin").trim();
   const identifier = normalizeIdentifier(process.env.ADMIN_IDENTIFIER);
@@ -613,6 +644,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
   }
 
   try {
+    await ensureSupabaseAuthUser({ email: identifier, user });
     const supabase = getSupabaseAuthClient();
     const { error } = await supabase.auth.resetPasswordForEmail(identifier, {
       redirectTo: PASSWORD_RECOVERY_REDIRECT

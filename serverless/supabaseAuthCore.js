@@ -20,6 +20,42 @@ const getSupabaseAuthClient = () => {
   });
 };
 
+const getSupabaseAdminClient = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+  if (!url || !serviceRoleKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required so password recovery can create or verify Supabase Auth users.");
+  }
+
+  return createClient(url, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+};
+
+const createRecoveryPassword = () => `${crypto.randomUUID()}-${crypto.randomUUID()}-KR`;
+
+const ensureSupabaseAuthUser = async ({ email, user }) => {
+  const admin = getSupabaseAdminClient();
+  const { error } = await admin.auth.admin.createUser({
+    email,
+    password: createRecoveryPassword(),
+    email_confirm: true,
+    user_metadata: {
+      full_name: user.fullName || user.full_name || "",
+      mongo_user_id: String(user._id || user.id || ""),
+      source: "keanu-membership-platform"
+    }
+  });
+
+  if (error && !/already|registered|exists|duplicate/i.test(error.message || "")) {
+    throw error;
+  }
+};
+
 export const requestSupabasePasswordRecovery = async ({ identifier }) => {
   const email = normalizeAuthIdentifier(identifier);
 
@@ -32,6 +68,21 @@ export const requestSupabasePasswordRecovery = async ({ identifier }) => {
 
   if (!user) {
     return { status: 404, payload: { error: "No account was found for that email address." } };
+  }
+
+  try {
+    await ensureSupabaseAuthUser({ email, user });
+  } catch (error) {
+    console.error("[auth/forgot-password]", {
+      message: "Supabase Auth user provisioning failed",
+      error: error?.message
+    });
+    return {
+      status: 500,
+      payload: {
+        error: error?.message || "Password recovery could not be prepared."
+      }
+    };
   }
 
   const supabase = getSupabaseAuthClient();
