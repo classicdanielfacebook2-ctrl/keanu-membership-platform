@@ -129,7 +129,7 @@ export const insertMessage = async ({ conversationId, role, text, attachments = 
     .insert({
       conversation_id: conversationId,
       role,
-      author: author || (role === "agent" ? "Support Agent" : role === "bot" ? "AI Support" : "Visitor"),
+      author: author || (role === "agent" ? "Concierge Specialist" : role === "bot" ? "Member Concierge" : "Member"),
       text: text || "",
       attachments,
       status: "delivered"

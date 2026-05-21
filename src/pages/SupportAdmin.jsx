@@ -160,7 +160,7 @@ export default function SupportAdmin() {
       conversationId: activeId,
       role: "system",
       author: "System",
-      text: "A support agent has joined the conversation."
+      text: "A concierge specialist has joined the conversation."
     });
     setActiveConversation(updated);
     setMessages((current) => mergeById(current, [systemMessage]));

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, CheckCheck, Headset, ImagePlus, Loader2, Paperclip, Send, Sparkles, X } from "lucide-react";
+import { Bot, Headset, ImagePlus, Loader2, Paperclip, Send, Sparkles, X } from "lucide-react";
 import {
   getOrCreateConversation,
   getSupportRealtimeClient,
@@ -15,7 +15,7 @@ import {
   updateConversation
 } from "../services/supportRealtime.js";
 
-const starterPrompts = ["OTP issue", "Password reset", "Membership question", "Payment support", "Human agent"];
+const starterPrompts = ["Verification", "Account access", "Membership", "Payment", "Concierge"];
 
 const readFileAttachment = (file) =>
   new Promise((resolve, reject) => {
@@ -38,21 +38,21 @@ const needsHumanAgent = (text = "") =>
 const botReply = (text = "") => {
   const normalized = text.toLowerCase();
   if (needsHumanAgent(normalized)) {
-    return "I will connect you with a support agent. Please keep this chat open while the team reviews your message.";
+    return "A concierge specialist can assist further.";
   }
   if (/\botp|verification|code\b/.test(normalized)) {
-    return "For verification code issues, confirm the selected email or phone number, then use Resend Code. If it still does not arrive, request a support agent here.";
+    return "Your verification request has been received.";
   }
   if (/password|reset|login|sign in/.test(normalized)) {
-    return "For password recovery, open Forgot password, choose email or SMS, enter the code, and set a new password. I can transfer this chat if it does not work.";
+    return "Please confirm the registered contact method.";
   }
   if (/membership|card|silver|gold|vip|premium|apply/.test(normalized)) {
-    return "Membership applications begin from the Apply page. Choose a card level, complete your details, and continue through the guided application flow.";
+    return "We’re checking that for you.";
   }
   if (/payment|pay|stripe|paypal|purchase|paid/.test(normalized)) {
-    return "Payments should only be completed through an approved secure payment provider. Do not enter card details manually on the review site.";
+    return "Your payment inquiry is noted.";
   }
-  return "I can help with verification, password recovery, membership cards, and payment questions. If this needs a person, type agent and I will transfer the conversation.";
+  return "Your account status appears active.";
 };
 
 export default function LiveChatWidget() {
@@ -186,6 +186,7 @@ export default function LiveChatWidget() {
       });
       setConversation(updated);
 
+      setTyping("bot");
       await messageChannelRef.current?.send({
         type: "broadcast",
         event: "typing",
@@ -202,6 +203,7 @@ export default function LiveChatWidget() {
           });
           setConversation(afterBot);
         } finally {
+          setTyping("");
           messageChannelRef.current?.send({
             type: "broadcast",
             event: "typing",
@@ -253,7 +255,7 @@ export default function LiveChatWidget() {
             <h2>Keanu Reeves Company</h2>
             <p>
               <span className={connected ? "support-dot online" : "support-dot"} />
-              {connected ? (agentOnline ? "Agent available" : "Online support available") : "Support initializing"}
+              {connected ? (agentOnline ? "Concierge specialist online" : "Concierge assistant online") : "Support initializing"}
             </p>
           </div>
           <button className="icon-button" type="button" onClick={() => setOpen(false)} aria-label="Close live support">
@@ -265,8 +267,8 @@ export default function LiveChatWidget() {
           {!messages.length ? (
             <div className="support-welcome">
               <Sparkles size={24} />
-              <strong>How can we assist?</strong>
-              <span>Ask about verification, password reset, membership cards, or payment support.</span>
+              <strong>Welcome to Member Concierge</strong>
+              <span>How may we assist you today?</span>
             </div>
           ) : null}
 
@@ -276,10 +278,10 @@ export default function LiveChatWidget() {
                 {message.role === "bot" ? (
                   <span className="message-author">
                     <Bot size={14} />
-                    AI Support
+                    Member Concierge
                   </span>
                 ) : null}
-                {message.role === "agent" ? <span className="message-author">Support Agent</span> : null}
+                {message.role === "agent" ? <span className="message-author">Concierge Specialist</span> : null}
                 {message.text ? <p>{message.text}</p> : null}
                 {message.attachments?.length ? (
                   <div className="message-attachments">
@@ -291,12 +293,6 @@ export default function LiveChatWidget() {
                     ))}
                   </div>
                 ) : null}
-                {message.role === "user" ? (
-                  <small>
-                    <CheckCheck size={13} />
-                    {message.status === "seen" ? "Seen" : "Delivered"}
-                  </small>
-                ) : null}
               </div>
             </article>
           ))}
@@ -306,7 +302,7 @@ export default function LiveChatWidget() {
               <span />
               <span />
               <span />
-              {typing === "bot" ? "AI is replying" : "Support is typing"}
+              {typing === "bot" ? "Concierge is typing" : "Specialist is typing"}
             </div>
           ) : null}
         </div>
