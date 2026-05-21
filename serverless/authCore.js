@@ -6,6 +6,7 @@ const COOKIE_NAME = "kr_membership_session";
 const COMPANY_NAME = "Keanu Reeves Company";
 const OTP_FROM_EMAIL = "verification@keanureeves.company";
 const OTP_EXPIRES_MINUTES = 10;
+const RESET_EXPIRES_MINUTES = 15;
 const isProduction = process.env.NODE_ENV === "production";
 
 let mongoClientPromise;
@@ -177,6 +178,16 @@ export const createOtpFields = async () => {
   };
 };
 
+export const createPasswordResetFields = async () => {
+  const resetCode = generateOtp();
+  return {
+    resetCode,
+    resetCodeHash: await bcrypt.hash(resetCode, 12),
+    resetExpiresAt: new Date(Date.now() + RESET_EXPIRES_MINUTES * 60 * 1000),
+    resetAttempts: 0
+  };
+};
+
 const escapeHtml = (value = "") =>
   String(value).replace(/[&<>"']/g, (character) => {
     const entities = {
@@ -201,6 +212,18 @@ const verificationEmailHtml = ({ fullName, otp }) => `
   </div>
 `;
 
+const passwordResetEmailHtml = ({ fullName, resetCode }) => `
+  <div style="margin:0;padding:32px;background:#050505;color:#f7f3ea;font-family:Inter,Arial,sans-serif;">
+    <div style="max-width:560px;margin:0 auto;border:1px solid rgba(244,216,139,.34);background:#0d0d0d;padding:32px;">
+      <p style="margin:0 0 12px;color:#f4d88b;font-size:12px;letter-spacing:.18em;text-transform:uppercase;">${COMPANY_NAME}</p>
+      <h1 style="margin:0 0 18px;font-family:Georgia,serif;font-size:32px;line-height:1.1;color:#fff9ed;">Reset your password</h1>
+      <p style="margin:0 0 20px;line-height:1.7;color:#cfc7ba;">Hello ${escapeHtml(fullName)}, use the reset code below to create a new password for your account.</p>
+      <div style="margin:24px 0;padding:18px 22px;border:1px solid rgba(244,216,139,.4);background:#060606;color:#f4d88b;font-size:34px;font-weight:800;letter-spacing:.28em;text-align:center;">${resetCode}</div>
+      <p style="margin:0;color:#a9a197;line-height:1.7;">This code expires in ${RESET_EXPIRES_MINUTES} minutes. If you did not request a password reset, you can ignore this email.</p>
+    </div>
+  </div>
+`;
+
 export const sendOtpEmail = async ({ to, fullName, otp }) => {
   const apiKey = requiredEnv("RESEND_API_KEY");
   const response = await fetch("https://api.resend.com/emails", {
@@ -220,6 +243,29 @@ export const sendOtpEmail = async ({ to, fullName, otp }) => {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data?.message || "Resend rejected the verification email.");
+  }
+  return data;
+};
+
+export const sendPasswordResetEmail = async ({ to, fullName, resetCode }) => {
+  const apiKey = requiredEnv("RESEND_API_KEY");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: `${COMPANY_NAME} <${OTP_FROM_EMAIL}>`,
+      to,
+      subject: `${COMPANY_NAME} password reset code`,
+      html: passwordResetEmailHtml({ fullName, resetCode })
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.message || "Resend rejected the password reset email.");
   }
   return data;
 };

@@ -2,12 +2,13 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { LockKeyhole, MailCheck, ShieldCheck } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
-import { forgotPassword } from "../services/authApi.js";
+import { forgotPassword, resetPassword } from "../services/authApi.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export default function AuthPage({ mode }) {
   const isRegister = mode === "register";
   const isForgot = mode === "forgot";
+  const isReset = mode === "reset";
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const auth = useAuth();
@@ -47,6 +48,11 @@ export default function AuthPage({ mode }) {
       if (isForgot) {
         const data = await forgotPassword({ identifier: form.identifier });
         setMessage(data.message);
+      } else if (isReset) {
+        const data = await resetPassword({ identifier: form.identifier, resetCode: otp, password: form.password });
+        setMessage(data.message || "Password updated. You can now log in.");
+        setOtp("");
+        setForm((current) => ({ ...current, password: "" }));
       } else if (isRegister) {
         const data = await auth.register(form);
         setVerificationPending(Boolean(data.verificationRequired));
@@ -102,24 +108,44 @@ export default function AuthPage({ mode }) {
     <section className="page-section auth-page narrow-page">
       <SectionHeader
         eyebrow="Secure Account"
-        title={isForgot ? "Reset account access." : isRegister ? "Create your membership account." : "Sign in to continue."}
+        title={
+          isForgot
+            ? "Reset account access."
+            : isReset
+              ? "Create a new password."
+              : isRegister
+                ? "Create your membership account."
+                : "Sign in to continue."
+        }
         copy={
           isForgot
             ? "Request a secure reset link or verification code."
+            : isReset
+              ? "Enter the reset code sent to your email and choose a new password."
             : "Authentication uses bcrypt password hashing, httpOnly session cookies, and email verification before account access."
         }
       />
 
       <form className="form-panel premium-panel auth-form" onSubmit={verificationPending ? handleVerifyOtp : handleSubmit}>
         <div className="secure-box">
-          {verificationPending ? <MailCheck size={28} /> : isForgot ? <ShieldCheck size={28} /> : <LockKeyhole size={28} />}
+          {verificationPending ? <MailCheck size={28} /> : isForgot || isReset ? <ShieldCheck size={28} /> : <LockKeyhole size={28} />}
           <div>
-            <h3>{verificationPending ? "Verify your email" : isForgot ? "Secure reset request" : "Protected login session"}</h3>
+            <h3>
+              {verificationPending
+                ? "Verify your email"
+                : isForgot
+                  ? "Secure reset request"
+                  : isReset
+                    ? "Reset password"
+                    : "Protected login session"}
+            </h3>
             <p>
               {verificationPending
                 ? `Enter the 6-digit code sent to ${verificationIdentifier || form.identifier}.`
                 : isForgot
-                  ? "Reset delivery will use the configured account contact method."
+                  ? "If the email is registered, a reset code will be delivered privately."
+                  : isReset
+                    ? "Use the 6-digit code from your email to protect your account."
                   : "Passwords are never stored in plain text."}
             </p>
           </div>
@@ -139,11 +165,11 @@ export default function AuthPage({ mode }) {
 
         {!verificationPending ? (
           <label htmlFor="identifier">
-            {isRegister ? "Email address" : "Email or phone number"}
+            {isRegister || isForgot || isReset ? "Email address" : "Email or phone number"}
             <input
               id="identifier"
               required
-              type={isRegister ? "email" : "text"}
+              type={isRegister || isForgot || isReset ? "email" : "text"}
               value={form.identifier}
               onChange={(event) => updateField("identifier", event.target.value)}
             />
@@ -152,7 +178,7 @@ export default function AuthPage({ mode }) {
 
         {!verificationPending && !isForgot ? (
           <label htmlFor="password">
-            Password
+            {isReset ? "New password" : "Password"}
             <input
               id="password"
               required
@@ -164,9 +190,9 @@ export default function AuthPage({ mode }) {
           </label>
         ) : null}
 
-        {verificationPending ? (
+        {verificationPending || isReset ? (
           <label htmlFor="otp">
-            Verification code
+            {isReset ? "Reset code" : "Verification code"}
             <input
               id="otp"
               required
@@ -190,6 +216,8 @@ export default function AuthPage({ mode }) {
               ? "Verify Account"
               : isForgot
                 ? "Request Reset"
+                : isReset
+                  ? "Update Password"
                 : isRegister
                   ? "Create Account"
                   : "Login"}
@@ -212,7 +240,18 @@ export default function AuthPage({ mode }) {
               <Link to="/forgot-password">Forgot password?</Link>
             </>
           ) : null}
-          {!verificationPending && isForgot ? <Link to="/login">Back to login</Link> : null}
+          {!verificationPending && isForgot ? (
+            <>
+              <Link to="/reset-password">Enter reset code</Link>
+              <Link to="/login">Back to login</Link>
+            </>
+          ) : null}
+          {!verificationPending && isReset ? (
+            <>
+              <Link to="/forgot-password">Request a new code</Link>
+              <Link to="/login">Back to login</Link>
+            </>
+          ) : null}
         </div>
       </form>
     </section>

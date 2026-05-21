@@ -39,6 +39,9 @@ db.exec(`
     otp_hash TEXT,
     otp_expires_at TEXT,
     otp_attempts INTEGER NOT NULL DEFAULT 0,
+    reset_code_hash TEXT,
+    reset_expires_at TEXT,
+    reset_attempts INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 `);
@@ -54,12 +57,16 @@ ensureColumn("users", "verified", "INTEGER NOT NULL DEFAULT 0");
 ensureColumn("users", "otp_hash", "TEXT");
 ensureColumn("users", "otp_expires_at", "TEXT");
 ensureColumn("users", "otp_attempts", "INTEGER NOT NULL DEFAULT 0");
+ensureColumn("users", "reset_code_hash", "TEXT");
+ensureColumn("users", "reset_expires_at", "TEXT");
+ensureColumn("users", "reset_attempts", "INTEGER NOT NULL DEFAULT 0");
 
 const JWT_SECRET = process.env.AUTH_JWT_SECRET || "replace-this-secret-before-production";
 const COOKIE_NAME = "kr_membership_session";
 const PORT = Number(process.env.AUTH_API_PORT || 4174);
 const isProduction = process.env.NODE_ENV === "production";
 const OTP_EXPIRES_MINUTES = 10;
+const RESET_EXPIRES_MINUTES = 15;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const OTP_FROM_EMAIL = "verification@keanureeves.company";
 const COMPANY_NAME = "Keanu Reeves Company";
@@ -151,6 +158,20 @@ const createOtpForUser = async (userId) => {
   return { otp, expiresAt };
 };
 
+const createPasswordResetForUser = async (userId) => {
+  const resetCode = generateOtp();
+  const resetCodeHash = await bcrypt.hash(resetCode, 12);
+  const expiresAt = new Date(Date.now() + RESET_EXPIRES_MINUTES * 60 * 1000).toISOString();
+
+  db.prepare("UPDATE users SET reset_code_hash = ?, reset_expires_at = ?, reset_attempts = 0 WHERE id = ?").run(
+    resetCodeHash,
+    expiresAt,
+    userId
+  );
+
+  return { resetCode, expiresAt };
+};
+
 const verificationEmailHtml = ({ fullName, otp }) => `
   <div style="margin:0;padding:32px;background:#050505;color:#f7f3ea;font-family:Inter,Arial,sans-serif;">
     <div style="max-width:560px;margin:0 auto;border:1px solid rgba(244,216,139,.34);background:#0d0d0d;padding:32px;">
@@ -159,6 +180,18 @@ const verificationEmailHtml = ({ fullName, otp }) => `
       <p style="margin:0 0 20px;line-height:1.7;color:#cfc7ba;">Hello ${escapeHtml(fullName)}, use the verification code below to activate your membership account.</p>
       <div style="margin:24px 0;padding:18px 22px;border:1px solid rgba(244,216,139,.4);background:#060606;color:#f4d88b;font-size:34px;font-weight:800;letter-spacing:.28em;text-align:center;">${otp}</div>
       <p style="margin:0;color:#a9a197;line-height:1.7;">This code expires in ${OTP_EXPIRES_MINUTES} minutes. If you did not create this account, you can ignore this email.</p>
+    </div>
+  </div>
+`;
+
+const passwordResetEmailHtml = ({ fullName, resetCode }) => `
+  <div style="margin:0;padding:32px;background:#050505;color:#f7f3ea;font-family:Inter,Arial,sans-serif;">
+    <div style="max-width:560px;margin:0 auto;border:1px solid rgba(244,216,139,.34);background:#0d0d0d;padding:32px;">
+      <p style="margin:0 0 12px;color:#f4d88b;font-size:12px;letter-spacing:.18em;text-transform:uppercase;">${COMPANY_NAME}</p>
+      <h1 style="margin:0 0 18px;font-family:Georgia,serif;font-size:32px;line-height:1.1;color:#fff9ed;">Reset your password</h1>
+      <p style="margin:0 0 20px;line-height:1.7;color:#cfc7ba;">Hello ${escapeHtml(fullName)}, use the reset code below to create a new password for your account.</p>
+      <div style="margin:24px 0;padding:18px 22px;border:1px solid rgba(244,216,139,.4);background:#060606;color:#f4d88b;font-size:34px;font-weight:800;letter-spacing:.28em;text-align:center;">${resetCode}</div>
+      <p style="margin:0;color:#a9a197;line-height:1.7;">This code expires in ${RESET_EXPIRES_MINUTES} minutes. If you did not request a password reset, you can ignore this email.</p>
     </div>
   </div>
 `;
@@ -189,6 +222,36 @@ const sendOtpEmail = async ({ to, fullName, otp }) => {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data?.message || "Verification email could not be sent.");
+  }
+  return data;
+};
+
+const sendPasswordResetEmail = async ({ to, fullName, resetCode }) => {
+  if (!RESEND_API_KEY) {
+    if (isProduction) {
+      throw new Error("RESEND_API_KEY must be configured to send password reset emails.");
+    }
+    console.warn(`[development] Password reset code for ${to}: ${resetCode}`);
+    return { id: "development-console-reset-code" };
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: `${COMPANY_NAME} <${OTP_FROM_EMAIL}>`,
+      to,
+      subject: `${COMPANY_NAME} password reset code`,
+      html: passwordResetEmailHtml({ fullName, resetCode })
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.message || "Password reset email could not be sent.");
   }
   return data;
 };
@@ -392,15 +455,63 @@ app.get("/api/auth/me", requireAuth, (req, res) => {
   return res.json({ user: publicUser(req.user) });
 });
 
-app.post("/api/auth/forgot-password", (req, res) => {
+app.post("/api/auth/forgot-password", async (req, res) => {
   const identifier = normalizeIdentifier(req.body.identifier);
-  // Production later: create reset token, store a hashed token, and send via email/SMS provider.
-  return res.json({
-    ok: true,
-    message: identifier
-      ? "If an account exists, a secure reset link or code will be sent."
-      : "Enter an email or phone number to request a reset."
-  });
+  const neutralMessage = "If this email is registered, we sent a reset link/code to your email address.";
+
+  if (identifier && isEmailIdentifier(identifier)) {
+    const user = findUserByIdentifier(identifier);
+    if (user) {
+      const { resetCode } = await createPasswordResetForUser(user.id);
+      try {
+        await sendPasswordResetEmail({ to: user.identifier, fullName: user.full_name, resetCode });
+        console.log("Password reset email sent");
+      } catch (error) {
+        console.error("Password reset email failed", { message: error.message });
+      }
+    }
+  }
+
+  return res.json({ ok: true, message: neutralMessage });
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  const identifier = normalizeIdentifier(req.body.identifier);
+  const resetCode = String(req.body.resetCode || "").trim();
+  const password = String(req.body.password || "");
+
+  if (!identifier || !/^\d{6}$/.test(resetCode) || password.length < 8) {
+    return res.status(400).json({ error: "Email, 6-digit reset code, and a new password are required." });
+  }
+
+  const user = findUserByIdentifier(identifier);
+  if (!user || !user.reset_code_hash || !user.reset_expires_at) {
+    return res.status(400).json({ error: "Invalid or expired reset code." });
+  }
+
+  if (Date.now() > Date.parse(user.reset_expires_at)) {
+    db.prepare("UPDATE users SET reset_code_hash = NULL, reset_expires_at = NULL, reset_attempts = 0 WHERE id = ?").run(
+      user.id
+    );
+    return res.status(400).json({ error: "Reset code expired. Request a new code." });
+  }
+
+  if (user.reset_attempts >= 5) {
+    return res.status(429).json({ error: "Too many reset attempts. Request a new code." });
+  }
+
+  const validCode = await bcrypt.compare(resetCode, user.reset_code_hash);
+  if (!validCode) {
+    db.prepare("UPDATE users SET reset_attempts = reset_attempts + 1 WHERE id = ?").run(user.id);
+    return res.status(401).json({ error: "Invalid reset code." });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  db.prepare(
+    "UPDATE users SET password_hash = ?, reset_code_hash = NULL, reset_expires_at = NULL, reset_attempts = 0 WHERE id = ?"
+  ).run(passwordHash, user.id);
+
+  return res.json({ ok: true, message: "Password updated. You can now log in." });
 });
 
 app.get("/api/health", (_req, res) => {

@@ -54,3 +54,8 @@ export const forgotPassword = (payload) =>
     method: "POST",
     body: JSON.stringify(payload)
   });
+export const resetPassword = (payload) =>
+  authRequest("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
