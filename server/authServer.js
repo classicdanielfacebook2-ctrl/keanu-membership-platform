@@ -7,14 +7,6 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isAllowedPhoneCountry, isAllowedPhoneNumber } from "../src/data/phoneCountries.js";
-import {
-  createOrGetConversation as createOrGetMongoSupportConversation,
-  getConversationHistory,
-  listConversations,
-  markSeen,
-  saveSupportMessage as saveMongoSupportMessage,
-  takeoverConversation
-} from "../serverless/supportCore.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
@@ -681,58 +673,10 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/support/conversation", async (req, res) => {
-  try {
-    res.json(await createOrGetMongoSupportConversation(req.body?.visitorId));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get("/api/support/conversation", async (req, res) => {
-  try {
-    res.json(await getConversationHistory(req.query?.conversationId));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get("/api/support/conversations", async (_req, res) => {
-  try {
-    res.json({ conversations: await listConversations() });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post("/api/support/message", async (req, res) => {
-  try {
-    res.json(await saveMongoSupportMessage(req.body || {}));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post("/api/support/seen", async (req, res) => {
-  try {
-    res.json(await markSeen(req.body || {}));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post("/api/support/takeover", async (req, res) => {
-  try {
-    res.json(await takeoverConversation(req.body?.conversationId));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 await seedAdminFromEnvironment();
 
 app.listen(PORT, "127.0.0.1", () => {
-  console.log(`Auth and support API running at http://127.0.0.1:${PORT}`);
+  console.log(`Auth API running at http://127.0.0.1:${PORT}`);
   if (JWT_SECRET === "replace-this-secret-before-production") {
     console.warn("AUTH_JWT_SECRET is using the development fallback. Set a strong secret before production.");
   }
