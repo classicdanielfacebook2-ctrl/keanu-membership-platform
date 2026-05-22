@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Eye, EyeOff, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { forgotPassword, resetPassword } from "../services/authApi.js";
 import { preparePasswordRecoverySession, updateRecoveredPassword } from "../services/supabasePasswordReset.js";
@@ -7,6 +8,22 @@ import { allowedPhoneCountries, getAllowedPhoneCountry, getCountryFlag } from ".
 import { getApprovedHomeImages } from "../data/homeImages.js";
 
 const cleanPhone = (value = "") => value.replace(/[^\d]/g, "");
+
+const getPasswordRules = (password = "") => [
+  ["Minimum 8 characters", password.length >= 8],
+  ["One uppercase letter", /[A-Z]/.test(password)],
+  ["One lowercase letter", /[a-z]/.test(password)],
+  ["One number", /\d/.test(password)],
+  ["One special character", /[^A-Za-z0-9]/.test(password)]
+];
+
+const getPasswordStrength = (password = "") => {
+  const score = getPasswordRules(password).filter(([, valid]) => valid).length;
+  if (!password) return { label: "Weak", className: "weak", score: 0 };
+  if (score <= 2) return { label: "Weak", className: "weak", score };
+  if (score <= 4) return { label: "Medium", className: "medium", score };
+  return { label: "Strong", className: "strong", score };
+};
 
 export default function AuthPage({ mode }) {
   const isRegister = mode === "register";
@@ -34,6 +51,9 @@ export default function AuthPage({ mode }) {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
 
   const returnTo = useMemo(() => params.get("returnTo") || "/", [params]);
   const authLogo = useMemo(
@@ -43,6 +63,8 @@ export default function AuthPage({ mode }) {
   const selectedCountry = getAllowedPhoneCountry(form.countryIso);
   const phoneIdentifier = `${selectedCountry.callingCode}${cleanPhone(form.phone)}`;
   const selectedIdentifier = isForgot ? form.recoveryIdentifier.trim() : method === "sms" ? phoneIdentifier : form.email.trim();
+  const passwordRules = getPasswordRules(form.password);
+  const passwordStrength = getPasswordStrength(form.password);
 
   useEffect(() => {
     if (!isUpdatePassword) return;
@@ -96,10 +118,15 @@ export default function AuthPage({ mode }) {
         if (form.password !== form.confirmPassword) {
           throw new Error("Passwords do not match.");
         }
+        if (!passwordRules.every(([, valid]) => valid)) {
+          throw new Error("Create a password that meets all requirements.");
+        }
         const data = await updateRecoveredPassword({ password: form.password });
-        setMessage(data.message || "Password updated. You can now sign in.");
+        setPasswordUpdated(true);
+        setMessage(data.message || "Password updated successfully.");
         updateField("password", "");
         updateField("confirmPassword", "");
+        window.setTimeout(() => navigate("/login", { replace: true }), 3000);
       } else if (isReset) {
         const data = await resetPassword({ identifier: selectedIdentifier, resetCode: otp, password: form.password });
         setMessage(data.message || "Password updated.");
@@ -168,8 +195,9 @@ export default function AuthPage({ mode }) {
   const pageCopy = getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending });
 
   return (
-    <section className="auth-page">
-      <div className="auth-card">
+    <section className={isUpdatePassword ? "auth-page reset-password-page" : "auth-page"}>
+      <div className={isUpdatePassword ? "auth-watermark" : ""} aria-hidden="true" />
+      <div className={isUpdatePassword ? "auth-card reset-password-card" : "auth-card"}>
         <div className="auth-brand-mini" aria-hidden="true">
           {logoFailed ? <img src="/logo.svg" alt="" /> : <img src={authLogo} alt="" onError={() => setLogoFailed(true)} />}
         </div>
@@ -252,28 +280,60 @@ export default function AuthPage({ mode }) {
             <>
               <label htmlFor="password">
                 New Password
-                <input
-                  id="password"
-                  required
-                  minLength="8"
-                  type="password"
-                  placeholder="Enter your new password"
-                  value={form.password}
-                  onChange={(event) => updateField("password", event.target.value)}
-                />
+                <div className="password-field-shell">
+                  <input
+                    id="password"
+                    required
+                    minLength="8"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your new password"
+                    value={form.password}
+                    onChange={(event) => updateField("password", event.target.value)}
+                  />
+                  <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
               </label>
               <label htmlFor="confirmPassword">
                 Confirm Password
-                <input
-                  id="confirmPassword"
-                  required
-                  minLength="8"
-                  type="password"
-                  placeholder="Confirm your new password"
-                  value={form.confirmPassword}
-                  onChange={(event) => updateField("confirmPassword", event.target.value)}
-                />
+                <div className="password-field-shell">
+                  <input
+                    id="confirmPassword"
+                    required
+                    minLength="8"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm your new password"
+                    value={form.confirmPassword}
+                    onChange={(event) => updateField("confirmPassword", event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((value) => !value)}
+                    aria-label={showConfirmPassword ? "Hide password confirmation" : "Show password confirmation"}
+                  >
+                    {showConfirmPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
               </label>
+              <div className="password-strength-panel">
+                <div className="strength-head">
+                  <span>Password strength</span>
+                  <strong className={passwordStrength.className}>{passwordStrength.label}</strong>
+                </div>
+                <div className={`strength-meter ${passwordStrength.className}`} aria-hidden="true">
+                  <span />
+                </div>
+                <div className="password-rules">
+                  <strong>Password must include</strong>
+                  {passwordRules.map(([rule, valid]) => (
+                    <span className={valid ? "valid" : ""} key={rule}>
+                      {valid ? <Check size={14} /> : <X size={14} />}
+                      {rule}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </>
           ) : null}
 
@@ -310,11 +370,18 @@ export default function AuthPage({ mode }) {
           ) : null}
 
           {error ? <div className="notice warning">{error}</div> : null}
-          {message ? <div className="notice success">{message}</div> : null}
+          {message ? (
+            <div className={passwordUpdated ? "notice success password-success-notice" : "notice success"}>
+              {passwordUpdated ? <Check size={18} /> : null}
+              {passwordUpdated ? "Password updated successfully. Redirecting to sign in..." : message}
+            </div>
+          ) : null}
 
-          <button className="button primary auth-submit" type="submit" disabled={submitting}>
+          <button className="button primary auth-submit" type="submit" disabled={submitting || passwordUpdated}>
             {submitting
               ? "Please wait..."
+              : passwordUpdated
+                ? "Redirecting..."
               : verificationPending
                 ? "Verify Account"
                 : isForgot
@@ -335,10 +402,10 @@ export default function AuthPage({ mode }) {
             </div>
           ) : null}
 
-          {!verificationPending ? (
+          {!verificationPending && !isUpdatePassword ? (
             <div className="auth-links">
               {isRegister ? <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`}>Already have an account?</Link> : null}
-              {!isRegister && !isForgot && !isReset ? (
+              {!isRegister && !isForgot && !isReset && !isUpdatePassword ? (
                 <>
                   <Link to={`/register?returnTo=${encodeURIComponent(returnTo)}`}>Create account</Link>
                   <Link to="/forgot-password">Forgot password?</Link>
@@ -347,7 +414,7 @@ export default function AuthPage({ mode }) {
               {isForgot ? (
                 <Link to="/login">Back to sign in</Link>
               ) : null}
-              {isReset || isUpdatePassword ? (
+              {isReset ? (
                 <>
                   <Link to="/forgot-password">Reset password</Link>
                   <Link to="/login">Back to sign in</Link>
@@ -497,9 +564,9 @@ function getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verifica
 
   if (isUpdatePassword) {
     return {
-      label: "ACCOUNT RECOVERY",
-      heading: "Create a new password",
-      subtitle: "Enter and confirm your new password to restore account access."
+      label: "ACCOUNT SECURITY",
+      heading: "Create New Password",
+      subtitle: "Choose a secure password to restore access to your membership account."
     };
   }
 

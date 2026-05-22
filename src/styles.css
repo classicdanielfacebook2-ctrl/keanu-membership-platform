@@ -284,6 +284,8 @@ button:disabled {
   min-height: calc(100vh - 8rem);
   place-items: center;
   padding: clamp(2rem, 5vw, 4rem) 1rem;
+  position: relative;
+  overflow: hidden;
 }
 
 .auth-card {
@@ -612,6 +614,209 @@ button:disabled {
   padding: 0.72rem 0.78rem;
   font-size: 0.86rem;
   line-height: 1.45;
+}
+
+.reset-password-page {
+  min-height: calc(100vh - 7rem);
+  padding-block: clamp(2.4rem, 6vw, 5rem);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(244, 216, 139, 0.1), transparent 32%),
+    radial-gradient(circle at 0% 80%, rgba(201, 157, 67, 0.08), transparent 30%);
+}
+
+.auth-watermark {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, rgba(5, 5, 5, 0.7), rgba(5, 5, 5, 0.92)),
+    url("/logo.svg");
+  background-repeat: no-repeat;
+  background-position: right clamp(-5rem, -8vw, -1rem) center;
+  background-size: min(34rem, 78vw);
+  opacity: 0.08;
+  filter: blur(10px) saturate(0.72);
+  pointer-events: none;
+}
+
+.reset-password-card {
+  width: min(100%, 31rem);
+  border-radius: 22px;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border-color: rgba(244, 216, 139, 0.2);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(244, 216, 139, 0.08), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.072), rgba(255, 255, 255, 0.018)),
+    rgba(8, 8, 8, 0.88);
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.42), 0 0 2.4rem rgba(201, 157, 67, 0.07);
+}
+
+.reset-password-card .auth-heading {
+  margin-bottom: 1.25rem;
+}
+
+.reset-password-card .auth-heading h1 {
+  font-size: clamp(2.2rem, 7vw, 3rem);
+}
+
+.password-field-shell {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  min-height: 2.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.password-field-shell:focus-within {
+  border-color: rgba(244, 216, 139, 0.6);
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow: 0 0 0 3px rgba(201, 157, 67, 0.09);
+}
+
+.password-field-shell input {
+  min-height: 2.9rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.password-field-shell input:focus {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.password-field-shell button {
+  width: 2.7rem;
+  height: 2.7rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #d8c78f;
+  cursor: pointer;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.password-field-shell button:hover {
+  color: var(--ink);
+  transform: scale(1.04);
+}
+
+.password-strength-panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(244, 216, 139, 0.13);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.strength-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #cfc7ba;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.strength-head strong {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.strength-head strong.weak {
+  color: #e5a172;
+}
+
+.strength-head strong.medium {
+  color: #e7c978;
+}
+
+.strength-head strong.strong {
+  color: #9fe0b0;
+}
+
+.strength-meter {
+  height: 0.34rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.strength-meter span {
+  display: block;
+  width: 22%;
+  height: 100%;
+  border-radius: inherit;
+  background: #e5a172;
+  transition: width 220ms ease, background 220ms ease;
+}
+
+.strength-meter.medium span {
+  width: 64%;
+  background: #e7c978;
+}
+
+.strength-meter.strong span {
+  width: 100%;
+  background: #9fe0b0;
+}
+
+.password-rules {
+  display: grid;
+  gap: 0.46rem;
+}
+
+.password-rules strong {
+  color: #fff7e8;
+  font-size: 0.82rem;
+}
+
+.password-rules span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #9b9286;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  transition: color 160ms ease;
+}
+
+.password-rules span svg {
+  flex: 0 0 auto;
+  color: #7b7166;
+}
+
+.password-rules span.valid {
+  color: #d9cfbd;
+}
+
+.password-rules span.valid svg {
+  color: #9fe0b0;
+}
+
+.password-success-notice {
+  justify-content: center;
+  border-color: rgba(159, 224, 176, 0.42);
+  background: rgba(159, 224, 176, 0.07);
+  animation: successRise 360ms ease both;
+}
+
+@keyframes successRise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .resend-code-row {
