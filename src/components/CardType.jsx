@@ -1,4 +1,4 @@
-import { Check, CreditCard, FilePenLine } from "lucide-react";
+import { Check, FilePenLine } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -9,19 +9,19 @@ const tierMeta = {
   premium: { member: "KR-PRM-0000", label: "Premium Access" }
 };
 
-export default function CardType({ card, featured = false, compact = false }) {
+export default function CardType({ card, featured = false, compact = false, hideActions = false }) {
   const meta = tierMeta[card.id] || tierMeta.silver;
   const auth = useAuth();
   const navigate = useNavigate();
 
-  const handleProtectedAction = (action) => {
+  const handleSelectCard = () => {
     if (!auth.isAuthenticated) {
       sessionStorage.setItem("pendingMembershipCard", card.id);
-      sessionStorage.setItem("pendingMembershipAction", action);
-      navigate(`/login?returnTo=${encodeURIComponent(`/${action}?card=${card.id}`)}`);
+      sessionStorage.setItem("pendingMembershipAction", "apply");
+      navigate(`/login?returnTo=${encodeURIComponent(`/apply?card=${card.id}`)}`);
       return;
     }
-    navigate(`/${action}?card=${card.id}`);
+    navigate(`/apply?card=${card.id}`);
   };
 
   return (
@@ -56,16 +56,14 @@ export default function CardType({ card, featured = false, compact = false }) {
             </li>
           ))}
         </ul>
-        <div className="card-actions">
-          <button className="button primary" type="button" onClick={() => handleProtectedAction("apply")}>
-            <FilePenLine size={17} />
-            Apply
-          </button>
-          <button className="button secondary" type="button" onClick={() => handleProtectedAction("payment")}>
-            <CreditCard size={17} />
-            Purchase
-          </button>
-        </div>
+        {!hideActions ? (
+          <div className="card-actions">
+            <button className="button primary" type="button" onClick={handleSelectCard}>
+              <FilePenLine size={17} />
+              Select Card
+            </button>
+          </div>
+        ) : null}
       </div>
     </article>
   );

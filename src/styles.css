@@ -2000,6 +2000,47 @@ button:disabled {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.conversion-flow {
+  max-width: 74rem;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.conversion-progress {
+  border: 1px solid rgba(244, 216, 139, 0.16);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(0, 0, 0, 0.26));
+  padding: clamp(1rem, 2.4vw, 1.35rem);
+}
+
+.conversion-steps {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.conversion-steps button {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.conversion-steps button span {
+  display: inline-grid;
+  width: 1.45rem;
+  height: 1.45rem;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(244, 216, 139, 0.12);
+  color: var(--gold-light);
+  font-size: 0.75rem;
+  font-weight: 850;
+}
+
+.conversion-panel {
+  min-height: 28rem;
+}
+
 .step-tabs button,
 .card-choice,
 .admin-actions button {
@@ -2027,6 +2068,12 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.compact-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
 .card-choice {
   min-height: 5.5rem;
 }
@@ -2039,6 +2086,14 @@ button:disabled {
 .card-choice strong {
   margin-top: 0.35rem;
   color: var(--gold-light);
+}
+
+.card-choice small {
+  display: block;
+  margin-top: 0.55rem;
+  color: #a9a197;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .form-grid {
@@ -2108,6 +2163,56 @@ textarea {
   gap: 1rem;
 }
 
+.conversion-payment,
+.confirmation-panel {
+  max-width: 48rem;
+  margin-inline: auto;
+}
+
+.payment-summary-box h3,
+.confirmation-panel h3 {
+  margin: 0.25rem 0 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.9rem, 4vw, 2.7rem);
+}
+
+.payment-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  color: var(--muted);
+  border: 1px solid rgba(244, 216, 139, 0.18);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+  background: rgba(244, 216, 139, 0.055);
+}
+
+.payment-note svg {
+  color: var(--gold-light);
+  flex: 0 0 auto;
+}
+
+.confirmation-panel {
+  display: grid;
+  gap: 1rem;
+  text-align: left;
+}
+
+.confirmation-panel > svg {
+  color: var(--gold-light);
+}
+
+.confirmation-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.selected-card-preview {
+  max-width: 26rem;
+  margin: 1.25rem auto 0;
+}
+
 .review-details {
   grid-template-columns: auto 1fr;
   border: 1px solid var(--line);
@@ -2156,6 +2261,36 @@ textarea {
 .payment-panel {
   display: grid;
   gap: 1rem;
+}
+
+.single-payment-layout {
+  grid-template-columns: minmax(0, 46rem);
+  justify-content: center;
+}
+
+.payment-empty {
+  max-width: 38rem;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+  justify-items: start;
+  padding: clamp(1.2rem, 4vw, 2rem);
+}
+
+.payment-empty svg {
+  color: var(--gold-light);
+}
+
+.payment-empty h3 {
+  margin: 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.payment-empty p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
 }
 
 .payment-summary {
@@ -3994,7 +4129,8 @@ textarea {
 @media (max-width: 1180px) {
   .cards-grid,
   .gallery-grid,
-  .dashboard-stats {
+  .dashboard-stats,
+  .compact-card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -4231,6 +4367,7 @@ textarea {
   .faq-grid,
   .dashboard-stats,
   .card-choice-grid,
+  .compact-card-grid,
   .step-tabs {
     grid-template-columns: 1fr;
   }

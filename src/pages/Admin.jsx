@@ -76,9 +76,13 @@ export default function Admin() {
                   <td>
                     <strong>{application.fullName}</strong>
                     <span>{application.email}</span>
+                    <small>{application.referenceId || application.id}</small>
                     <small>{new Date(application.createdAt).toLocaleDateString()}</small>
                   </td>
-                  <td>{cardName(application.selectedCard)}</td>
+                  <td>
+                    <strong>{cardName(application.selectedCard)}</strong>
+                    <span>{application.preferredContactMethod || "Email"}</span>
+                  </td>
                   <td>
                     <select
                       value={application.paymentStatus}

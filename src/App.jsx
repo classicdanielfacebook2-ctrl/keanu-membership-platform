@@ -12,7 +12,6 @@ import {
   MessagesSquare,
   ShieldAlert,
   Sparkles,
-  ShieldCheck,
   X
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -39,7 +38,6 @@ const navItems = [
   { to: "/journey", label: "Journey", icon: Sparkles },
   { to: "/cards", label: "Cards", icon: CreditCard },
   { to: "/apply", label: "Apply", icon: FileText },
-  { to: "/payment", label: "Payment", icon: ShieldCheck },
   { to: "/support", label: "Support", icon: Headset },
   { to: "/protection", label: "Protection", icon: ShieldAlert }
 ];

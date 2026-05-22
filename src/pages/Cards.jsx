@@ -7,8 +7,8 @@ export default function Cards() {
     <section className="page-section">
       <SectionHeader
         eyebrow="Membership Cards"
-        title="Select the card level that matches the applicant's request."
-        copy="Prices are placeholders until management approves final fees and payment provider rules."
+        title="Choose your membership level."
+        copy="Review the available card tiers, then select one card to begin the guided application flow."
       />
       <div className="cards-grid">
         {cardTypes.map((card, index) => (

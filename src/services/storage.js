@@ -19,10 +19,12 @@ export const getApplications = () => read(APPLICATIONS_KEY, []);
 
 export const saveApplication = (application) => {
   const applications = getApplications();
+  const referenceId = createCaseId();
   const next = [
     {
       ...application,
       id: crypto.randomUUID(),
+      referenceId,
       createdAt: new Date().toISOString(),
       reviewStatus: "Pending Review",
       paymentStatus: "Pending",
