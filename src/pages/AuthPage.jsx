@@ -65,6 +65,7 @@ export default function AuthPage({ mode }) {
   const selectedIdentifier = isForgot ? form.recoveryIdentifier.trim() : method === "sms" ? phoneIdentifier : form.email.trim();
   const passwordRules = getPasswordRules(form.password);
   const passwordStrength = getPasswordStrength(form.password);
+  const showPasswordGuidance = isUpdatePassword && form.password.length > 0;
 
   useEffect(() => {
     if (!isUpdatePassword) return;
@@ -208,6 +209,13 @@ export default function AuthPage({ mode }) {
         </div>
 
         <form className="auth-form" onSubmit={verificationPending ? handleVerifyOtp : handleSubmit}>
+          {isUpdatePassword ? (
+            <div className="recovery-verified-badge">
+              <Check size={15} />
+              Recovery link verified
+            </div>
+          ) : null}
+
           {!verificationPending && isRegister ? (
             <>
               <label htmlFor="fullName">
@@ -236,7 +244,7 @@ export default function AuthPage({ mode }) {
             </>
           ) : null}
 
-          {!verificationPending && !isRegister && !isReset && !isForgot ? (
+          {!verificationPending && !isRegister && !isReset && !isForgot && !isUpdatePassword ? (
             <MethodTabs label="Continue with" method={method} setMethod={setMethod} emailLabel="Email" smsLabel="Phone" />
           ) : null}
 
@@ -258,7 +266,7 @@ export default function AuthPage({ mode }) {
             </label>
           ) : null}
 
-          {!verificationPending && !isRegister && !isForgot && method === "email" ? (
+          {!verificationPending && !isRegister && !isForgot && !isUpdatePassword && method === "email" ? (
             <label htmlFor="email">
               Email Address
               <input
@@ -272,7 +280,7 @@ export default function AuthPage({ mode }) {
             </label>
           ) : null}
 
-          {!verificationPending && !isRegister && !isForgot && method === "sms" ? (
+          {!verificationPending && !isRegister && !isForgot && !isUpdatePassword && method === "sms" ? (
             <PhoneField form={form} updateField={updateField} placeholder="Enter your phone number" />
           ) : null}
 
@@ -316,7 +324,7 @@ export default function AuthPage({ mode }) {
                   </button>
                 </div>
               </label>
-              <div className="password-strength-panel">
+              <div className={showPasswordGuidance ? "password-strength-panel visible" : "password-strength-panel"}>
                 <div className="strength-head">
                   <span>Password strength</span>
                   <strong className={passwordStrength.className}>{passwordStrength.label}</strong>
@@ -566,7 +574,7 @@ function getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verifica
     return {
       label: "ACCOUNT SECURITY",
       heading: "Create New Password",
-      subtitle: "Choose a secure password to restore access to your membership account."
+      subtitle: "For your security, choose a strong password to restore access to your membership account."
     };
   }
 

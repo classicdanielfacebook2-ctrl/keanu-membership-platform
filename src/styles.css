@@ -709,9 +709,45 @@ button:disabled {
   display: grid;
   gap: 0.75rem;
   padding: 0.95rem;
-  border: 1px solid rgba(244, 216, 139, 0.13);
+  border: 1px solid transparent;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.028);
+  max-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+  padding-block: 0;
+  transform: translateY(-6px);
+  transition: max-height 260ms ease, opacity 220ms ease, padding 220ms ease, transform 220ms ease, border-color 220ms ease, visibility 220ms ease;
+}
+
+.password-strength-panel.visible {
+  max-height: 18rem;
+  opacity: 1;
+  visibility: visible;
+  padding: 0.95rem;
+  border-color: rgba(244, 216, 139, 0.13);
+  transform: translateY(0);
+}
+
+.recovery-verified-badge {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.36rem 0.62rem;
+  border: 1px solid rgba(159, 224, 176, 0.24);
+  border-radius: 999px;
+  background: rgba(159, 224, 176, 0.055);
+  color: #c9f1d2;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.recovery-verified-badge svg {
+  color: #9fe0b0;
 }
 
 .strength-head {
@@ -786,6 +822,7 @@ button:disabled {
   font-size: 0.8rem;
   line-height: 1.35;
   transition: color 160ms ease;
+  animation: ruleFadeIn 180ms ease both;
 }
 
 .password-rules span svg {
@@ -799,6 +836,17 @@ button:disabled {
 
 .password-rules span.valid svg {
   color: #9fe0b0;
+}
+
+@keyframes ruleFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .password-success-notice {
@@ -817,6 +865,21 @@ button:disabled {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+.reset-auth-footer {
+  justify-content: center;
+  text-align: center;
+  padding-block: 1rem;
+}
+
+.reset-auth-footer .footer-brand {
+  margin-inline: auto;
+}
+
+.reset-auth-footer .footer-brand div {
+  display: grid;
+  gap: 0.1rem;
 }
 
 .resend-code-row {

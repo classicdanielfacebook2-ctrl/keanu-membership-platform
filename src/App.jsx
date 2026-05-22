@@ -79,6 +79,7 @@ export default function App() {
 
   const showBrandImage = brandImage && !brandImageFailed;
   const showLiveChat = !location.pathname.startsWith("/admin") && location.pathname !== "/media-review";
+  const simpleAuthFooter = location.pathname === "/reset-password/update";
 
   return (
     <div className="app-shell">
@@ -197,7 +198,7 @@ export default function App() {
 
       {showLiveChat ? <LiveChatWidget /> : null}
 
-      <footer className="site-footer">
+      <footer className={simpleAuthFooter ? "site-footer reset-auth-footer" : "site-footer"}>
         <div className="footer-brand">
           <span className="brand-mark brand-portrait" aria-hidden="true">
             {showBrandImage ? <img src={brandImage} alt="" /> : <span>KR</span>}
@@ -205,22 +206,24 @@ export default function App() {
           <div>
             <strong>Keanu Reeves Company</strong>
             <span>support@keanureeves.company</span>
-            <small>Copyright 2026. All rights reserved.</small>
+            {simpleAuthFooter ? null : <small>Copyright 2026. All rights reserved.</small>}
           </div>
         </div>
-        <div className="footer-stack">
-          <div className="footer-links">
-            <NavLink to="/terms">Terms</NavLink>
-            <NavLink to="/privacy">Privacy</NavLink>
-            <NavLink to="/refund">Refund Review Policy</NavLink>
-            <NavLink to="/protection">Security Policy</NavLink>
+        {simpleAuthFooter ? null : (
+          <div className="footer-stack">
+            <div className="footer-links">
+              <NavLink to="/terms">Terms</NavLink>
+              <NavLink to="/privacy">Privacy</NavLink>
+              <NavLink to="/refund">Refund Review Policy</NavLink>
+              <NavLink to="/protection">Security Policy</NavLink>
+            </div>
+            <div className="social-links" aria-label="Social media placeholders">
+              <span>IG</span>
+              <span>FB</span>
+              <span>X</span>
+            </div>
           </div>
-          <div className="social-links" aria-label="Social media placeholders">
-            <span>IG</span>
-            <span>FB</span>
-            <span>X</span>
-          </div>
-        </div>
+        )}
       </footer>
     </div>
   );
