@@ -1,11 +1,12 @@
 export async function authRequest(path, options = {}) {
+  const { headers: optionHeaders, ...fetchOptions } = options;
   const response = await fetch(path, {
     credentials: "include",
+    ...fetchOptions,
     headers: {
       "Content-Type": "application/json",
-      ...(options.headers || {})
-    },
-    ...options
+      ...(optionHeaders || {})
+    }
   });
 
   const contentType = response.headers.get("content-type") || "";

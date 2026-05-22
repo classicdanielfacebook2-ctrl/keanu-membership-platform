@@ -75,7 +75,7 @@ export default function AuthPage({ mode }) {
 
     preparePasswordRecoverySession()
       .then(() => {
-        if (!cancelled) setMessage("Recovery link verified. Enter a new password to continue.");
+        if (!cancelled) setMessage("");
       })
       .catch((requestError) => {
         if (!cancelled) setError(requestError.message);
@@ -116,13 +116,28 @@ export default function AuthPage({ mode }) {
         const data = await forgotPassword({ identifier: selectedIdentifier });
         setMessage(data.message);
       } else if (isUpdatePassword) {
-        if (form.password !== form.confirmPassword) {
+        const currentPassword = form.password;
+        const currentConfirmPassword = form.confirmPassword;
+        const currentPasswordRules = getPasswordRules(currentPassword);
+        const currentStrength = getPasswordStrength(currentPassword);
+        const requirementsMet = currentPasswordRules.every(([, valid]) => valid);
+        const passwordsMatch = currentPassword === currentConfirmPassword;
+
+        console.info("[auth/reset-password/validation]", {
+          passwordLength: currentPassword.length,
+          confirmPasswordLength: currentConfirmPassword.length,
+          requirementsMet,
+          passwordsMatch,
+          strength: currentStrength.label
+        });
+
+        if (!passwordsMatch) {
           throw new Error("Passwords do not match.");
         }
-        if (!passwordRules.every(([, valid]) => valid)) {
+        if (!requirementsMet) {
           throw new Error("Create a password that meets all requirements.");
         }
-        const data = await updateRecoveredPassword({ password: form.password });
+        const data = await updateRecoveredPassword({ password: currentPassword });
         setPasswordUpdated(true);
         setMessage(data.message || "Password updated successfully.");
         updateField("password", "");
