@@ -2,7 +2,7 @@ export const cardTypes = [
   {
     id: "silver",
     name: "Silver Card",
-    price: "€49.99",
+    price: "\u20ac49.99",
     priceAmountCents: 4999,
     currency: "eur",
     stripePriceEnv: "STRIPE_PRICE_SILVER",
@@ -16,7 +16,7 @@ export const cardTypes = [
   {
     id: "gold",
     name: "Gold Card",
-    price: "€99.99",
+    price: "\u20ac99.99",
     priceAmountCents: 9999,
     currency: "eur",
     stripePriceEnv: "STRIPE_PRICE_GOLD",
@@ -30,7 +30,7 @@ export const cardTypes = [
   {
     id: "vip",
     name: "VIP Card",
-    price: "€199.99",
+    price: "\u20ac199.99",
     priceAmountCents: 19999,
     currency: "eur",
     stripePriceEnv: "STRIPE_PRICE_VIP",
@@ -44,7 +44,7 @@ export const cardTypes = [
   {
     id: "premium",
     name: "Premium Card",
-    price: "€499.99",
+    price: "\u20ac499.99",
     priceAmountCents: 49999,
     currency: "eur",
     stripePriceEnv: "STRIPE_PRICE_PREMIUM",
@@ -60,3 +60,7 @@ export const cardTypes = [
 export const paymentStatuses = ["Pending", "Paid", "Failed", "Refunded", "Disputed"];
 export const reviewStatuses = ["Pending", "Approved", "Rejected"];
 export const shippingStatuses = ["Not Started", "Processing", "Shipped", "Delivered"];
+
+export const getCardById = (id) => cardTypes.find((card) => card.id === id);
+
+export const getCardPrice = (id) => getCardById(id)?.price || "\u20ac0.00";

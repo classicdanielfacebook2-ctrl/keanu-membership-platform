@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, CreditCard, LockKeyhole, ShieldCheck } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
-import { cardTypes, paymentStatuses } from "../data/cards.js";
+import { cardTypes, getCardPrice, paymentStatuses } from "../data/cards.js";
 import { getApplications, updateApplication } from "../services/storage.js";
 import { createCheckoutSession, stripePublishableKey } from "../services/stripeCheckout.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const cardName = (id) => cardTypes.find((card) => card.id === id)?.name || "Selected membership card";
-const cardPrice = (id) => cardTypes.find((card) => card.id === id)?.price || "Membership price";
+const cardPrice = (id) => getCardPrice(id);
 
 export default function Payment() {
   const [params] = useSearchParams();
