@@ -15,7 +15,25 @@ const write = (key, value) => {
   localStorage.setItem(key, JSON.stringify(value));
 };
 
-export const getApplications = () => read(APPLICATIONS_KEY, []);
+const normalizeApplication = (application) => ({
+  ...application,
+  reviewStatus: application.reviewStatus === "Pending Review" ? "Pending" : application.reviewStatus || "Pending",
+  paymentStatus: application.paymentStatus || "Pending",
+  membershipStatus: application.membershipStatus || (application.paymentStatus === "Paid" ? "Active" : "Pending"),
+  paymentMethod:
+    !application.paymentMethod || application.paymentMethod === "Secure provider checkout"
+      ? "Stripe Checkout"
+      : application.paymentMethod,
+  cardStatus: application.cardStatus || "Not Started"
+});
+
+export const getApplications = () => {
+  const applications = read(APPLICATIONS_KEY, []);
+  const normalized = applications.map(normalizeApplication);
+  const changed = JSON.stringify(applications) !== JSON.stringify(normalized);
+  if (changed) write(APPLICATIONS_KEY, normalized);
+  return normalized;
+};
 
 export const saveApplication = (application) => {
   const applications = getApplications();
@@ -28,6 +46,8 @@ export const saveApplication = (application) => {
       createdAt: new Date().toISOString(),
       reviewStatus: "Pending",
       paymentStatus: "Pending",
+      membershipStatus: "Pending",
+      paymentMethod: application.paymentMethod || "Stripe Checkout",
       cardStatus: "Not Started"
     },
     ...applications
