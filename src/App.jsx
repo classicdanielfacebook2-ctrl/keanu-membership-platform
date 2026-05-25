@@ -19,6 +19,8 @@ import Home from "./pages/Home.jsx";
 import Cards from "./pages/Cards.jsx";
 import Apply from "./pages/Apply.jsx";
 import Payment from "./pages/Payment.jsx";
+import PaymentSuccess from "./pages/PaymentSuccess.jsx";
+import PaymentCancelled from "./pages/PaymentCancelled.jsx";
 import Support from "./pages/Support.jsx";
 import Admin from "./pages/Admin.jsx";
 import SupportAdmin from "./pages/SupportAdmin.jsx";
@@ -149,6 +151,8 @@ export default function App() {
           <Route path="/cards" element={<Cards />} />
           <Route path="/apply" element={<Apply />} />
           <Route path="/payment" element={<Payment />} />
+          <Route path="/payment-success" element={<PaymentSuccess />} />
+          <Route path="/payment-cancelled" element={<PaymentCancelled />} />
           <Route path="/support" element={<Support />} />
           <Route path="/protection" element={<ProtectionCenter />} />
           <Route

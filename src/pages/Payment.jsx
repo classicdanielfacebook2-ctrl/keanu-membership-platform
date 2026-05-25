@@ -4,6 +4,7 @@ import { ArrowRight, CreditCard, LockKeyhole, ShieldCheck } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes, paymentStatuses } from "../data/cards.js";
 import { getApplications, updateApplication } from "../services/storage.js";
+import { createCheckoutSession, stripePublishableKey } from "../services/stripeCheckout.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const cardName = (id) => cardTypes.find((card) => card.id === id)?.name || "Selected membership card";
@@ -14,6 +15,8 @@ export default function Payment() {
   const navigate = useNavigate();
   const auth = useAuth();
   const [applications, setApplications] = useState([]);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
   const applicationId = params.get("application");
 
   useEffect(() => {
@@ -44,6 +47,26 @@ export default function Payment() {
   const updatePaymentStatus = (nextStatus) => {
     setStatus(nextStatus);
     if (application) setApplications(updateApplication(application.id, { paymentStatus: nextStatus }));
+  };
+
+  const handleCheckout = async () => {
+    if (!application) return;
+    setCheckoutError("");
+    setCheckoutLoading(true);
+    try {
+      if (!stripePublishableKey) {
+        console.warn("[stripe/checkout]", {
+          message: "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not configured in the frontend environment."
+        });
+      }
+      const session = await createCheckoutSession(application);
+      if (!session.url) throw new Error("Stripe checkout URL was not returned.");
+      updatePaymentStatus("Pending");
+      window.location.href = session.url;
+    } catch (error) {
+      setCheckoutError(error?.message || "Unable to start Stripe Checkout.");
+      setCheckoutLoading(false);
+    }
   };
 
   return (
@@ -84,11 +107,13 @@ export default function Payment() {
             </div>
 
             <div className="payment-actions">
-              <button className="button primary" type="button" onClick={() => updatePaymentStatus("Pending")}>
+              <button className="button primary" type="button" onClick={handleCheckout} disabled={checkoutLoading}>
                 <CreditCard size={17} />
-                Continue to Payment
+                {checkoutLoading ? "Opening Checkout..." : "Continue to Payment"}
               </button>
             </div>
+
+            {checkoutError ? <div className="notice warning">{checkoutError}</div> : null}
 
             <label htmlFor="paymentStatus">
               Payment status
@@ -101,7 +126,7 @@ export default function Payment() {
 
             <div className="payment-badge">
               <ShieldCheck size={18} />
-              Secure provider checkout
+              Stripe secure checkout
             </div>
             {/* Backend later: create Stripe/PayPal checkout sessions and reconcile provider webhooks here. */}
           </div>

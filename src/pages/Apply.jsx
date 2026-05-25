@@ -291,6 +291,10 @@ export default function Apply() {
                 provider confirmation for your selected membership.
               </p>
               <div className="hero-actions">
+                <Link className="button primary" to={`/payment?application=${submitted.id}`}>
+                  Continue to Payment
+                  <ArrowRight size={17} />
+                </Link>
                 <Link className="button secondary" to="/cards">
                   View Card Options
                 </Link>

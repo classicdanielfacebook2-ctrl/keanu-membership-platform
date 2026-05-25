@@ -2,7 +2,9 @@ export const cardTypes = [
   {
     id: "silver",
     name: "Silver Card",
-    price: "Pricing available soon",
+    price: "$25.00",
+    priceAmountCents: 2500,
+    currency: "usd",
     benefits: [
       "Official membership registration",
       "Member ID number",
@@ -13,7 +15,9 @@ export const cardTypes = [
   {
     id: "gold",
     name: "Gold Card",
-    price: "Pricing available soon",
+    price: "$50.00",
+    priceAmountCents: 5000,
+    currency: "usd",
     benefits: [
       "Everything in Silver",
       "Priority support",
@@ -24,7 +28,9 @@ export const cardTypes = [
   {
     id: "vip",
     name: "VIP Card",
-    price: "Pricing available soon",
+    price: "$100.00",
+    priceAmountCents: 10000,
+    currency: "usd",
     benefits: [
       "Everything in Gold",
       "VIP badge",
@@ -35,7 +41,9 @@ export const cardTypes = [
   {
     id: "premium",
     name: "Premium Card",
-    price: "Pricing available soon",
+    price: "$200.00",
+    priceAmountCents: 20000,
+    currency: "usd",
     benefits: [
       "Everything in VIP",
       "Premium recognition",
@@ -45,6 +53,6 @@ export const cardTypes = [
   }
 ];
 
-export const paymentStatuses = ["Pending", "Paid", "Failed"];
+export const paymentStatuses = ["Pending", "Paid", "Failed", "Refunded", "Disputed"];
 export const reviewStatuses = ["Pending", "Approved", "Rejected"];
 export const shippingStatuses = ["Not Started", "Processing", "Shipped", "Delivered"];

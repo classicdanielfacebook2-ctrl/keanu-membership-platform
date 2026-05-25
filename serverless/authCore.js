@@ -81,6 +81,11 @@ export const getRegistrationIntentsCollection = async () => {
   return intents;
 };
 
+export const getMongoDatabase = async () => {
+  const client = await getMongoClient();
+  return client.db(process.env.MONGODB_DB || "keanu_membership_platform");
+};
+
 export const isUserVerified = (user) => Boolean(user?.isVerified || user?.verified);
 
 export const cleanupExpiredOtpUsers = async (users) => {
