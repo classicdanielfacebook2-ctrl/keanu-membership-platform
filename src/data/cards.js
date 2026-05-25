@@ -2,10 +2,10 @@ export const cardTypes = [
   {
     id: "silver",
     name: "Silver Card",
-    price: "$25.00",
-    priceAmountCents: 2500,
-    currency: "usd",
-    stripePriceId: "", // Replace with live Stripe Price ID, for example: price_123.
+    price: "€49.99",
+    priceAmountCents: 4999,
+    currency: "eur",
+    stripePriceEnv: "STRIPE_PRICE_SILVER",
     benefits: [
       "Official membership registration",
       "Member ID number",
@@ -16,10 +16,10 @@ export const cardTypes = [
   {
     id: "gold",
     name: "Gold Card",
-    price: "$50.00",
-    priceAmountCents: 5000,
-    currency: "usd",
-    stripePriceId: "", // Replace with live Stripe Price ID, for example: price_123.
+    price: "€99.99",
+    priceAmountCents: 9999,
+    currency: "eur",
+    stripePriceEnv: "STRIPE_PRICE_GOLD",
     benefits: [
       "Everything in Silver",
       "Priority support",
@@ -30,10 +30,10 @@ export const cardTypes = [
   {
     id: "vip",
     name: "VIP Card",
-    price: "$100.00",
-    priceAmountCents: 10000,
-    currency: "usd",
-    stripePriceId: "", // Replace with live Stripe Price ID, for example: price_123.
+    price: "€199.99",
+    priceAmountCents: 19999,
+    currency: "eur",
+    stripePriceEnv: "STRIPE_PRICE_VIP",
     benefits: [
       "Everything in Gold",
       "VIP badge",
@@ -44,10 +44,10 @@ export const cardTypes = [
   {
     id: "premium",
     name: "Premium Card",
-    price: "$200.00",
-    priceAmountCents: 20000,
-    currency: "usd",
-    stripePriceId: "", // Replace with live Stripe Price ID, for example: price_123.
+    price: "€499.99",
+    priceAmountCents: 49999,
+    currency: "eur",
+    stripePriceEnv: "STRIPE_PRICE_PREMIUM",
     benefits: [
       "Everything in VIP",
       "Premium recognition",

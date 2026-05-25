@@ -40,6 +40,11 @@ export const getCardPlan = (cardId) => {
   return plan;
 };
 
+const getStripePriceIdForPlan = (plan) => {
+  if (!plan?.stripePriceEnv) return "";
+  return process.env[plan.stripePriceEnv] || "";
+};
+
 export const createCheckoutSession = async ({ user, application }) => {
   const stripe = getStripe();
   const siteUrl = getSiteUrl();
@@ -47,13 +52,14 @@ export const createCheckoutSession = async ({ user, application }) => {
   const payments = await getMembershipPaymentsCollection();
   const applicationId = String(application.id || application.referenceId || "");
 
-  const lineItem = plan.stripePriceId
-    ? { price: plan.stripePriceId, quantity: 1 }
+  const stripePriceId = getStripePriceIdForPlan(plan);
+  const lineItem = stripePriceId
+    ? { price: stripePriceId, quantity: 1 }
     : {
-        // Temporary test price data. Replace `stripePriceId` in src/data/cards.js with live Stripe Price IDs.
+        // Temporary inline price_data fallback. Add STRIPE_PRICE_SILVER/GOLD/VIP/PREMIUM in Vercel to use live Stripe Price IDs.
         quantity: 1,
         price_data: {
-          currency: plan.currency || "usd",
+          currency: plan.currency || "eur",
           unit_amount: plan.priceAmountCents,
           product_data: {
             name: `KR Global Membership - ${plan.name}`,
@@ -101,7 +107,7 @@ export const createCheckoutSession = async ({ user, application }) => {
         selectedCard: plan.id,
         cardName: plan.name,
         amount: plan.priceAmountCents,
-        currency: plan.currency || "usd",
+        currency: plan.currency || "eur",
         paymentStatus: "Pending",
         membershipStatus: "Pending",
         stripeStatus: session.status,

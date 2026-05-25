@@ -8,7 +8,7 @@ import { createCheckoutSession, stripePublishableKey } from "../services/stripeC
 import { useAuth } from "../context/AuthContext.jsx";
 
 const cardName = (id) => cardTypes.find((card) => card.id === id)?.name || "Selected membership card";
-const cardPrice = (id) => cardTypes.find((card) => card.id === id)?.price || "Pricing available soon";
+const cardPrice = (id) => cardTypes.find((card) => card.id === id)?.price || "Membership price";
 
 export default function Payment() {
   const [params] = useSearchParams();
