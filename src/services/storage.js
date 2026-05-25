@@ -26,7 +26,7 @@ export const saveApplication = (application) => {
       id: crypto.randomUUID(),
       referenceId,
       createdAt: new Date().toISOString(),
-      reviewStatus: "Pending Review",
+      reviewStatus: "Pending",
       paymentStatus: "Pending",
       cardStatus: "Not Started"
     },
@@ -64,7 +64,7 @@ export const saveSupportMessage = (message) => {
   return next[0];
 };
 
-export const protectionStatuses = ["Submitted", "Under Review", "Evidence Required", "Escalated", "Resolved", "Closed"];
+export const protectionStatuses = ["Submitted", "In Progress", "Evidence Required", "Escalated", "Resolved", "Closed"];
 
 export const getProtectionReports = () => read(PROTECTION_REPORTS_KEY, []);
 

@@ -81,7 +81,7 @@ const storySections = [
     title: "A private life protected with dignity.",
     copy: [
       "Over the years, Reeves has kept his personal relationships largely private. That discretion has become part of how many people understand him: respectful, careful, and unwilling to turn intimacy into publicity.",
-      "Fans have often admired the way he carries himself around others, with gentleness and courtesy rather than spectacle. His private life remains private, and this review page honors that boundary."
+      "Fans have often admired the way he carries himself around others, with gentleness and courtesy rather than spectacle. His private life remains private, and this page honors that boundary."
     ],
     fallback: "Approved image not available yet"
   },
@@ -168,7 +168,7 @@ export default function Journey() {
           <span className="eyebrow">Keanu Reeves Journey</span>
           <h1>A cinematic story of resilience, humility, and lasting impact.</h1>
           <p>
-            A premium biography experience for review, honoring the path from a difficult childhood
+            A premium biography experience honoring the path from a difficult childhood
             to a career defined by discipline, kindness, and worldwide respect.
           </p>
           <Link className="button primary large" to="/cards">
@@ -181,8 +181,8 @@ export default function Journey() {
       <div className="journey-intro-quote">
         <Quote size={30} />
         <p>
-          This page only displays images approved through the private media review page. Rejected
-          and pending photos remain hidden from the public biography experience.
+          Explore a cinematic biography experience shaped around resilience, craft, privacy,
+          and a lasting connection with supporters around the world.
         </p>
       </div>
 
@@ -209,7 +209,7 @@ export default function Journey() {
           <span className="eyebrow">Movie Timeline</span>
           <h2>From early work to modern legendary roles.</h2>
           <p>
-            A review-ready timeline showing the shape of a long career across comedy, action,
+            A cinematic timeline showing the shape of a long career across comedy, action,
             science fiction, drama, and modern franchise cinema.
           </p>
         </div>
@@ -237,14 +237,14 @@ export default function Journey() {
       <section className="quote-section">
         <div className="section-header">
           <span className="eyebrow">Inspiration</span>
-          <h2>Quote placeholders for an approved official campaign.</h2>
+          <h2>Reflections on resilience, humility, and legacy.</h2>
         </div>
         <div className="quote-grid">
           {quoteCards.map((quote) => (
             <blockquote key={quote}>
               <Star size={20} />
               <p>{quote}</p>
-              <cite>Approved quote placeholder</cite>
+              <cite>KR Global Membership</cite>
             </blockquote>
           ))}
         </div>

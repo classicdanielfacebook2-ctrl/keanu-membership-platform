@@ -196,7 +196,7 @@ export default function Home() {
   ].filter(Boolean);
 
   useEffect(() => {
-    const heroVideo = getVideoForSlot("top-video-advert-downloaded", "Top video advert placeholder");
+    const heroVideo = getVideoForSlot("top-video-advert-downloaded", "Top Video Advert");
     if (heroVideo) {
       window.setTimeout(() => playAdvertMuted(heroVideo), 120);
     }
@@ -239,8 +239,8 @@ export default function Home() {
         </div>
         <div className="hero-video-banner">
           <ApprovedVideoSlot
-            video={getVideoForSlot("top-video-advert-downloaded", "Top video advert placeholder")}
-            label="Top video advert placeholder"
+            video={getVideoForSlot("top-video-advert-downloaded", "Top Video Advert")}
+            label="Top Video Advert"
             soundEnabled={soundVideoId === "top-video-advert-downloaded"}
             activeIframeId={activeIframeId}
             onPlay={handleVideoPlay}
@@ -331,7 +331,7 @@ export default function Home() {
 
             return (
               <article className={`photo-story-block ${index % 2 ? "reverse" : ""}`} key={id}>
-                <ApprovedPhotoSlot image={image} label={`${meta.title} placeholder`} />
+                <ApprovedPhotoSlot image={image} label={meta.title} />
                 <div className="media-story-copy photo-copy">
                   <span className="eyebrow">Visual Story</span>
                   <h3>{meta.title}</h3>

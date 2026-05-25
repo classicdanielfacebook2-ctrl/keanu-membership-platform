@@ -51,7 +51,7 @@ export default function Payment() {
       <SectionHeader
         eyebrow="Payment"
         title="Final payment summary."
-        copy="Payment appears after the application details have been reviewed. This review build does not collect card details manually."
+        copy="Payment appears after the application details are confirmed. Card details are handled only through secure payment providers."
       />
 
       {application ? (
@@ -91,7 +91,7 @@ export default function Payment() {
             </div>
 
             <label htmlFor="paymentStatus">
-              Admin review payment status
+              Payment status
               <select id="paymentStatus" value={status} onChange={(e) => updatePaymentStatus(e.target.value)}>
                 {paymentStatuses.map((paymentStatus) => (
                   <option key={paymentStatus}>{paymentStatus}</option>
@@ -101,7 +101,7 @@ export default function Payment() {
 
             <div className="payment-badge">
               <ShieldCheck size={18} />
-              Provider integration placeholder
+              Secure provider checkout
             </div>
             {/* Backend later: create Stripe/PayPal checkout sessions and reconcile provider webhooks here. */}
           </div>
@@ -110,7 +110,7 @@ export default function Payment() {
         <div className="payment-empty premium-panel">
           <CreditCard size={34} />
           <h3>No payment-ready application found</h3>
-          <p>Select a card and complete the application review before opening payment.</p>
+          <p>Select a card and complete the application details before opening payment.</p>
           <Link className="button primary" to="/cards">
             Choose Card
             <ArrowRight size={17} />

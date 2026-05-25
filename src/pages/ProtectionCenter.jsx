@@ -9,7 +9,7 @@ const incidentTypes = [
   "Unauthorized Membership Seller",
   "Fake Social Media Account",
   "Account Security Concern",
-  "Refund Review Request"
+  "Refund Support Request"
 ];
 
 const emptyReport = {
@@ -108,11 +108,11 @@ export default function ProtectionCenter() {
           <div className="protection-icon">
             <ShieldCheck size={24} />
           </div>
-          <h2>Security review intake</h2>
-          <p>Submit details clearly so the security team can review the report and request additional evidence if needed.</p>
+          <h2>Security case intake</h2>
+          <p>Submit details clearly so the security team can investigate the report and request additional evidence if needed.</p>
           <div className="protection-note">
             <LockKeyhole size={17} />
-            <span>Eligible cases may qualify for reimbursement review following internal investigation and verification.</span>
+            <span>Eligible cases may qualify for reimbursement support following internal investigation and verification.</span>
           </div>
           <div className="protection-note">
             <LockKeyhole size={17} />
@@ -127,7 +127,7 @@ export default function ProtectionCenter() {
         <form className="protection-form" onSubmit={handleSubmit}>
           {submittedCase ? (
             <div className="case-confirmation">
-              <strong>Your report has been received and will be reviewed by the security team.</strong>
+              <strong>Your report has been received and will be handled by the security team.</strong>
               <span>Case ID: {submittedCase.caseId}</span>
               {emailStatus ? <small>{emailStatus}</small> : null}
             </div>

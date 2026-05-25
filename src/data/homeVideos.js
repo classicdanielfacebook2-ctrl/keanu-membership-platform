@@ -8,11 +8,11 @@ export const homeVideoSuggestions = [
   {
     id: "top-video-advert-downloaded",
     title: "John Wick: Chapter 4 Official Trailer",
-    category: "Top video advert placeholder",
+    category: "Top video advert",
     videoUrl: blobVideoUrl("top-video-advert-downloaded", "/media/review-videos/top-video-advert.mp4"),
     embedUrl: "",
     thumbnailUrl: "",
-    source: blobHomeVideos["top-video-advert-downloaded"]?.url ? "Vercel Blob" : "Downloaded review video",
+    source: blobHomeVideos["top-video-advert-downloaded"]?.url ? "Vercel Blob" : "Hosted video asset",
     credit: "Lionsgate Movies",
     status: "approved",
     reviewedByManagement: true
@@ -24,7 +24,7 @@ export const homeVideoSuggestions = [
     videoUrl: blobVideoUrl("main-video-banner-downloaded", "/media/review-videos/main-video-banner-replacement-combined.mp4"),
     embedUrl: "",
     thumbnailUrl: "",
-    source: blobHomeVideos["main-video-banner-downloaded"]?.url ? "Vercel Blob" : "Downloaded review video",
+    source: blobHomeVideos["main-video-banner-downloaded"]?.url ? "Vercel Blob" : "Hosted video asset",
     credit: "IGN / Lionsgate promotional clip",
     status: "approved",
     reviewedByManagement: true
@@ -36,7 +36,7 @@ export const homeVideoSuggestions = [
     videoUrl: blobVideoUrl("interview-preview-downloaded", "/media/review-videos/interview-preview.mp4"),
     embedUrl: "",
     thumbnailUrl: "",
-    source: blobHomeVideos["interview-preview-downloaded"]?.url ? "Vercel Blob" : "Downloaded review video",
+    source: blobHomeVideos["interview-preview-downloaded"]?.url ? "Vercel Blob" : "Hosted video asset",
     credit: "WIRED",
     status: "approved",
     reviewedByManagement: true
@@ -48,7 +48,7 @@ export const homeVideoSuggestions = [
     videoUrl: blobVideoUrl("membership-campaign-preview-downloaded", "/media/review-videos/membership-campaign-preview.mp4"),
     embedUrl: "",
     thumbnailUrl: "",
-    source: blobHomeVideos["membership-campaign-preview-downloaded"]?.url ? "Vercel Blob" : "Downloaded review video",
+    source: blobHomeVideos["membership-campaign-preview-downloaded"]?.url ? "Vercel Blob" : "Hosted video asset",
     credit: "The Sun Showbiz / PA red carpet footage",
     status: "approved",
     reviewedByManagement: true

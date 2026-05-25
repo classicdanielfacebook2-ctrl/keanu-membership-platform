@@ -1,6 +1,6 @@
 import { Image, Play, Video } from "lucide-react";
 
-export function VideoPlaceholder({ compact = false, label = "Approved Keanu Reeves video advert" }) {
+export function VideoPlaceholder({ compact = false, label = "Keanu Reeves video feature" }) {
   return (
     <div className={compact ? "media-placeholder video compact" : "media-placeholder video"}>
       <div className="media-overlay" />
@@ -10,13 +10,13 @@ export function VideoPlaceholder({ compact = false, label = "Approved Keanu Reev
       <div className="media-caption">
         <Video size={18} />
         <strong>{label}</strong>
-        <span>Licensed management-approved video will replace this placeholder before launch.</span>
+        <span>Premium video feature for the membership experience.</span>
       </div>
     </div>
   );
 }
 
-export function PhotoPlaceholder({ label = "Approved official photo" }) {
+export function PhotoPlaceholder({ label = "Official photo feature" }) {
   return (
     <div className="media-placeholder photo">
       <div className="media-overlay" />

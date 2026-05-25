@@ -9,7 +9,7 @@ export const homeImageSuggestions = [
   {
     id: "official-portrait",
     title: "Keanu Reeves portrait, 2019",
-    category: "Official portrait placeholder",
+    category: "Official portrait",
     imageUrl: blobImageUrl("official-portrait", "/media/review-images/keanu-reeves-2019.jpg"),
     alt: "Keanu Reeves photographed in 2019 during a public meeting in Sao Paulo",
     source: blobHomeImages["official-portrait"]?.url ? "Vercel Blob" : "Wikimedia Commons",
@@ -20,7 +20,7 @@ export const homeImageSuggestions = [
   {
     id: "campaign-still",
     title: "John Wick red carpet portrait, 2014",
-    category: "Campaign still placeholder",
+    category: "Campaign still",
     imageUrl: blobImageUrl("campaign-still", "/media/review-images/keanu-reeves-2014.jpg"),
     alt: "Keanu Reeves at a John Wick red carpet event in 2014",
     source: blobHomeImages["campaign-still"]?.url ? "Vercel Blob" : "Wikimedia Commons",
@@ -31,7 +31,7 @@ export const homeImageSuggestions = [
   {
     id: "membership-lifestyle",
     title: "Fantastic Fest portrait, 2013",
-    category: "Membership card lifestyle placeholder",
+    category: "Membership card lifestyle",
     imageUrl: blobImageUrl("membership-lifestyle", "/media/review-images/keanu-fantastic-fest-2013.jpg"),
     alt: "Keanu Reeves at the Fantastic Fest premiere of Man of Tai Chi in 2013",
     source: blobHomeImages["membership-lifestyle"]?.url ? "Vercel Blob" : "Wikimedia Commons",
@@ -42,7 +42,7 @@ export const homeImageSuggestions = [
   {
     id: "press-photo",
     title: "Keanu Reeves cropped portrait, 2019",
-    category: "Approved press photo placeholder",
+    category: "Press photo",
     imageUrl: blobImageUrl("press-photo", "/media/review-images/keanu-reeves-2019-cropped.jpg"),
     alt: "Cropped portrait of Keanu Reeves in 2019",
     source: blobHomeImages["press-photo"]?.url ? "Vercel Blob" : "Wikimedia Commons",

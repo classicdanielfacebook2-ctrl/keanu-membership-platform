@@ -9,21 +9,21 @@ const supportItems = [
   ["OTP & Verification", "Receive calm guidance for verification codes and account confirmation."],
   ["Account Recovery", "Reset access with a registered email address or phone number."],
   ["Membership Assistance", "Get help choosing a card tier or continuing an application."],
-  ["Payment Support", "Review payment status and next steps through approved payment channels."]
+  ["Payment Support", "Check payment status and next steps through secure payment channels."]
 ];
 
-const trustItems = ["SSL Secured Communication", "Verified Support Channel", "Encrypted Case Review", "Privacy Protected"];
+const trustItems = ["SSL Secured Communication", "Verified Support Channel", "Encrypted Case Handling", "Privacy Protected"];
 
 const protectionCards = [
   ["Report Fraud", "Submit impersonation, scam, or unauthorized seller concerns.", ShieldAlert],
-  ["Refund Review", "Request investigation for eligible payment-related cases.", RotateCcw],
+  ["Refund Support", "Request assistance for eligible payment-related cases.", RotateCcw],
   ["Identity Impersonation", "Report fake profiles or identity misuse connected to membership.", Fingerprint],
-  ["Payment Investigation", "Share transaction details for secure review.", CreditCard]
+  ["Payment Investigation", "Share transaction details for secure handling.", CreditCard]
 ];
 
-const reviewTimes = [
+const responseTimes = [
   ["Live Support", "under 10 minutes"],
-  ["Fraud Review", "24-72 hours"],
+  ["Fraud Support", "24-72 hours"],
   ["Refund Investigation", "3-7 business days"]
 ];
 
@@ -92,8 +92,8 @@ export default function Support() {
           <div className="review-time-card">
             <Clock size={16} />
             <div>
-              <strong>Estimated review times</strong>
-              {reviewTimes.map(([label, time]) => (
+              <strong>Estimated response times</strong>
+              {responseTimes.map(([label, time]) => (
                 <span key={label}>
                   {label}: {time}
                 </span>
@@ -123,7 +123,7 @@ export default function Support() {
           <form className="support-request-form" onSubmit={handleSubmit}>
             <div className="support-form-head">
               <h3>Contact Member Services</h3>
-              <p>Send a concise request and the support team will review it.</p>
+              <p>Send a concise request and the support team will respond.</p>
             </div>
             {submittedCase ? (
               <div className="notice success case-notice">
@@ -189,7 +189,7 @@ export default function Support() {
           <span className="mini-eyebrow">Security & Trust</span>
           <h2 id="securityProtectionTitle">Security & Fraud Protection</h2>
           <p>
-            Eligible cases may qualify for reimbursement review following internal investigation and verification.
+            Eligible cases may qualify for reimbursement support following internal investigation and verification.
             Submitting a report does not guarantee compensation approval.
           </p>
         </div>

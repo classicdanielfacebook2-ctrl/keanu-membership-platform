@@ -192,7 +192,7 @@ export default function LiveChatWidget() {
       window.setTimeout(async () => {
         try {
           const reply = transferNeeded
-            ? "Your request has been escalated for manual review."
+            ? "Your request has been escalated for manual handling."
             : await getAssistantReply(assistantHistory);
           const botMessage = await insertMessage({ conversationId: conversation.id, role: "bot", text: reply });
           setMessages((current) => mergeById(current, [botMessage]));

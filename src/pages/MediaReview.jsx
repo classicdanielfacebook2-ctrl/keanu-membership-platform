@@ -58,7 +58,7 @@ function ReviewSection({
     <section className="media-review-block">
       <div className="media-review-block-header">
         <div>
-          <span className="eyebrow">Pending Management Review</span>
+          <span className="eyebrow">Media Library</span>
           <h2>{title}</h2>
           <p>{copy}</p>
         </div>
@@ -110,7 +110,7 @@ function ReviewSection({
                     onError={() => setFailedMedia((current) => ({ ...current, [item.id]: true }))}
                   />
                 )}
-                <span className="review-status">{item.status || "pending review"}</span>
+                <span className="review-status">{item.status || "pending"}</span>
               </div>
 
               <div className="review-card-copy">
@@ -133,7 +133,7 @@ function ReviewSection({
                   </div>
                   <div>
                     <dt>Status</dt>
-                    <dd>{item.reviewedByManagement ? "Reviewed by management" : "Pending management review"}</dd>
+                    <dd>{item.status || "pending"}</dd>
                   </div>
                 </dl>
 
@@ -223,9 +223,9 @@ export default function MediaReview() {
   return (
     <section className="page-section wide-page media-review-page">
       <SectionHeader
-        eyebrow="Private Media Review"
-        title="Management approval center for public media."
-        copy="All collected videos and photos start pending. Only approved Home media appears publicly; rejected and pending media remain hidden behind premium placeholders."
+        eyebrow="Media Library"
+        title="Public media control center."
+        copy="Manage videos and photos used across the Home and Journey pages. Published media appears publicly while inactive media remains hidden."
       />
 
       <div className="media-review-stats">

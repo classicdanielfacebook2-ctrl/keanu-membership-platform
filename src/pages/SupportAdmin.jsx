@@ -194,7 +194,7 @@ export default function SupportAdmin() {
       <SectionHeader
         eyebrow="Support Dashboard"
         title="Real-time support command center."
-        copy="Monitor new conversations, review AI handoffs, and continue live support from one premium agent inbox."
+        copy="Monitor new conversations, manage AI handoffs, and continue live support from one premium agent inbox."
       />
 
       <div className="dashboard-stats">

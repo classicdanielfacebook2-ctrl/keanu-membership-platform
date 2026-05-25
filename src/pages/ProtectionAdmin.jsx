@@ -13,7 +13,7 @@ export default function ProtectionAdmin() {
   const stats = useMemo(
     () => [
       { label: "Total reports", value: reports.length, icon: ShieldAlert },
-      { label: "Under review", value: reports.filter((report) => report.status === "Under Review").length, icon: AlertTriangle },
+      { label: "In progress", value: reports.filter((report) => report.status === "In Progress").length, icon: AlertTriangle },
       { label: "Evidence required", value: reports.filter((report) => report.status === "Evidence Required").length, icon: FileText },
       { label: "Resolved / closed", value: reports.filter((report) => ["Resolved", "Closed"].includes(report.status)).length, icon: CheckCircle2 }
     ],
@@ -28,8 +28,8 @@ export default function ProtectionAdmin() {
     <section className="page-section wide-page protection-admin-page">
       <SectionHeader
         eyebrow="Protection Admin"
-        title="Member protection case review."
-        copy="Review submitted security reports, evidence, case status, and internal investigation notes."
+        title="Member protection case management."
+        copy="Manage submitted security reports, evidence, case status, and internal investigation notes."
       />
 
       <div className="dashboard-stats">

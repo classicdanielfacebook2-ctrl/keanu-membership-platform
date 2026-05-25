@@ -84,7 +84,7 @@ export default function Apply() {
       return;
     }
     if (step === 1 && !applicationComplete) {
-      setStepError("Complete the required applicant details before review.");
+      setStepError("Complete the required applicant details before continuing.");
       return;
     }
     setStepError("");
@@ -126,7 +126,7 @@ export default function Apply() {
       <SectionHeader
         eyebrow="Membership Application"
         title="A clear application path from card selection to confirmation."
-        copy="Choose a membership level, complete applicant details, review the information, then continue to the secure payment stage."
+        copy="Choose a membership level, complete applicant details, confirm the information, then continue to the secure payment stage."
       />
 
       <div className="conversion-flow">
@@ -284,11 +284,11 @@ export default function Apply() {
                 <span>Selected Membership Card</span>
                 <strong>{selectedCard?.name || cardTypes.find((card) => card.id === submitted.selectedCard)?.name}</strong>
                 <span>Status</span>
-                <strong>Pending Review</strong>
+                <strong>Pending</strong>
               </div>
               <p>
-                Your application has been saved and is awaiting review. The next step is payment
-                provider confirmation when checkout is activated for approved applicants.
+                Your application has been received and is pending. The next step is payment
+                provider confirmation for your selected membership.
               </p>
               <div className="hero-actions">
                 <Link className="button secondary" to="/cards">

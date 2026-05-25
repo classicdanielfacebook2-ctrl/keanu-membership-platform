@@ -212,10 +212,10 @@ export default function App() {
             <div className="footer-links">
               <NavLink to="/terms">Terms</NavLink>
               <NavLink to="/privacy">Privacy</NavLink>
-              <NavLink to="/refund">Refund Review Policy</NavLink>
+              <NavLink to="/refund">Refund Policy</NavLink>
               <NavLink to="/protection">Security Policy</NavLink>
             </div>
-            <div className="social-links" aria-label="Social media placeholders">
+            <div className="social-links" aria-label="Social media links">
               <span>IG</span>
               <span>FB</span>
               <span>X</span>

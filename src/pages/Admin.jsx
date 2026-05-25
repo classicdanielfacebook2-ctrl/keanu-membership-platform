@@ -18,7 +18,7 @@ export default function Admin() {
       { label: "Total applications", value: applications.length, icon: Users },
       {
         label: "Pending applications",
-        value: applications.filter((item) => item.reviewStatus === "Pending Review").length,
+        value: applications.filter((item) => item.reviewStatus === "Pending").length,
         icon: Clock
       },
       {
@@ -44,7 +44,7 @@ export default function Admin() {
       <SectionHeader
         eyebrow="Admin Dashboard"
         title="Professional application control center."
-        copy="Access is restricted to authenticated admin accounts. Application records still use local review storage until production application APIs and payment webhooks are connected."
+        copy="Access is restricted to authenticated admin accounts for membership, payment, and card fulfillment operations."
       />
 
       <div className="dashboard-stats">
@@ -137,7 +137,7 @@ export default function Admin() {
             ) : (
               <tr>
                 <td colSpan="6" className="empty-cell">
-                  No applications yet. Submit a demo application to populate this dashboard.
+                  No applications yet.
                 </td>
               </tr>
             )}

@@ -46,5 +46,5 @@ export const cardTypes = [
 ];
 
 export const paymentStatuses = ["Pending", "Paid", "Failed"];
-export const reviewStatuses = ["Pending Review", "Approved", "Rejected"];
+export const reviewStatuses = ["Pending", "Approved", "Rejected"];
 export const shippingStatuses = ["Not Started", "Processing", "Shipped", "Delivered"];
