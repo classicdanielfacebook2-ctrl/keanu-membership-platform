@@ -1,7 +1,11 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/auth/:action",
+      "destination": "/api/auth?action=:action"
+    },
+    {
+      "source": "/:path((?!api/).*)",
       "destination": "/index.html"
     }
   ]

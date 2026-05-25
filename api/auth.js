@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { isAllowedPhoneCountry, isAllowedPhoneNumber } from "../../src/data/phoneCountries.js";
+import { isAllowedPhoneCountry, isAllowedPhoneNumber } from "../src/data/phoneCountries.js";
 import {
   checkTwilioSmsOtp,
   cleanupExpiredOtpUsers,
@@ -22,8 +22,8 @@ import {
   sendTwilioSmsOtp,
   setSessionCookie,
   signToken
-} from "../../serverless/authCore.js";
-import { sendSupabaseRecoveryResponse, syncSupabaseRecoveredPassword } from "../../serverless/supabaseAuthCore.js";
+} from "../serverless/authCore.js";
+import { sendSupabaseRecoveryResponse, syncSupabaseRecoveredPassword } from "../serverless/supabaseAuthCore.js";
 
 const getAction = (req) => (Array.isArray(req.query?.action) ? req.query.action[0] : req.query?.action || "");
 
