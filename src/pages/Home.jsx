@@ -9,19 +9,19 @@ import { getApprovedHomeVideos } from "../data/homeVideos.js";
 const advertCopy = {
   "top-video-advert-downloaded": {
     category: "Top Video Advert",
-    copy: "Discover a premium membership experience designed for dedicated supporters and eligible applicants."
+    copy: "A cinematic introduction to the membership experience, designed for supporters who value recognition, story, and access."
   },
   "main-video-banner-downloaded": {
     category: "Cinematic Membership Film",
-    copy: "Explore the official membership card process, created to guide applicants through a secure and professional application journey."
+    copy: "A closer look at the card journey, from selection to secure checkout and account access."
   },
   "interview-preview-downloaded": {
     category: "Interview Feature",
-    copy: "Explore selected media moments that highlight the story, personality, and career journey behind the platform."
+    copy: "Selected media moments that bring a quieter, more personal tone to the platform."
   },
   "membership-campaign-preview-downloaded": {
     category: "Membership Campaign Film",
-    copy: "Learn how each card tier is structured, what applicants receive, and how the premium membership experience works."
+    copy: "A refined view of the membership tiers and the premium experience behind each card."
   }
 };
 
@@ -29,22 +29,22 @@ const photoCopy = {
   "official-portrait": {
     title: "Official Portrait",
     caption:
-      "A refined official portrait section presenting the face of the membership experience with a mature and premium visual tone."
+      "A polished portrait moment that sets the tone for a premium membership identity."
   },
   "campaign-still": {
     title: "Campaign Still",
     caption:
-      "A selected campaign image used to support the platform's official membership message and create a stronger visual identity."
+      "A cinematic still that supports the visual world of the membership platform."
   },
   "membership-lifestyle": {
     title: "Membership Card Lifestyle",
     caption:
-      "A lifestyle visual showing the premium feeling of card ownership and the value of belonging to an elevated membership experience."
+      "A lifestyle frame shaped around card ownership, belonging, and private access."
   },
   "press-photo": {
     title: "Press Photo",
     caption:
-      "A refined press image used to strengthen trust, recognition, and professional presentation."
+      "A refined public-facing image for trust, recognition, and professional presence."
   }
 };
 
@@ -252,13 +252,8 @@ export default function Home() {
           <span className="eyebrow">A Premium Membership Experience</span>
           <h1>More than a card. A connection to a story that continues to inspire.</h1>
           <p>
-            Behind every membership card is more than a name. It represents a journey, loyalty,
-            recognition, and a connection to a legacy built through discipline, struggle, and
-            worldwide admiration.
-          </p>
-          <p>
-            Explore the story, the career, the defining moments, and the premium membership
-            experience created for dedicated supporters.
+            Behind every membership card is a sense of loyalty, recognition, and connection to a
+            legacy shaped by discipline, resilience, and worldwide admiration.
           </p>
           <div className="hero-actions discover-actions">
             <a className="button discover-button" href="#featured-story">
@@ -274,9 +269,13 @@ export default function Home() {
           <span className="eyebrow">Application Ready</span>
           <h3>Begin your membership application</h3>
           <p>
-            Choose your preferred membership level and continue through a secure guided application
-            experience designed for dedicated supporters.
+            Choose your membership level and continue through a secure guided application experience.
           </p>
+          <div className="cinematic-trust-row" aria-label="Payment trust indicators">
+            <span>Stripe Checkout</span>
+            <span>Encrypted session</span>
+            <span>Private account access</span>
+          </div>
           <div className="hero-actions">
             <Link className="button discover-button large" to="/apply">
               Apply for Membership
@@ -293,7 +292,7 @@ export default function Home() {
         <SectionHeader
           eyebrow="Featured Story"
           title="A cinematic path through career, character, and cultural impact."
-          copy="Each visual moment is presented like a premium documentary sequence, moving from career-defining roles to the enduring admiration that surrounds the story."
+          copy="A quieter documentary-style sequence, moving through defining roles, visual moments, and the admiration behind the membership experience."
         />
         <div className="media-story-stack">
           {advertVideos.map((video) => {

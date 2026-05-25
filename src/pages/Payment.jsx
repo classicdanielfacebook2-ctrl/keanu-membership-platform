@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, CreditCard, LockKeyhole, ShieldCheck } from "lucide-react";
+import { ArrowRight, CreditCard, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes, getCardPrice, paymentStatuses } from "../data/cards.js";
 import { getApplications, updateApplication } from "../services/storage.js";
@@ -74,7 +74,7 @@ export default function Payment() {
       <SectionHeader
         eyebrow="Stripe Checkout"
         title="Secure membership payment."
-        copy="Confirm your membership details, then continue to Stripe Checkout to complete payment securely."
+        copy="Confirm the card, amount, and applicant details before continuing to Stripe."
       />
 
       {application ? (
@@ -102,14 +102,36 @@ export default function Payment() {
               <LockKeyhole size={30} />
               <div>
                 <h3>Stripe Checkout</h3>
-                <p>You will be redirected to Stripe to complete payment securely. Card details are not entered on this website.</p>
+                <p>Payment is completed on Stripe. Card details are never entered or stored on this website.</p>
               </div>
+            </div>
+
+            <div className="stripe-trust-grid" aria-label="Stripe payment trust indicators">
+              <span>
+                <ShieldCheck size={17} />
+                TLS secured checkout
+              </span>
+              <span>
+                <CreditCard size={17} />
+                Stripe-hosted payment page
+              </span>
+              <span>
+                <Sparkles size={17} />
+                Instant membership payment record
+              </span>
             </div>
 
             <div className="payment-actions">
               <button className="button primary" type="button" onClick={handleCheckout} disabled={checkoutLoading}>
                 <CreditCard size={17} />
-                {checkoutLoading ? "Opening Stripe..." : "Pay Securely with Stripe"}
+                {checkoutLoading ? (
+                  <>
+                    <span className="button-loader" aria-hidden="true" />
+                    Opening Stripe
+                  </>
+                ) : (
+                  "Pay Securely with Stripe"
+                )}
               </button>
             </div>
 
@@ -126,7 +148,7 @@ export default function Payment() {
 
             <div className="payment-badge">
               <ShieldCheck size={18} />
-              Stripe Checkout enabled
+              Verified Stripe payment flow
             </div>
             {/* Backend later: create Stripe/PayPal checkout sessions and reconcile provider webhooks here. */}
           </div>

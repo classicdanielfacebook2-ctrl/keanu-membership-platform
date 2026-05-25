@@ -25,7 +25,11 @@ export default function CardType({ card, featured = false, compact = false, hide
   };
 
   return (
-    <article className={`membership-card ${card.id} ${featured ? "featured" : ""} ${compact ? "compact" : ""}`}>
+    <article
+      className={`membership-card ${card.id} ${featured ? "featured" : ""} ${compact ? "compact" : ""}`}
+      tabIndex={0}
+      aria-label={`${card.name} membership card`}
+    >
       <div className="lux-card-preview" aria-label={`${card.name} card design`}>
         <div className="card-shine" />
         <div className="chip" aria-hidden="true">
