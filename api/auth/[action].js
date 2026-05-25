@@ -1,0 +1,348 @@
+import bcrypt from "bcryptjs";
+import { isAllowedPhoneCountry, isAllowedPhoneNumber } from "../../src/data/phoneCountries.js";
+import {
+  checkTwilioSmsOtp,
+  cleanupExpiredOtpUsers,
+  cleanupExpiredRegistrationIntents,
+  clearSessionCookie,
+  createOtpFields,
+  getRegistrationIntentsCollection,
+  getUsersCollection,
+  getVerificationChannel,
+  handleApiError,
+  isEmailIdentifier,
+  isPhoneIdentifier,
+  isUserVerified,
+  methodNotAllowed,
+  normalizeAuthIdentifier,
+  publicUser,
+  requireAuth,
+  sendJson,
+  sendOtpEmail,
+  sendTwilioSmsOtp,
+  setSessionCookie,
+  signToken
+} from "../../serverless/authCore.js";
+import { sendSupabaseRecoveryResponse, syncSupabaseRecoveredPassword } from "../../serverless/supabaseAuthCore.js";
+
+const getAction = (req) => (Array.isArray(req.query?.action) ? req.query.action[0] : req.query?.action || "");
+
+async function login(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+
+  const identifier = normalizeAuthIdentifier(req.body?.identifier);
+  const password = String(req.body?.password || "");
+  if (!isEmailIdentifier(identifier) && (!isPhoneIdentifier(identifier) || !isAllowedPhoneNumber(identifier))) {
+    return sendJson(res, 400, { error: "Enter an allowed email address or phone number." });
+  }
+
+  const users = await getUsersCollection();
+  const user = await users.findOne({ $or: [{ identifier }, { email: identifier }, { phone: identifier }] });
+
+  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    return sendJson(res, 401, { error: "Invalid email/phone or password." });
+  }
+
+  if (!isUserVerified(user)) {
+    return sendJson(res, 403, {
+      error: "Please verify your email before logging in.",
+      verificationRequired: true,
+      identifier: user.identifier
+    });
+  }
+
+  setSessionCookie(res, signToken(user));
+  return sendJson(res, 200, { user: publicUser(user) });
+}
+
+async function logout(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  clearSessionCookie(res);
+  return sendJson(res, 200, { ok: true });
+}
+
+async function me(req, res) {
+  if (req.method !== "GET") {
+    res.setHeader("Allow", "GET");
+    return sendJson(res, 405, { error: "Method not allowed." });
+  }
+
+  try {
+    const user = await requireAuth(req);
+    return sendJson(res, 200, { user: publicUser(user) });
+  } catch (error) {
+    clearSessionCookie(res);
+    if (error.status === 401) return sendJson(res, 401, { error: error.message });
+    throw error;
+  }
+}
+
+async function register(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+
+  const fullName = String(req.body?.fullName || "").trim();
+  const email = normalizeAuthIdentifier(req.body?.email || req.body?.identifier);
+  const phone = normalizeAuthIdentifier(req.body?.phone);
+  const phoneCountry = String(req.body?.phoneCountry || "").toUpperCase();
+  const verificationMethod = req.body?.verificationMethod === "sms" ? "sms" : "email";
+  const identifier = verificationMethod === "sms" ? phone : email;
+  const password = String(req.body?.password || "");
+
+  if (!fullName || !email || !phone || password.length < 8) {
+    return sendJson(res, 400, {
+      error: "Full name, email address, phone number, and a password of at least 8 characters are required."
+    });
+  }
+
+  if (!isEmailIdentifier(email) || !isPhoneIdentifier(phone) || !isAllowedPhoneCountry(phoneCountry) || !isAllowedPhoneNumber(phone)) {
+    return sendJson(res, 400, { error: "Enter a valid email address and select an allowed phone country." });
+  }
+
+  const users = await getUsersCollection();
+  const intents = await getRegistrationIntentsCollection();
+  await cleanupExpiredOtpUsers(users);
+  await cleanupExpiredRegistrationIntents(intents);
+
+  const existing = await users.findOne({ $or: [{ identifier }, { email }, { phone }] });
+  if (isUserVerified(existing)) {
+    return sendJson(res, 409, { error: "An account already exists for that email or phone number." });
+  }
+  if (existing) await users.deleteOne({ _id: existing._id });
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const channel = verificationMethod === "sms" ? "sms" : getVerificationChannel(identifier);
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  const pendingRegistration = {
+    fullName,
+    identifier,
+    email,
+    phone,
+    phoneCountry,
+    passwordHash,
+    role: "user",
+    channel,
+    otpAttempts: 0,
+    expiresAt,
+    createdAt: new Date()
+  };
+
+  if (channel === "email") {
+    const otpFields = await createOtpFields();
+    pendingRegistration.otpHash = otpFields.otpHash;
+    pendingRegistration.expiresAt = otpFields.otpExpiresAt;
+
+    await intents.replaceOne({ identifier }, pendingRegistration, { upsert: true });
+    try {
+      await sendOtpEmail({ to: identifier, fullName, otp: otpFields.otp });
+    } catch (error) {
+      await intents.deleteOne({ identifier });
+      throw error;
+    }
+  } else {
+    await intents.replaceOne({ identifier }, pendingRegistration, { upsert: true });
+    try {
+      await sendTwilioSmsOtp({ to: identifier });
+    } catch (error) {
+      await intents.deleteOne({ identifier });
+      throw error;
+    }
+  }
+
+  return sendJson(res, 201, {
+    verificationRequired: true,
+    identifier,
+    channel,
+    expiresAt: pendingRegistration.expiresAt.toISOString(),
+    message:
+      channel === "sms"
+        ? "A verification code has been sent to your phone number."
+        : "A verification code has been sent to your email."
+  });
+}
+
+async function verifyOtp(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+
+  const identifier = normalizeAuthIdentifier(req.body?.identifier);
+  const otp = String(req.body?.otp || "").trim();
+  const users = await getUsersCollection();
+  const intents = await getRegistrationIntentsCollection();
+  const user = await users.findOne({ identifier });
+
+  if (isUserVerified(user)) {
+    setSessionCookie(res, signToken(user));
+    return sendJson(res, 200, { user: publicUser(user), message: "Account already verified." });
+  }
+
+  const pending = await intents.findOne({ identifier });
+  if (!pending) return sendJson(res, 404, { error: "No pending verification found. Please register again." });
+
+  if (!/^\d{6}$/.test(otp)) return sendJson(res, 400, { error: "Enter the 6-digit verification code sent to you." });
+
+  if (Date.now() > new Date(pending.expiresAt).getTime()) {
+    await intents.deleteOne({ _id: pending._id });
+    return sendJson(res, 400, { error: "Verification code expired. Please register again to receive a new code." });
+  }
+
+  if ((pending.otpAttempts || 0) >= 5) {
+    return sendJson(res, 429, { error: "Too many verification attempts. Request a new code." });
+  }
+
+  const validOtp =
+    pending.channel === "sms"
+      ? (await checkTwilioSmsOtp({ to: pending.identifier, code: otp })).status === "approved"
+      : pending.otpHash && (await bcrypt.compare(otp, pending.otpHash));
+
+  if (!validOtp) {
+    await intents.updateOne({ _id: pending._id }, { $inc: { otpAttempts: 1 } });
+    return sendJson(res, 401, { error: "Invalid verification code." });
+  }
+
+  const result = await users.insertOne({
+    fullName: pending.fullName,
+    identifier: pending.identifier,
+    email: pending.email,
+    phone: pending.phone,
+    phoneCountry: pending.phoneCountry,
+    passwordHash: pending.passwordHash,
+    role: pending.role || "user",
+    verified: true,
+    isVerified: true,
+    createdAt: new Date()
+  });
+  await intents.deleteOne({ _id: pending._id });
+  const verifiedUser = await users.findOne({ _id: result.insertedId });
+  setSessionCookie(res, signToken(verifiedUser));
+  return sendJson(res, 200, { user: publicUser(verifiedUser), message: "Account verified successfully." });
+}
+
+async function resendOtp(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+
+  const identifier = normalizeAuthIdentifier(req.body?.identifier);
+  const intents = await getRegistrationIntentsCollection();
+  const pending = await intents.findOne({ identifier });
+
+  if (!pending) return sendJson(res, 404, { error: "No pending verification found. Please register again." });
+
+  if (pending.channel === "sms") {
+    await sendTwilioSmsOtp({ to: pending.identifier });
+    return sendJson(res, 200, { ok: true, message: "A new verification code has been sent to your phone number." });
+  }
+
+  const otpFields = await createOtpFields();
+  await intents.updateOne(
+    { _id: pending._id },
+    {
+      $set: {
+        otpHash: otpFields.otpHash,
+        expiresAt: otpFields.otpExpiresAt,
+        otpAttempts: 0
+      }
+    }
+  );
+  await sendOtpEmail({ to: pending.identifier, fullName: pending.fullName, otp: otpFields.otp });
+  return sendJson(res, 200, {
+    ok: true,
+    expiresAt: otpFields.otpExpiresAt.toISOString(),
+    message: "A new verification code has been sent to your email."
+  });
+}
+
+async function forgotPassword(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  return sendSupabaseRecoveryResponse(res, req.body?.identifier);
+}
+
+async function resetPassword(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+
+  const identifier = normalizeAuthIdentifier(req.body?.identifier);
+  const resetCode = String(req.body?.resetCode || "").trim();
+  const password = String(req.body?.password || "");
+
+  if (!identifier || !/^\d{6}$/.test(resetCode) || password.length < 8) {
+    return sendJson(res, 400, { error: "Email, 6-digit reset code, and a new password are required." });
+  }
+
+  if (!isEmailIdentifier(identifier) && (!isPhoneIdentifier(identifier) || !isAllowedPhoneNumber(identifier))) {
+    return sendJson(res, 400, { error: "Enter an allowed email address or phone number." });
+  }
+
+  const users = await getUsersCollection();
+  const user = await users.findOne({ $or: [{ identifier }, { email: identifier }, { phone: identifier }] });
+  const channel = getVerificationChannel(identifier);
+
+  if (!user) return sendJson(res, 400, { error: "Invalid or expired reset code." });
+
+  if (channel === "email") {
+    if (!user.resetCodeHash || !user.resetExpiresAt) {
+      return sendJson(res, 400, { error: "Invalid or expired reset code." });
+    }
+
+    if (Date.now() > new Date(user.resetExpiresAt).getTime()) {
+      await users.updateOne({ _id: user._id }, { $unset: { resetCodeHash: "", resetExpiresAt: "" }, $set: { resetAttempts: 0 } });
+      return sendJson(res, 400, { error: "Reset code expired. Request a new code." });
+    }
+
+    if ((user.resetAttempts || 0) >= 5) {
+      return sendJson(res, 429, { error: "Too many reset attempts. Request a new code." });
+    }
+
+    const validCode = await bcrypt.compare(resetCode, user.resetCodeHash);
+    if (!validCode) {
+      await users.updateOne({ _id: user._id }, { $inc: { resetAttempts: 1 } });
+      return sendJson(res, 401, { error: "Invalid reset code." });
+    }
+  } else {
+    const verification = await checkTwilioSmsOtp({ to: identifier, code: resetCode });
+    if (verification.status !== "approved") return sendJson(res, 401, { error: "Invalid reset code." });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: { passwordHash, resetAttempts: 0 },
+      $unset: { resetCodeHash: "", resetExpiresAt: "" }
+    }
+  );
+
+  return sendJson(res, 200, { ok: true, message: "Password updated. You can now log in." });
+}
+
+async function supabaseResetPassword(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+
+  const authorization = req.headers.authorization || "";
+  const accessToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  const result = await syncSupabaseRecoveredPassword({ accessToken, password: req.body?.password });
+  return sendJson(res, result.status, result.payload);
+}
+
+const handlers = {
+  "forgot-password": forgotPassword,
+  login,
+  logout,
+  me,
+  register,
+  "resend-otp": resendOtp,
+  "reset-password": resetPassword,
+  "supabase-reset-password": supabaseResetPassword,
+  "verify-otp": verifyOtp
+};
+
+export default async function handler(req, res) {
+  const action = getAction(req);
+  const routeHandler = handlers[action];
+
+  if (!routeHandler) {
+    return sendJson(res, 404, { error: "Authentication route not found." });
+  }
+
+  try {
+    return await routeHandler(req, res);
+  } catch (error) {
+    return handleApiError(res, `auth/${action}`, error);
+  }
+}

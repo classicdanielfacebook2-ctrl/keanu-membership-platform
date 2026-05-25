@@ -7,8 +7,3 @@ export const createCheckoutSession = (application) =>
     method: "POST",
     body: JSON.stringify({ application })
   });
-
-export const getCheckoutSessionStatus = (sessionId) =>
-  authRequest(`/api/stripe/session-status?session_id=${encodeURIComponent(sessionId)}`, {
-    method: "GET"
-  });
