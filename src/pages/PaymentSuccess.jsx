@@ -11,7 +11,7 @@ const cardName = (id) => cardTypes.find((card) => card.id === id)?.name || "Memb
 export default function PaymentSuccess() {
   const [params] = useSearchParams();
   const sessionId = params.get("session_id") || "";
-  const applicationId = params.get("application") || "";
+  const applicationId = params.get("application") || sessionStorage.getItem("pendingStripeApplicationId") || "";
   const [status, setStatus] = useState({ paymentStatus: "Pending", membershipStatus: "Pending" });
   const [error, setError] = useState("");
 
@@ -25,11 +25,15 @@ export default function PaymentSuccess() {
     getCheckoutSessionStatus(sessionId)
       .then((data) => {
         setStatus({ paymentStatus: data.paymentStatus, membershipStatus: data.membershipStatus });
-        if (application?.id) {
-          updateApplication(application.id, {
+        const localApplication =
+          application ||
+          getApplications().find((item) => item.id === data.applicationId || item.referenceId === data.referenceId);
+        if (localApplication?.id) {
+          updateApplication(localApplication.id, {
             paymentStatus: data.paymentStatus,
             membershipStatus: data.membershipStatus
           });
+          sessionStorage.removeItem("pendingStripeApplicationId");
         }
       })
       .catch((requestError) => setError(requestError.message));

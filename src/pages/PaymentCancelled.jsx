@@ -6,7 +6,7 @@ import { useEffect, useMemo } from "react";
 
 export default function PaymentCancelled() {
   const [params] = useSearchParams();
-  const applicationId = params.get("application") || "";
+  const applicationId = params.get("application") || sessionStorage.getItem("pendingStripeApplicationId") || "";
   const application = useMemo(
     () => getApplications().find((item) => item.id === applicationId || item.referenceId === applicationId),
     [applicationId]
@@ -15,6 +15,7 @@ export default function PaymentCancelled() {
   useEffect(() => {
     if (application?.id) {
       updateApplication(application.id, { paymentStatus: "Pending", membershipStatus: "Pending" });
+      sessionStorage.removeItem("pendingStripeApplicationId");
     }
   }, [application]);
 

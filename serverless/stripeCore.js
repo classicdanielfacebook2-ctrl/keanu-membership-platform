@@ -47,12 +47,28 @@ export const createCheckoutSession = async ({ user, application }) => {
   const payments = await getMembershipPaymentsCollection();
   const applicationId = String(application.id || application.referenceId || "");
 
+  const lineItem = plan.stripePriceId
+    ? { price: plan.stripePriceId, quantity: 1 }
+    : {
+        // Temporary test price data. Replace `stripePriceId` in src/data/cards.js with live Stripe Price IDs.
+        quantity: 1,
+        price_data: {
+          currency: plan.currency || "usd",
+          unit_amount: plan.priceAmountCents,
+          product_data: {
+            name: `KR Global Membership - ${plan.name}`,
+            description: plan.benefits.slice(0, 3).join(" / "),
+            images: [`${siteUrl}/brand/kr-stripe-icon.png`]
+          }
+        }
+      };
+
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer_email: application.email || user.email || undefined,
     client_reference_id: applicationId,
-    success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}&application=${encodeURIComponent(applicationId)}`,
-    cancel_url: `${siteUrl}/payment-cancelled?application=${encodeURIComponent(applicationId)}`,
+    success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${siteUrl}/payment-cancelled`,
     metadata: {
       applicationId,
       referenceId: String(application.referenceId || ""),
@@ -68,20 +84,7 @@ export const createCheckoutSession = async ({ user, application }) => {
         selectedCard: plan.id
       }
     },
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: plan.currency || "usd",
-          unit_amount: plan.priceAmountCents,
-          product_data: {
-            name: `KR Global Membership - ${plan.name}`,
-            description: plan.benefits.slice(0, 3).join(" / "),
-            images: [`${siteUrl}/brand/kr-stripe-icon.png`]
-          }
-        }
-      }
-    ]
+    line_items: [lineItem]
   });
 
   await payments.updateOne(

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CheckCircle2, CreditCard, ShieldCheck } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck } from "lucide-react";
 import CardType from "../components/CardType.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import { saveApplication } from "../services/storage.js";
+import { createCheckoutSession } from "../services/stripeCheckout.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const emptyForm = {
@@ -17,7 +18,7 @@ const emptyForm = {
   paymentMethod: "Stripe Checkout"
 };
 
-const steps = ["Choose Card", "Apply", "Review", "Payment", "Confirmation"];
+const steps = ["Choose Card", "Apply", "Review", "Payment"];
 
 export default function Apply() {
   const [params] = useSearchParams();
@@ -27,8 +28,8 @@ export default function Apply() {
   const initialCard = cardTypes.some((card) => card.id === requestedCard) ? requestedCard : "";
   const [step, setStep] = useState(initialCard ? 1 : 0);
   const [form, setForm] = useState({ ...emptyForm, selectedCard: initialCard });
-  const [submitted, setSubmitted] = useState(null);
   const [stepError, setStepError] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const selectedCard = cardTypes.find((card) => card.id === form.selectedCard) || null;
   const progress = ((step + 1) / steps.length) * 100;
@@ -66,7 +67,7 @@ export default function Apply() {
     if (targetStep === 0) return true;
     if (targetStep === 1) return Boolean(form.selectedCard);
     if (targetStep === 2 || targetStep === 3) return Boolean(form.selectedCard && applicationComplete);
-    return Boolean(submitted);
+    return false;
   };
 
   const goToStep = (targetStep) => {
@@ -96,29 +97,36 @@ export default function Apply() {
     setStep((current) => Math.max(current - 1, 0));
   };
 
-  const handleContinueToPayment = (event) => {
+  const handleContinueToPayment = async (event) => {
     event.preventDefault();
     if (!selectedCard || !applicationComplete) {
       setStepError("Review the selected card and applicant details before payment.");
       return;
     }
-
-    // Backend later: replace local storage with a secure application API and database write.
-    const saved = saveApplication({
-      fullName: form.fullName.trim(),
-      email: form.email.trim(),
-      phone: form.phone.trim(),
-      country: form.country.trim(),
-      selectedCard: selectedCard.id,
-      preferredContactMethod: form.preferredContactMethod,
-      paymentMethod: "Stripe Checkout"
-    });
-
-    setSubmitted(saved);
-    sessionStorage.removeItem("pendingMembershipCard");
-    sessionStorage.removeItem("pendingMembershipAction");
+    setCheckoutLoading(true);
     setStepError("");
-    setStep(4);
+
+    try {
+      const saved = saveApplication({
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        country: form.country.trim(),
+        selectedCard: selectedCard.id,
+        preferredContactMethod: form.preferredContactMethod,
+        paymentMethod: "Stripe Checkout"
+      });
+
+      sessionStorage.setItem("pendingStripeApplicationId", saved.id);
+      sessionStorage.removeItem("pendingMembershipCard");
+      sessionStorage.removeItem("pendingMembershipAction");
+      const session = await createCheckoutSession(saved);
+      if (!session.url) throw new Error("Stripe checkout URL was not returned.");
+      window.location.href = session.url;
+    } catch (error) {
+      setCheckoutLoading(false);
+      setStepError(error?.message || "Unable to open Stripe Checkout.");
+    }
   };
 
   return (
@@ -273,59 +281,25 @@ export default function Apply() {
             </div>
           ) : null}
 
-          {step === 4 && submitted ? (
-            <div className="confirmation-panel">
-              <CheckCircle2 size={36} />
-              <span className="eyebrow">Confirmation</span>
-              <h3>Application received</h3>
-              <div className="review-details">
-                <span>Application Reference ID</span>
-                <strong>{submitted.referenceId || submitted.id}</strong>
-                <span>Selected Membership Card</span>
-                <strong>{selectedCard?.name || cardTypes.find((card) => card.id === submitted.selectedCard)?.name}</strong>
-                <span>Status</span>
-                <strong>Pending</strong>
-              </div>
-              <p>
-                Your application has been received and is pending. The next step is payment
-                provider confirmation for your selected membership.
-              </p>
-              <div className="hero-actions">
-                <Link className="button primary" to={`/payment?application=${submitted.id}`}>
-                  Pay Securely with Stripe
-                  <ArrowRight size={17} />
-                </Link>
-                <Link className="button secondary" to="/cards">
-                  View Card Options
-                </Link>
-                <Link className="button ghost" to="/support">
-                  Contact Support
-                </Link>
-              </div>
-            </div>
-          ) : null}
-
           {stepError ? <div className="notice warning">{stepError}</div> : null}
 
-          {step < 4 ? (
-            <div className="step-actions">
-              <button className="button ghost" type="button" onClick={previousStep} disabled={step === 0}>
-                <ArrowLeft size={17} />
-                Back
+          <div className="step-actions">
+            <button className="button ghost" type="button" onClick={previousStep} disabled={step === 0 || checkoutLoading}>
+              <ArrowLeft size={17} />
+              Back
+            </button>
+            {step < 3 ? (
+              <button className="button primary" type="button" onClick={nextStep}>
+                Next
+                <ArrowRight size={17} />
               </button>
-              {step < 3 ? (
-                <button className="button primary" type="button" onClick={nextStep}>
-                  Next
-                  <ArrowRight size={17} />
-                </button>
-              ) : (
-                <button className="button primary" type="submit">
-                  Confirm Application
-                  <ArrowRight size={17} />
-                </button>
-              )}
-            </div>
-          ) : null}
+            ) : (
+              <button className="button primary" type="submit" disabled={checkoutLoading}>
+                {checkoutLoading ? "Opening Stripe..." : "Pay Securely with Stripe"}
+                <ArrowRight size={17} />
+              </button>
+            )}
+          </div>
         </form>
       </div>
 

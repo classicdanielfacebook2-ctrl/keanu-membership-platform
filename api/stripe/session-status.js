@@ -31,6 +31,9 @@ export default async function handler(req, res) {
 
     return sendJson(res, 200, {
       checkoutSessionId: session.id,
+      applicationId: session.metadata?.applicationId || session.client_reference_id || "",
+      referenceId: session.metadata?.referenceId || "",
+      selectedCard: session.metadata?.selectedCard || "",
       stripeStatus: session.status,
       stripePaymentStatus: session.payment_status,
       ...mapped

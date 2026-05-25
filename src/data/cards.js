@@ -5,6 +5,7 @@ export const cardTypes = [
     price: "$25.00",
     priceAmountCents: 2500,
     currency: "usd",
+    stripePriceId: "", // Replace with live Stripe Price ID, for example: price_123.
     benefits: [
       "Official membership registration",
       "Member ID number",
@@ -18,6 +19,7 @@ export const cardTypes = [
     price: "$50.00",
     priceAmountCents: 5000,
     currency: "usd",
+    stripePriceId: "", // Replace with live Stripe Price ID, for example: price_123.
     benefits: [
       "Everything in Silver",
       "Priority support",
@@ -31,6 +33,7 @@ export const cardTypes = [
     price: "$100.00",
     priceAmountCents: 10000,
     currency: "usd",
+    stripePriceId: "", // Replace with live Stripe Price ID, for example: price_123.
     benefits: [
       "Everything in Gold",
       "VIP badge",
@@ -44,6 +47,7 @@ export const cardTypes = [
     price: "$200.00",
     priceAmountCents: 20000,
     currency: "usd",
+    stripePriceId: "", // Replace with live Stripe Price ID, for example: price_123.
     benefits: [
       "Everything in VIP",
       "Premium recognition",
