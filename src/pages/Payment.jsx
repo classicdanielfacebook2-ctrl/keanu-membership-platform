@@ -72,9 +72,9 @@ export default function Payment() {
   return (
     <section className="page-section payment-page">
       <SectionHeader
-        eyebrow="Payment"
-        title="Final payment summary."
-        copy="Payment appears after the application details are confirmed. Card details are handled only through secure payment providers."
+        eyebrow="Stripe Checkout"
+        title="Secure membership payment."
+        copy="Confirm your membership details, then continue to Stripe Checkout to complete payment securely."
       />
 
       {application ? (
@@ -95,21 +95,21 @@ export default function Payment() {
               <span>Applicant Name</span>
               <strong>{application.fullName}</strong>
               <span>Payment Method</span>
-              <strong>{application.paymentMethod || "Secure provider checkout"}</strong>
+              <strong>{application.paymentMethod || "Stripe Checkout"}</strong>
             </div>
 
             <div className="secure-box">
               <LockKeyhole size={30} />
               <div>
-                <h3>Secure provider checkout</h3>
-                <p>Checkout will continue only through an approved provider such as Stripe or PayPal.</p>
+                <h3>Stripe Checkout</h3>
+                <p>You will be redirected to Stripe to complete payment securely. Card details are not entered on this website.</p>
               </div>
             </div>
 
             <div className="payment-actions">
               <button className="button primary" type="button" onClick={handleCheckout} disabled={checkoutLoading}>
                 <CreditCard size={17} />
-                {checkoutLoading ? "Opening Checkout..." : "Continue to Payment"}
+                {checkoutLoading ? "Opening Stripe..." : "Pay Securely with Stripe"}
               </button>
             </div>
 
@@ -126,7 +126,7 @@ export default function Payment() {
 
             <div className="payment-badge">
               <ShieldCheck size={18} />
-              Stripe secure checkout
+              Stripe Checkout enabled
             </div>
             {/* Backend later: create Stripe/PayPal checkout sessions and reconcile provider webhooks here. */}
           </div>

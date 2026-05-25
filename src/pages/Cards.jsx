@@ -8,7 +8,7 @@ export default function Cards() {
       <SectionHeader
         eyebrow="Membership Cards"
         title="Choose your membership level."
-        copy="Review the available card tiers, then select one card to begin the guided application flow."
+        copy="Review the available card tiers, select one card, then complete the guided application before secure Stripe Checkout."
       />
       <div className="cards-grid">
         {cardTypes.map((card, index) => (

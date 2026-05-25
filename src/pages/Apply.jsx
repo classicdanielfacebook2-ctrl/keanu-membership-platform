@@ -14,7 +14,7 @@ const emptyForm = {
   country: "",
   selectedCard: "",
   preferredContactMethod: "Email",
-  paymentMethod: "Secure provider checkout"
+  paymentMethod: "Stripe Checkout"
 };
 
 const steps = ["Choose Card", "Apply", "Review", "Payment", "Confirmation"];
@@ -111,7 +111,7 @@ export default function Apply() {
       country: form.country.trim(),
       selectedCard: selectedCard.id,
       preferredContactMethod: form.preferredContactMethod,
-      paymentMethod: form.paymentMethod
+      paymentMethod: "Stripe Checkout"
     });
 
     setSubmitted(saved);
@@ -268,7 +268,7 @@ export default function Apply() {
               </div>
               <div className="payment-note">
                 <ShieldCheck size={18} />
-                <span>Payment will continue through an approved secure provider. No card details are collected manually.</span>
+                  <span>Payment continues through Stripe Checkout. Card details are entered only on Stripe's secure payment page.</span>
               </div>
             </div>
           ) : null}
@@ -292,7 +292,7 @@ export default function Apply() {
               </p>
               <div className="hero-actions">
                 <Link className="button primary" to={`/payment?application=${submitted.id}`}>
-                  Continue to Payment
+                  Pay Securely with Stripe
                   <ArrowRight size={17} />
                 </Link>
                 <Link className="button secondary" to="/cards">
@@ -320,7 +320,7 @@ export default function Apply() {
                 </button>
               ) : (
                 <button className="button primary" type="submit">
-                  Continue to Payment
+                  Confirm Application
                   <ArrowRight size={17} />
                 </button>
               )}
