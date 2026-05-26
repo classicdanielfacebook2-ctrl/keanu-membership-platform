@@ -36,6 +36,7 @@ const baseMetadata = (object = {}) => ({
   selectedCard: object.metadata?.selectedCard || "",
   paymentMethod: object.metadata?.paymentMethod || "",
   paymentMethodLabel: object.metadata?.paymentMethodLabel || "",
+  paymentCurrency: object.metadata?.paymentCurrency || "",
   delayedPayment: object.metadata?.delayedPayment === "true"
 });
 

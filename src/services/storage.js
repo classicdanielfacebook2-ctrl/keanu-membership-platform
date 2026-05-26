@@ -25,6 +25,8 @@ const normalizeApplication = (application) => ({
       ? "card"
       : application.paymentMethod,
   paymentMethodLabel: application.paymentMethodLabel || "",
+  paymentCurrency: application.paymentCurrency || "EUR",
+  paymentAmount: application.paymentAmount || "",
   cardStatus: application.cardStatus || "Not Started"
 });
 

@@ -45,13 +45,33 @@ const getStripePriceIdForPlan = (plan) => {
   return process.env[plan.stripePriceEnv] || "";
 };
 
+const supportedCurrencies = ["eur", "usd", "gbp", "aud", "cad", "brl", "chf", "clp"];
+const currencyRatesFromEur = {
+  eur: 1,
+  usd: 1.08,
+  gbp: 0.86,
+  aud: 1.65,
+  cad: 1.48,
+  brl: 5.86,
+  chf: 0.96,
+  clp: 1010
+};
+
 const paymentMethodConfig = {
   card: { label: "Credit/Debit Card", stripeTypes: ["card"], delayed: false },
   google_pay: { label: "Google Pay", stripeTypes: ["card"], delayed: false },
   apple_pay: { label: "Apple Pay", stripeTypes: ["card"], delayed: false },
-  amazon_pay: { label: "Amazon Pay", stripeTypes: ["amazon_pay"], delayed: false },
+  amazon_pay: { label: "Amazon Pay", stripeTypes: ["amazon_pay"], currencies: ["eur", "usd", "gbp"], delayed: false },
   link: { label: "Link by Stripe", stripeTypes: ["link", "card"], delayed: false },
-  sepa: { label: "SEPA Bank Transfer / Direct Debit", stripeTypes: ["sepa_debit"], delayed: true }
+  sepa: { label: "SEPA Direct Debit", stripeTypes: ["sepa_debit"], currencies: ["eur"], delayed: true },
+  bank_transfer: {
+    label: "Bank Transfer",
+    stripeTypes: ["customer_balance"],
+    currencies: ["eur", "usd", "gbp"],
+    delayed: true
+  },
+  ideal: { label: "iDEAL", stripeTypes: ["ideal"], currencies: ["eur"], delayed: false },
+  open_banking: { label: "Open Banking", stripeTypes: ["pay_by_bank"], currencies: ["gbp"], delayed: false }
 };
 
 const normalizePaymentMethod = (value = "") => {
@@ -59,7 +79,40 @@ const normalizePaymentMethod = (value = "") => {
   return paymentMethodConfig[id] ? id : "card";
 };
 
-export const createCheckoutSession = async ({ user, application, paymentMethod }) => {
+const normalizeCurrency = (value = "eur") => {
+  const currency = String(value || "eur").trim().toLowerCase();
+  return supportedCurrencies.includes(currency) ? currency : "eur";
+};
+
+const convertPlanAmount = (plan, currency) => {
+  const rate = currencyRatesFromEur[currency] || 1;
+  const converted = plan.priceAmountCents * rate;
+  return currency === "clp" ? Math.max(500, Math.round(converted / 100) * 100) : Math.max(50, Math.round(converted));
+};
+
+const assertPaymentMethodAvailable = (paymentConfig, currency) => {
+  if (paymentConfig.currencies && !paymentConfig.currencies.includes(currency)) {
+    throw new Error(`${paymentConfig.label} is not available for ${currency.toUpperCase()} payments.`);
+  }
+};
+
+const getBankTransferOptions = (currency) => {
+  const bankTransferTypes = {
+    eur: "eu_bank_transfer",
+    usd: "us_bank_transfer",
+    gbp: "gb_bank_transfer"
+  };
+  return {
+    customer_balance: {
+      funding_type: "bank_transfer",
+      bank_transfer: {
+        type: bankTransferTypes[currency] || "eu_bank_transfer"
+      }
+    }
+  };
+};
+
+export const createCheckoutSession = async ({ user, application, paymentMethod, currency }) => {
   const stripe = getStripe();
   const siteUrl = getSiteUrl();
   const plan = getCardPlan(application.selectedCard);
@@ -67,16 +120,20 @@ export const createCheckoutSession = async ({ user, application, paymentMethod }
   const applicationId = String(application.id || application.referenceId || "");
   const paymentMethodId = normalizePaymentMethod(paymentMethod || application.paymentMethod);
   const paymentConfig = paymentMethodConfig[paymentMethodId];
+  const selectedCurrency = normalizeCurrency(currency || application.paymentCurrency || plan.currency || "eur");
+  assertPaymentMethodAvailable(paymentConfig, selectedCurrency);
+  const selectedAmount = convertPlanAmount(plan, selectedCurrency);
 
   const stripePriceId = getStripePriceIdForPlan(plan);
-  const lineItem = stripePriceId
+  const canUseStripePriceId = stripePriceId && selectedCurrency === (plan.currency || "eur").toLowerCase();
+  const lineItem = canUseStripePriceId
     ? { price: stripePriceId, quantity: 1 }
     : {
         // Temporary inline price_data fallback. Add STRIPE_PRICE_SILVER/GOLD/VIP/PREMIUM in Vercel to use live Stripe Price IDs.
         quantity: 1,
         price_data: {
-          currency: plan.currency || "eur",
-          unit_amount: plan.priceAmountCents,
+          currency: selectedCurrency,
+          unit_amount: selectedAmount,
           product_data: {
             name: `KR Global Membership - ${plan.name}`,
             description: plan.benefits.slice(0, 3).join(" / "),
@@ -100,6 +157,7 @@ export const createCheckoutSession = async ({ user, application, paymentMethod }
       applicantName: String(application.fullName || user.fullName || ""),
       paymentMethod: paymentMethodId,
       paymentMethodLabel: paymentConfig.label,
+      paymentCurrency: selectedCurrency,
       delayedPayment: String(paymentConfig.delayed)
     },
     payment_intent_data: {
@@ -110,9 +168,16 @@ export const createCheckoutSession = async ({ user, application, paymentMethod }
         selectedCard: plan.id,
         paymentMethod: paymentMethodId,
         paymentMethodLabel: paymentConfig.label,
+        paymentCurrency: selectedCurrency,
         delayedPayment: String(paymentConfig.delayed)
       }
     },
+    ...(paymentMethodId === "bank_transfer"
+      ? {
+          customer_creation: "always",
+          payment_method_options: getBankTransferOptions(selectedCurrency)
+        }
+      : {}),
     line_items: [lineItem]
   });
 
@@ -129,8 +194,8 @@ export const createCheckoutSession = async ({ user, application, paymentMethod }
         fullName: application.fullName || user.fullName || "",
         selectedCard: plan.id,
         cardName: plan.name,
-        amount: plan.priceAmountCents,
-        currency: plan.currency || "eur",
+        amount: selectedAmount,
+        currency: selectedCurrency,
         paymentMethod: paymentMethodId,
         paymentMethodLabel: paymentConfig.label,
         delayedPayment: paymentConfig.delayed,

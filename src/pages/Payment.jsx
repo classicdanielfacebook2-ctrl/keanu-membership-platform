@@ -3,7 +3,15 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, BadgeCheck, Building2, CreditCard, LockKeyhole, ShieldCheck, Smartphone, Sparkles, Wallet } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes, getCardPrice } from "../data/cards.js";
-import { getPaymentMethod, isDelayedPaymentMethod, paymentMethods } from "../data/paymentMethods.js";
+import {
+  convertEurCents,
+  currencyOptions,
+  formatPaymentAmount,
+  getPaymentMethod,
+  isDelayedPaymentMethod,
+  isPaymentMethodAvailable,
+  paymentMethods
+} from "../data/paymentMethods.js";
 import { getApplications, updateApplication } from "../services/storage.js";
 import { createCheckoutSession, stripePublishableKey } from "../services/stripeCheckout.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -27,6 +35,7 @@ export default function Payment() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [selectedMethodId, setSelectedMethodId] = useState("card");
+  const [selectedCurrency, setSelectedCurrency] = useState("EUR");
   const applicationId = params.get("application");
 
   useEffect(() => {
@@ -45,7 +54,20 @@ export default function Payment() {
     if (!application) return;
     if (application.paymentStatus) setStatus(application.paymentStatus);
     setSelectedMethodId(getPaymentMethod(application.paymentMethod).id);
+    setSelectedCurrency(application.paymentCurrency || "EUR");
   }, [application]);
+
+  const selectedCard = cardTypes.find((card) => card.id === application?.selectedCard) || null;
+  const selectedAmount = selectedCard ? convertEurCents(selectedCard.priceAmountCents, selectedCurrency) : 0;
+  const formattedAmount = selectedCard ? formatPaymentAmount(selectedAmount, selectedCurrency) : cardPrice(application?.selectedCard);
+  const selectedPaymentMethod = getPaymentMethod(selectedMethodId);
+
+  const handleCurrencyChange = (currency) => {
+    setSelectedCurrency(currency);
+    if (!isPaymentMethodAvailable(selectedMethodId, currency)) {
+      setSelectedMethodId("card");
+    }
+  };
 
   useEffect(() => {
     if (auth.loading) return;
@@ -74,14 +96,18 @@ export default function Payment() {
       const updatedApplication = {
         ...application,
         paymentMethod: selectedMethodId,
-        paymentMethodLabel: getPaymentMethod(selectedMethodId).title
+        paymentMethodLabel: selectedPaymentMethod.title,
+        paymentCurrency: selectedCurrency,
+        paymentAmount: formattedAmount
       };
-      const session = await createCheckoutSession(updatedApplication, selectedMethodId);
+      const session = await createCheckoutSession(updatedApplication, selectedMethodId, selectedCurrency);
       if (!session.url) throw new Error("Stripe checkout URL was not returned.");
       updatePaymentStatus("Pending");
       setApplications(updateApplication(application.id, {
         paymentMethod: selectedMethodId,
-        paymentMethodLabel: getPaymentMethod(selectedMethodId).title
+        paymentMethodLabel: selectedPaymentMethod.title,
+        paymentCurrency: selectedCurrency,
+        paymentAmount: formattedAmount
       }));
       window.location.href = session.url;
     } catch (error) {
@@ -104,19 +130,43 @@ export default function Payment() {
             <div className="payment-summary">
               <span className="eyebrow">Application {application.referenceId || application.id}</span>
               <h3>{cardName(application.selectedCard)}</h3>
-              <p>{cardPrice(application.selectedCard)}</p>
+              <p>{formattedAmount}</p>
               <div className={`status-pill ${status.toLowerCase()}`}>Payment Status: {status}</div>
+            </div>
+
+            <div className="wise-payment-shell">
+              <div className="wise-amount-card">
+                <span className="eyebrow">Amount to pay</span>
+                <strong>{formattedAmount}</strong>
+                <small>{cardName(application.selectedCard)} membership</small>
+              </div>
+
+              <div className="currency-selector" aria-label="Choose currency">
+                {currencyOptions.map((currency) => (
+                  <button
+                    key={currency.code}
+                    className={selectedCurrency === currency.code ? "currency-pill selected" : "currency-pill"}
+                    type="button"
+                    onClick={() => handleCurrencyChange(currency.code)}
+                  >
+                    <span>{currency.symbol}</span>
+                    {currency.code}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="review-details">
               <span>Selected Card</span>
               <strong>{cardName(application.selectedCard)}</strong>
               <span>Amount Due</span>
-              <strong>{cardPrice(application.selectedCard)}</strong>
+              <strong>{formattedAmount}</strong>
+              <span>Estimated Confirmation</span>
+              <strong>{selectedPaymentMethod.arrival}</strong>
               <span>Applicant Name</span>
               <strong>{application.fullName}</strong>
               <span>Payment Method</span>
-              <strong>{getPaymentMethod(selectedMethodId).title}</strong>
+              <strong>{selectedPaymentMethod.title}</strong>
             </div>
 
             <div className="secure-box">
@@ -131,6 +181,7 @@ export default function Payment() {
               {paymentMethods.map((method) => {
                 const Icon = paymentIcons[method.id] || CreditCard;
                 const selected = selectedMethodId === method.id;
+                const available = isPaymentMethodAvailable(method.id, selectedCurrency);
 
                 return (
                   <button
@@ -139,6 +190,7 @@ export default function Payment() {
                     type="button"
                     role="radio"
                     aria-checked={selected}
+                    disabled={!available}
                     onClick={() => setSelectedMethodId(method.id)}
                   >
                     <span className="payment-method-icon">
@@ -146,11 +198,22 @@ export default function Payment() {
                     </span>
                     <span>
                       <strong>{method.title}</strong>
-                      <small>{method.description}</small>
+                      <small>{available ? method.description : `Not available for ${selectedCurrency}`}</small>
                     </span>
                   </button>
                 );
               })}
+            </div>
+
+            <div className="fee-arrival-panel">
+              <span>
+                <strong>Total</strong>
+                {formattedAmount}
+              </span>
+              <span>
+                <strong>Fee note</strong>
+                {selectedPaymentMethod.feeNote}
+              </span>
             </div>
 
             <div className="stripe-trust-grid" aria-label="Stripe payment trust indicators">
