@@ -7011,12 +7011,15 @@ body::after {
 
   .location-select-menu {
     position: fixed;
-    inset: auto 0.8rem calc(var(--mobile-keyboard-offset, 0px) + max(0.7rem, env(safe-area-inset-bottom, 0px)));
+    top: max(5dvh, calc(env(safe-area-inset-top, 0px) + 0.85rem));
+    right: 0.8rem;
+    bottom: auto;
+    left: 0.8rem;
     z-index: 39;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
-    max-height: min(78dvh, calc(var(--visual-viewport-height, 100dvh) - 1.4rem));
-    max-height: min(78svh, calc(var(--visual-viewport-height, 100svh) - 1.4rem));
+    max-height: min(84dvh, calc(var(--visual-viewport-height, 100dvh) - max(5dvh, calc(env(safe-area-inset-top, 0px) + 0.85rem)) - max(var(--mobile-keyboard-offset, 0px), env(safe-area-inset-bottom, 0px)) - 0.8rem));
+    max-height: min(84svh, calc(var(--visual-viewport-height, 100svh) - max(5svh, calc(env(safe-area-inset-top, 0px) + 0.85rem)) - max(var(--mobile-keyboard-offset, 0px), env(safe-area-inset-bottom, 0px)) - 0.8rem));
     overflow: hidden;
     border-color: rgba(244, 216, 139, 0.22);
     border-radius: 14px;
@@ -7026,8 +7029,8 @@ body::after {
   }
 
   .location-select-menu.compact {
-    max-height: min(58dvh, calc(var(--visual-viewport-height, 100dvh) - 1.4rem));
-    max-height: min(58svh, calc(var(--visual-viewport-height, 100svh) - 1.4rem));
+    max-height: min(58dvh, calc(var(--visual-viewport-height, 100dvh) - max(5dvh, calc(env(safe-area-inset-top, 0px) + 0.85rem)) - max(var(--mobile-keyboard-offset, 0px), env(safe-area-inset-bottom, 0px)) - 0.8rem));
+    max-height: min(58svh, calc(var(--visual-viewport-height, 100svh) - max(5svh, calc(env(safe-area-inset-top, 0px) + 0.85rem)) - max(var(--mobile-keyboard-offset, 0px), env(safe-area-inset-bottom, 0px)) - 0.8rem));
     width: min(100% - 1.6rem, 28rem);
     margin-inline: auto;
   }
@@ -7098,7 +7101,7 @@ body::after {
 @keyframes locationSheetIn {
   from {
     opacity: 0;
-    transform: translateY(1.2rem);
+    transform: translateY(-0.65rem);
   }
   to {
     opacity: 1;
