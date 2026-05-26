@@ -115,9 +115,21 @@ export default function Apply() {
     setStep((current) => Math.max(current - 1, 0));
   };
 
-  const handleContinueToPayment = async (event) => {
-    event.preventDefault();
+  const handleContinueToPayment = async () => {
+    console.info("[checkout/start]", {
+      source: "final-payment-button",
+      selectedCard: selectedCard?.id || "",
+      paymentMethod: form.paymentMethod,
+      currency: form.paymentCurrency
+    });
+
     if (!selectedCard || !applicationComplete) {
+      console.info("[checkout/blocked]", {
+        source: "final-payment-button",
+        reason: "missing_application_details",
+        hasSelectedCard: Boolean(selectedCard),
+        applicationComplete: Boolean(applicationComplete)
+      });
       setStepError("Review the selected card and applicant details before payment.");
       return;
     }
@@ -143,6 +155,13 @@ export default function Apply() {
       sessionStorage.removeItem("pendingMembershipAction");
       const session = await createCheckoutSession(saved, form.paymentMethod, form.paymentCurrency);
       if (!session.url) throw new Error("Stripe checkout URL was not returned.");
+      console.info("[checkout/redirect]", {
+        source: "final-payment-button",
+        sessionId: session.id || "",
+        selectedCard: saved.selectedCard,
+        paymentMethod: saved.paymentMethod,
+        currency: saved.paymentCurrency
+      });
       window.location.href = session.url;
     } catch (error) {
       setCheckoutLoading(false);
@@ -184,7 +203,7 @@ export default function Apply() {
           ))}
         </div>
 
-        <form className="form-panel step-form conversion-panel" onSubmit={handleContinueToPayment}>
+        <form className="form-panel step-form conversion-panel" onSubmit={(event) => event.preventDefault()}>
           {step === 0 ? (
             <div className="select-card-step">
               <div className="compact-card-grid">
@@ -349,7 +368,7 @@ export default function Apply() {
                 <ArrowRight size={17} />
               </button>
             ) : (
-              <button className="button primary checkout-continue-button" type="submit" disabled={checkoutLoading}>
+              <button className="button primary checkout-continue-button" type="button" onClick={handleContinueToPayment} disabled={checkoutLoading}>
                 {checkoutLoading ? "Opening checkout..." : "Continue to Secure Payment"}
                 <ArrowRight size={17} />
               </button>

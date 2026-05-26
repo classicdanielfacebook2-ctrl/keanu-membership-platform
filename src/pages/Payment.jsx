@@ -72,7 +72,15 @@ export default function Payment() {
     if (application) setApplications(updateApplication(application.id, { paymentStatus: nextStatus }));
   };
 
-  const handleCheckout = async () => {
+  const handleContinueToPayment = async () => {
+    console.info("[checkout/start]", {
+      source: "final-payment-button",
+      applicationId: application?.id || application?.referenceId || "",
+      selectedCard: application?.selectedCard || "",
+      paymentMethod: selectedMethodId,
+      currency: selectedCurrency
+    });
+
     if (!application) return;
     setCheckoutError("");
     setCheckoutLoading(true);
@@ -98,6 +106,13 @@ export default function Payment() {
         paymentCurrency: selectedCurrency,
         paymentAmount: formattedAmount
       }));
+      console.info("[checkout/redirect]", {
+        source: "final-payment-button",
+        sessionId: session.id || "",
+        applicationId: application.id || application.referenceId || "",
+        paymentMethod: selectedMethodId,
+        currency: selectedCurrency
+      });
       window.location.href = session.url;
     } catch (error) {
       setCheckoutError(error?.message || "Unable to start Stripe Checkout.");
@@ -199,7 +214,7 @@ export default function Payment() {
             </div>
 
             <div className="payment-actions">
-              <button className="button primary" type="button" onClick={handleCheckout} disabled={checkoutLoading}>
+              <button className="button primary" type="button" onClick={handleContinueToPayment} disabled={checkoutLoading}>
                 <CreditCard size={17} />
                 {checkoutLoading ? (
                   <>
