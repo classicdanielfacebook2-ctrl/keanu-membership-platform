@@ -1,7 +1,6 @@
 import { NavLink, Route, Routes, useLocation } from "react-router-dom";
 import {
   BadgeCheck,
-  CreditCard,
   FileText,
   Headset,
   Image,
@@ -16,7 +15,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Home from "./pages/Home.jsx";
-import Cards from "./pages/Cards.jsx";
 import Apply from "./pages/Apply.jsx";
 import Payment from "./pages/Payment.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
@@ -38,7 +36,6 @@ import { getApprovedHomeImages } from "./data/homeImages.js";
 const navItems = [
   { to: "/", label: "Home", icon: BadgeCheck },
   { to: "/journey", label: "Journey", icon: Sparkles },
-  { to: "/cards", label: "Cards", icon: CreditCard },
   { to: "/apply", label: "Apply", icon: FileText },
   { to: "/support", label: "Support", icon: Headset },
   { to: "/protection", label: "Protection", icon: ShieldAlert }
@@ -148,7 +145,6 @@ export default function App() {
           <Route path="/journey" element={<Journey />} />
           <Route path="/bio" element={<Journey />} />
           <Route path="/about" element={<Journey />} />
-          <Route path="/cards" element={<Cards />} />
           <Route path="/apply" element={<Apply />} />
           <Route path="/payment" element={<Payment />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />

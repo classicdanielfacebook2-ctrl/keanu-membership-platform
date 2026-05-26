@@ -171,8 +171,8 @@ export default function Journey() {
             A premium biography experience honoring the path from a difficult childhood
             to a career defined by discipline, kindness, and worldwide respect.
           </p>
-          <Link className="button primary large" to="/cards">
-            Explore Membership Cards
+          <Link className="button primary large" to="/apply">
+            Apply for Membership
             <ArrowRight size={18} />
           </Link>
         </div>

@@ -242,8 +242,8 @@ export default function Payment() {
           <CreditCard size={34} />
           <h3>No payment-ready application found</h3>
           <p>Select a card and complete the application details before opening payment.</p>
-          <Link className="button primary" to="/cards">
-            Choose Card
+          <Link className="button primary" to="/apply">
+            Apply
             <ArrowRight size={17} />
           </Link>
         </div>

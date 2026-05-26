@@ -281,9 +281,6 @@ export default function Home() {
               Apply for Membership
               <ArrowRight size={18} />
             </Link>
-            <Link className="button secondary discover-button large" to="/cards">
-              View Membership Cards
-            </Link>
           </div>
         </div>
       </section>
