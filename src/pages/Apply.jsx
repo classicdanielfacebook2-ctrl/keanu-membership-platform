@@ -51,6 +51,7 @@ function SearchableLocationSelect({
   emptyText = "No matching option found.",
   disabled = false,
   searchable = true,
+  title,
   onSelect
 }) {
   const [open, setOpen] = useState(false);
@@ -122,13 +123,12 @@ function SearchableLocationSelect({
           <div className="location-select-backdrop" aria-hidden="true" onMouseDown={() => setOpen(false)} />
           <div className={searchable ? "location-select-menu" : "location-select-menu compact"} role="dialog" aria-label={label}>
             <div className="location-select-toolbar">
-              <div className="location-select-handle" aria-hidden="true" />
               <button className="location-select-close" type="button" onClick={() => setOpen(false)}>
-                Close
+                Back
               </button>
+              <strong>{title || `Select ${label.toLowerCase()}`}</strong>
               {searchable ? (
                 <input
-                  autoFocus
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={searchPlaceholder}
@@ -506,6 +506,7 @@ export default function Apply() {
                 placeholder="Select a card"
                 searchPlaceholder="Search membership card"
                 searchable={false}
+                title="Select membership card"
                 onSelect={(option) => updateField("selectedCard", option.value)}
               />
               <SearchableLocationSelect
@@ -516,6 +517,7 @@ export default function Apply() {
                 placeholder={locationApi ? "Select country" : "Loading countries"}
                 searchPlaceholder="Search country"
                 disabled={!locationApi}
+                title="Select country"
                 onSelect={(option) => updateField("countryCode", { code: option.value, name: option.label })}
               />
               <SearchableLocationSelect
@@ -527,6 +529,7 @@ export default function Apply() {
                 searchPlaceholder="Search state or region"
                 disabled={!form.countryCode}
                 emptyText="No state or region found for this country."
+                title="Select state / region"
                 onSelect={(option) => updateField("stateCode", { code: option.value, name: option.label })}
               />
               {form.stateCode === "__manual_state__" ? (
@@ -550,6 +553,7 @@ export default function Apply() {
                 searchPlaceholder="Search city"
                 disabled={!form.stateCode}
                 emptyText="No city found. Choose manual entry."
+                title="Select city"
                 onSelect={(option) => updateField("city", option.value)}
               />
               {form.city === "__manual__" ? (
@@ -572,6 +576,7 @@ export default function Apply() {
                 placeholder="Select number of applicants"
                 searchPlaceholder="Search applicant count"
                 searchable={false}
+                title="Select applicants"
                 onSelect={(option) => updateField("numberApplicants", option.value)}
               />
               <label className="wide" htmlFor="message">

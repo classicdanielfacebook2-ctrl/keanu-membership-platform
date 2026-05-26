@@ -6817,8 +6817,7 @@ body::after {
   text-transform: none;
 }
 
-.location-select-backdrop,
-.location-select-handle {
+.location-select-backdrop {
   display: none;
 }
 
@@ -6843,6 +6842,10 @@ body::after {
 .location-select-toolbar {
   display: grid;
   gap: 0.48rem;
+}
+
+.location-select-toolbar strong {
+  display: none;
 }
 
 .location-select-close {
@@ -7000,8 +7003,8 @@ body::after {
     inset: 0;
     z-index: 38;
     display: block;
-    background: rgba(0, 0, 0, 0.54);
-    backdrop-filter: blur(7px);
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(10px);
   }
 
   body.location-sheet-open {
@@ -7011,64 +7014,57 @@ body::after {
 
   .location-select-menu {
     position: fixed;
-    top: max(5dvh, calc(env(safe-area-inset-top, 0px) + 0.85rem));
-    right: 0.8rem;
-    bottom: auto;
-    left: 0.8rem;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    height: 100svh;
+    min-height: 100svh;
     z-index: 39;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
-    max-height: min(84dvh, calc(var(--visual-viewport-height, 100dvh) - max(5dvh, calc(env(safe-area-inset-top, 0px) + 0.85rem)) - max(var(--mobile-keyboard-offset, 0px), env(safe-area-inset-bottom, 0px)) - 0.8rem));
-    max-height: min(84svh, calc(var(--visual-viewport-height, 100svh) - max(5svh, calc(env(safe-area-inset-top, 0px) + 0.85rem)) - max(var(--mobile-keyboard-offset, 0px), env(safe-area-inset-bottom, 0px)) - 0.8rem));
+    max-height: var(--visual-viewport-height, 100dvh);
     overflow: hidden;
-    border-color: rgba(244, 216, 139, 0.22);
-    border-radius: 14px;
-    padding: 0.6rem 0.72rem 0.72rem;
+    border: 0;
+    border-radius: 0;
+    background:
+      radial-gradient(circle at 90% 0%, rgba(244, 216, 139, 0.1), transparent 15rem),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 38%),
+      #050505;
+    padding: calc(env(safe-area-inset-top, 0px) + 0.72rem) 1rem calc(env(safe-area-inset-bottom, 0px) + 0.85rem);
     animation: locationSheetIn 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
     backdrop-filter: blur(18px);
   }
 
   .location-select-menu.compact {
-    max-height: min(58dvh, calc(var(--visual-viewport-height, 100dvh) - max(5dvh, calc(env(safe-area-inset-top, 0px) + 0.85rem)) - max(var(--mobile-keyboard-offset, 0px), env(safe-area-inset-bottom, 0px)) - 0.8rem));
-    max-height: min(58svh, calc(var(--visual-viewport-height, 100svh) - max(5svh, calc(env(safe-area-inset-top, 0px) + 0.85rem)) - max(var(--mobile-keyboard-offset, 0px), env(safe-area-inset-bottom, 0px)) - 0.8rem));
-    width: min(100% - 1.6rem, 28rem);
-    margin-inline: auto;
+    max-height: var(--visual-viewport-height, 100dvh);
+    width: 100vw;
+    margin-inline: 0;
   }
 
   .location-select-toolbar {
-    position: sticky;
+    position: relative;
     top: 0;
     z-index: 2;
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 0.48rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.72rem;
     border-bottom: 1px solid rgba(244, 216, 139, 0.12);
     background:
       radial-gradient(circle at 88% 0%, rgba(244, 216, 139, 0.1), transparent 12rem),
       linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
-      rgba(8, 8, 8, 0.98);
-    padding-bottom: 0.52rem;
-  }
-
-  .location-select-handle {
-    grid-column: 1 / -1;
-    display: block;
-    width: 2.6rem;
-    height: 0.18rem;
-    margin: 0 auto 0.18rem;
-    border-radius: 999px;
-    background: rgba(244, 216, 139, 0.34);
+      rgba(8, 8, 8, 0.82);
+    padding-bottom: 0.78rem;
   }
 
   .location-select-close {
-    grid-column: 2;
-    grid-row: 2;
+    grid-column: 1;
+    grid-row: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 2.5rem;
+    min-height: 2.35rem;
     border: 1px solid rgba(244, 216, 139, 0.18);
-    border-radius: 999px;
+    border-radius: 8px;
     background: rgba(244, 216, 139, 0.06);
     color: rgba(244, 216, 139, 0.84);
     cursor: pointer;
@@ -7079,8 +7075,20 @@ body::after {
     text-transform: uppercase;
   }
 
+  .location-select-toolbar strong {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    color: #fff8eb;
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 1.42rem;
+    line-height: 1;
+  }
+
   .location-select-menu input {
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: 2;
     margin-bottom: 0;
   }
@@ -7101,7 +7109,7 @@ body::after {
 @keyframes locationSheetIn {
   from {
     opacity: 0;
-    transform: translateY(-0.65rem);
+    transform: translateY(0.5rem);
   }
   to {
     opacity: 1;
