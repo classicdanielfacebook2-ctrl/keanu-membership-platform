@@ -55,7 +55,7 @@ export default function AuthPage({ mode }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
 
-  const returnTo = useMemo(() => params.get("returnTo") || "/", [params]);
+  const returnTo = useMemo(() => params.get("returnTo") || "/home", [params]);
   const authLogo = useMemo(
     () => getApprovedHomeImages().find((image) => image.id === "official-portrait")?.imageUrl || "/logo.svg",
     []
@@ -102,7 +102,7 @@ export default function AuthPage({ mode }) {
       navigate(`/${pendingAction}?card=${pendingCard}`, { replace: true });
       return;
     }
-    navigate(returnTo || "/", { replace: true });
+    navigate(returnTo || "/home", { replace: true });
   };
 
   const handleSubmit = async (event) => {

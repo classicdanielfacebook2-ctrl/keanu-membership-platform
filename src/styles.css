@@ -4878,6 +4878,157 @@ textarea {
   box-shadow: 0 0 30px rgba(244, 216, 139, 0.32), 0 24px 60px rgba(0, 0, 0, 0.56);
 }
 
+.welcome-landing {
+  position: relative;
+  display: grid;
+  min-height: 100dvh;
+  overflow: hidden;
+  place-items: center;
+  padding: clamp(2rem, 5vw, 5rem);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(244, 216, 139, 0.16), transparent 24rem),
+    radial-gradient(circle at 82% 8%, rgba(255, 255, 255, 0.055), transparent 28rem),
+    #030303;
+}
+
+.welcome-media,
+.welcome-overlay,
+.welcome-particles {
+  position: absolute;
+  inset: 0;
+}
+
+.welcome-media {
+  opacity: 0.46;
+  filter: saturate(0.82) contrast(1.08);
+}
+
+.welcome-media video,
+.welcome-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.welcome-overlay {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.48), rgba(0, 0, 0, 0.88)),
+    radial-gradient(circle at 50% 45%, transparent 0 20%, rgba(0, 0, 0, 0.56) 68%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.9));
+}
+
+.welcome-particles {
+  pointer-events: none;
+}
+
+.welcome-particles span {
+  position: absolute;
+  width: 0.36rem;
+  height: 0.36rem;
+  border-radius: 999px;
+  background: rgba(244, 216, 139, 0.78);
+  box-shadow: 0 0 1.4rem rgba(244, 216, 139, 0.62);
+  opacity: 0.5;
+  animation: particleFloat 8s ease-in-out infinite;
+}
+
+.welcome-particles span:nth-child(1) {
+  left: 17%;
+  top: 28%;
+}
+
+.welcome-particles span:nth-child(2) {
+  right: 18%;
+  top: 18%;
+  animation-delay: 1.8s;
+}
+
+.welcome-particles span:nth-child(3) {
+  right: 28%;
+  bottom: 22%;
+  animation-delay: 3.2s;
+}
+
+.welcome-content {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  max-width: 72rem;
+  text-align: center;
+  animation: welcomeReveal 980ms cubic-bezier(0.18, 0.72, 0.22, 1) both;
+}
+
+.welcome-kicker {
+  color: var(--gold-light);
+  font-size: clamp(0.72rem, 1.4vw, 0.92rem);
+  font-weight: 900;
+  letter-spacing: clamp(0.18em, 1vw, 0.46em);
+  text-transform: uppercase;
+}
+
+.welcome-content h1 {
+  margin: clamp(0.9rem, 2vw, 1.35rem) 0 clamp(0.85rem, 2vw, 1.15rem);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(3.6rem, 12vw, 10rem);
+  line-height: 0.86;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  background: linear-gradient(105deg, #fff8e8 8%, #f4d88b 46%, #b9852e 84%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 3rem rgba(244, 216, 139, 0.16);
+}
+
+.welcome-content p {
+  max-width: 42rem;
+  margin: 0 0 clamp(1.6rem, 4vw, 2.7rem);
+  color: rgba(247, 243, 234, 0.82);
+  font-size: clamp(1rem, 2vw, 1.24rem);
+  line-height: 1.68;
+}
+
+.welcome-enter-button {
+  min-height: 3.55rem;
+  border-radius: 999px;
+  padding-inline: clamp(1.3rem, 4vw, 2.2rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@keyframes welcomeReveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@media (max-width: 560px) {
+  .welcome-landing {
+    padding-inline: 1rem;
+  }
+
+  .welcome-content h1 {
+    font-size: clamp(3rem, 18vw, 5.2rem);
+    line-height: 0.92;
+  }
+
+  .welcome-kicker {
+    letter-spacing: 0.18em;
+  }
+
+  .welcome-enter-button {
+    width: 100%;
+  }
+}
+
 .launcher-glow {
   position: absolute;
   inset: -0.34rem;

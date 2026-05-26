@@ -14,6 +14,7 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import Welcome from "./pages/Welcome.jsx";
 import Home from "./pages/Home.jsx";
 import Apply from "./pages/Apply.jsx";
 import Payment from "./pages/Payment.jsx";
@@ -34,7 +35,7 @@ import { useAuth } from "./context/AuthContext.jsx";
 import { getApprovedHomeImages } from "./data/homeImages.js";
 
 const navItems = [
-  { to: "/", label: "Home", icon: BadgeCheck },
+  { to: "/home", label: "Home", icon: BadgeCheck },
   { to: "/journey", label: "Journey", icon: Sparkles },
   { to: "/apply", label: "Apply", icon: FileText },
   { to: "/support", label: "Support", icon: Headset },
@@ -75,7 +76,8 @@ export default function App() {
   }, []);
 
   const showBrandImage = brandImage && !brandImageFailed;
-  const showLiveChat = !location.pathname.startsWith("/admin") && location.pathname !== "/media-review";
+  const isWelcomePage = location.pathname === "/";
+  const showLiveChat = !isWelcomePage && !location.pathname.startsWith("/admin") && location.pathname !== "/media-review";
   const simpleAuthFooter = location.pathname === "/reset-password/update";
 
   return (
@@ -87,8 +89,9 @@ export default function App() {
           <span />
         </div>
       ) : null}
+      {isWelcomePage ? null : (
       <header className="site-header">
-        <NavLink to="/" className="brand" onClick={closeMenu}>
+        <NavLink to="/home" className="brand" onClick={closeMenu}>
           <span className="brand-mark brand-portrait" aria-hidden="true">
             {showBrandImage ? (
               <img src={brandImage} alt="" onError={() => setBrandImageFailed(true)} />
@@ -138,10 +141,12 @@ export default function App() {
           )}
         </nav>
       </header>
+      )}
 
       <main className="page-transition" key={location.pathname}>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Welcome />} />
+          <Route path="/home" element={<Home />} />
           <Route path="/journey" element={<Journey />} />
           <Route path="/bio" element={<Journey />} />
           <Route path="/about" element={<Journey />} />
@@ -196,6 +201,7 @@ export default function App() {
 
       {showLiveChat ? <LiveChatWidget /> : null}
 
+      {isWelcomePage ? null : (
       <footer className={simpleAuthFooter ? "site-footer reset-auth-footer" : "site-footer"}>
         <div className="footer-brand">
           <span className="brand-mark brand-portrait" aria-hidden="true">
@@ -223,6 +229,7 @@ export default function App() {
           </div>
         )}
       </footer>
+      )}
     </div>
   );
 }
