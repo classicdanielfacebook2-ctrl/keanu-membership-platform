@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Check, Crown, ShieldCheck } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
@@ -11,6 +11,7 @@ import {
 import { saveApplication } from "../services/storage.js";
 import { createCheckoutSession } from "../services/stripeCheckout.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { clearApplicationDraft, getApplicationDraft, saveApplicationDraft } from "../services/applicationDraft.js";
 
 const emptyForm = {
   firstName: "",
@@ -32,198 +33,20 @@ const emptyForm = {
 };
 
 const steps = ["Membership", "Application", "Review", "Secure Payment"];
-const applicantOptions = [
-  { value: "1", label: "1 person" },
-  { value: "2", label: "2 people" },
-  { value: "3", label: "3 people" },
-  { value: "4", label: "4 people" },
-  { value: "5", label: "5 people" },
-  { value: "6+", label: "6 or more" }
-];
-
-function SearchableLocationSelect({
-  id,
-  label,
-  value,
-  options,
-  placeholder,
-  searchPlaceholder,
-  emptyText = "No matching option found.",
-  disabled = false,
-  searchable = true,
-  title,
-  onSelect
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const selectedOption = options.find((option) => option.value === value);
-  const filteredOptions = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    const manualOptions = options.filter((option) => String(option.value).startsWith("__"));
-    const dataOptions = options.filter((option) => !String(option.value).startsWith("__"));
-    if (!normalized) return [...dataOptions.slice(0, 219), ...manualOptions];
-
-    return options
-      .filter((option) => `${option.label} ${option.meta || ""}`.toLowerCase().includes(normalized))
-      .slice(0, 220);
-  }, [options, query]);
-
-  const selectOption = (option) => {
-    onSelect(option);
-    setOpen(false);
-    setQuery("");
-  };
-
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const root = document.documentElement;
-    const updateViewportMetrics = () => {
-      const viewport = window.visualViewport;
-      const viewportHeight = viewport?.height || window.innerHeight;
-      const keyboardOffset = viewport
-        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
-        : 0;
-
-      root.style.setProperty("--visual-viewport-height", `${Math.ceil(viewportHeight)}px`);
-      root.style.setProperty("--mobile-keyboard-offset", `${Math.ceil(keyboardOffset)}px`);
-    };
-
-    document.body.classList.add("location-sheet-open");
-    updateViewportMetrics();
-    window.visualViewport?.addEventListener("resize", updateViewportMetrics);
-    window.visualViewport?.addEventListener("scroll", updateViewportMetrics);
-    window.addEventListener("orientationchange", updateViewportMetrics);
-
-    return () => {
-      document.body.classList.remove("location-sheet-open");
-      root.style.removeProperty("--visual-viewport-height");
-      root.style.removeProperty("--mobile-keyboard-offset");
-      window.visualViewport?.removeEventListener("resize", updateViewportMetrics);
-      window.visualViewport?.removeEventListener("scroll", updateViewportMetrics);
-      window.removeEventListener("orientationchange", updateViewportMetrics);
-    };
-  }, [open]);
-
-  return (
-    <label className="location-select-field" htmlFor={id}>
-      {label}
-      <button
-        id={id}
-        className={open ? "location-select-trigger open" : "location-select-trigger"}
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span>{selectedOption?.label || placeholder}</span>
-        {selectedOption?.meta ? <small>{selectedOption.meta}</small> : null}
-      </button>
-      {open ? (
-        <>
-          <div className="location-select-backdrop" aria-hidden="true" onMouseDown={() => setOpen(false)} />
-          <div className={searchable ? "location-select-menu" : "location-select-menu compact"} role="dialog" aria-label={label}>
-            <div className="location-select-toolbar">
-              <button className="location-select-close" type="button" onClick={() => setOpen(false)}>
-                Back
-              </button>
-              <strong>{title || `Select ${label.toLowerCase()}`}</strong>
-              {searchable ? (
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={searchPlaceholder}
-                />
-              ) : null}
-            </div>
-            <div className="location-select-options" role="listbox">
-              {filteredOptions.map((option) => (
-                <button
-                  key={option.value}
-                  className={option.value === value ? "selected" : ""}
-                  type="button"
-                  onClick={() => selectOption(option)}
-                >
-                  <span>{option.label}</span>
-                  {option.meta ? <small>{option.meta}</small> : null}
-                </button>
-              ))}
-              {filteredOptions.length === 0 ? <p>{emptyText}</p> : null}
-            </div>
-          </div>
-        </>
-      ) : null}
-    </label>
-  );
-}
-
 export default function Apply() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const auth = useAuth();
   const requestedCard = params.get("card") || sessionStorage.getItem("pendingMembershipCard") || "";
+  const savedDraft = getApplicationDraft();
   const initialCard = cardTypes.some((card) => card.id === requestedCard) ? requestedCard : "";
-  const [step, setStep] = useState(initialCard ? 1 : 0);
-  const [form, setForm] = useState({ ...emptyForm, selectedCard: initialCard });
+  const [step, setStep] = useState(initialCard || savedDraft.selectedCard ? 1 : 0);
+  const [form, setForm] = useState({ ...emptyForm, ...savedDraft, selectedCard: initialCard || savedDraft.selectedCard || "" });
   const [stepError, setStepError] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [locationApi, setLocationApi] = useState(null);
-
-  useEffect(() => {
-    let active = true;
-    import("country-state-city").then((module) => {
-      if (!active) return;
-      setLocationApi({ Country: module.Country, State: module.State, City: module.City });
-    });
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const selectedCard = cardTypes.find((card) => card.id === form.selectedCard) || null;
   const selectedPaymentMethod = getPaymentMethod(form.paymentMethod);
-  const cardSelectOptions = useMemo(
-    () => cardTypes.map((card) => ({ value: card.id, label: card.name, meta: card.price })),
-    []
-  );
-  const countryOptions = useMemo(() => {
-    if (!locationApi) return [];
-    return locationApi.Country.getAllCountries().map((country) => ({
-      value: country.isoCode,
-      label: country.name,
-      meta: country.flag || country.isoCode,
-      country
-    }));
-  }, [locationApi]);
-  const stateOptions = useMemo(() => {
-    if (!locationApi || !form.countryCode) return [];
-    const states = locationApi.State.getStatesOfCountry(form.countryCode);
-
-    return states.map((state) => ({
-      value: state.isoCode,
-      label: state.name,
-      meta: state.isoCode,
-      state
-    }));
-  }, [form.countryCode, locationApi]);
-  const stateSelectOptions = useMemo(
-    () => [...stateOptions, { value: "__manual_state__", label: "State / region not listed", meta: "Type manually" }],
-    [stateOptions]
-  );
-  const cityOptions = useMemo(() => {
-    if (!locationApi || !form.countryCode || !form.stateCode) return [];
-    if (form.stateCode === "__manual_state__") return [];
-    return locationApi.City.getCitiesOfState(form.countryCode, form.stateCode).map((city) => ({
-      value: city.name,
-      label: city.name,
-      meta: city.stateCode || form.stateCode,
-      city
-    }));
-  }, [form.countryCode, form.stateCode, locationApi]);
-  const citySelectOptions = useMemo(
-    () => [...cityOptions, { value: "__manual__", label: "City not listed", meta: "Type manually" }],
-    [cityOptions]
-  );
   const finalStateRegion = form.stateCode === "__manual_state__" ? form.manualStateRegion.trim() : form.stateRegion;
   const finalCity = form.city === "__manual__" ? form.manualCity.trim() : form.city;
   const selectedAmount = selectedCard ? convertEurCents(selectedCard.priceAmountCents, form.paymentCurrency) : 0;
@@ -238,6 +61,10 @@ export default function Apply() {
     finalStateRegion &&
     finalCity &&
     form.numberApplicants;
+
+  useEffect(() => {
+    saveApplicationDraft(form);
+  }, [form]);
 
   useEffect(() => {
     if (auth.loading) return;
@@ -366,6 +193,7 @@ export default function Apply() {
       sessionStorage.removeItem("pendingMembershipAction");
       const session = await createCheckoutSession(saved, form.paymentMethod, form.paymentCurrency);
       if (!session.url) throw new Error("Stripe checkout URL was not returned.");
+      clearApplicationDraft();
       console.info("[checkout/redirect]", {
         source: "final-payment-button",
         sessionId: session.id || "",
@@ -498,40 +326,45 @@ export default function Apply() {
                   onChange={(e) => updateField("phone", e.target.value)}
                 />
               </label>
-              <SearchableLocationSelect
-                id="selectedCard"
-                label="Selected membership card"
-                value={form.selectedCard}
-                options={cardSelectOptions}
-                placeholder="Select a card"
-                searchPlaceholder="Search membership card"
-                searchable={false}
-                title="Select membership card"
-                onSelect={(option) => updateField("selectedCard", option.value)}
-              />
-              <SearchableLocationSelect
-                id="country"
-                label="Country"
-                value={form.countryCode}
-                options={countryOptions}
-                placeholder={locationApi ? "Select country" : "Loading countries"}
-                searchPlaceholder="Search country"
-                disabled={!locationApi}
-                title="Select country"
-                onSelect={(option) => updateField("countryCode", { code: option.value, name: option.label })}
-              />
-              <SearchableLocationSelect
-                id="stateRegion"
-                label="State / Region"
-                value={form.stateCode}
-                options={stateSelectOptions}
-                placeholder={form.countryCode ? "Select state or region" : "Select country first"}
-                searchPlaceholder="Search state or region"
-                disabled={!form.countryCode}
-                emptyText="No state or region found for this country."
-                title="Select state / region"
-                onSelect={(option) => updateField("stateCode", { code: option.value, name: option.label })}
-              />
+              <label className="wide">
+                Selected membership card
+                <div className="inline-choice-grid">
+                  {cardTypes.map((card) => (
+                    <button
+                      key={card.id}
+                      className={form.selectedCard === card.id ? "selected" : ""}
+                      type="button"
+                      onClick={() => updateField("selectedCard", card.id)}
+                    >
+                      <span>{card.name}</span>
+                      <small>{card.price}</small>
+                    </button>
+                  ))}
+                </div>
+              </label>
+              <label htmlFor="countrySelector">
+                Country
+                <button
+                  id="countrySelector"
+                  className="selector-page-trigger"
+                  type="button"
+                  onClick={() => navigate("/apply/select-country")}
+                >
+                  <span>{form.country || "Select country"}</span>
+                </button>
+              </label>
+              <label htmlFor="stateSelector">
+                State / Region
+                <button
+                  id="stateSelector"
+                  className="selector-page-trigger"
+                  type="button"
+                  disabled={!form.countryCode}
+                  onClick={() => navigate("/apply/select-state")}
+                >
+                  <span>{finalStateRegion || (form.countryCode ? "Select state or region" : "Select country first")}</span>
+                </button>
+              </label>
               {form.stateCode === "__manual_state__" ? (
                 <label htmlFor="manualStateRegion">
                   Type state / region manually
@@ -544,18 +377,18 @@ export default function Apply() {
                   />
                 </label>
               ) : null}
-              <SearchableLocationSelect
-                id="city"
-                label="City"
-                value={form.city}
-                options={citySelectOptions}
-                placeholder={form.stateCode ? "Select a city" : "Select state or region first"}
-                searchPlaceholder="Search city"
-                disabled={!form.stateCode}
-                emptyText="No city found. Choose manual entry."
-                title="Select city"
-                onSelect={(option) => updateField("city", option.value)}
-              />
+              <label htmlFor="citySelector">
+                City
+                <button
+                  id="citySelector"
+                  className="selector-page-trigger"
+                  type="button"
+                  disabled={!form.stateCode}
+                  onClick={() => navigate("/apply/select-city")}
+                >
+                  <span>{finalCity || (form.stateCode ? "Select city" : "Select state or region first")}</span>
+                </button>
+              </label>
               {form.city === "__manual__" ? (
                 <label htmlFor="manualCity">
                   Type city manually
@@ -568,17 +401,21 @@ export default function Apply() {
                   />
                 </label>
               ) : null}
-              <SearchableLocationSelect
-                id="numberApplicants"
-                label="Number of applicants"
-                value={form.numberApplicants}
-                options={applicantOptions}
-                placeholder="Select number of applicants"
-                searchPlaceholder="Search applicant count"
-                searchable={false}
-                title="Select applicants"
-                onSelect={(option) => updateField("numberApplicants", option.value)}
-              />
+              <label>
+                Number of applicants
+                <div className="applicant-choice-row">
+                  {["1", "2", "3", "4", "5", "6+"].map((count) => (
+                    <button
+                      key={count}
+                      className={form.numberApplicants === count ? "selected" : ""}
+                      type="button"
+                      onClick={() => updateField("numberApplicants", count)}
+                    >
+                      {count}
+                    </button>
+                  ))}
+                </div>
+              </label>
               <label className="wide" htmlFor="message">
                 Message or special request
                 <textarea

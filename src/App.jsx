@@ -29,6 +29,7 @@ import PolicyPage from "./pages/PolicyPage.jsx";
 import Journey from "./pages/Journey.jsx";
 import MediaReview from "./pages/MediaReview.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
+import LocationSelector from "./pages/LocationSelector.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import LiveChatWidget from "./components/LiveChatWidget.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
@@ -77,7 +78,8 @@ export default function App() {
 
   const showBrandImage = brandImage && !brandImageFailed;
   const isWelcomePage = location.pathname === "/";
-  const showLiveChat = !isWelcomePage && !location.pathname.startsWith("/admin") && location.pathname !== "/media-review";
+  const isSelectorPage = location.pathname.startsWith("/apply/select-");
+  const showLiveChat = !isWelcomePage && !isSelectorPage && !location.pathname.startsWith("/admin") && location.pathname !== "/media-review";
   const simpleAuthFooter = location.pathname === "/reset-password/update";
 
   return (
@@ -89,7 +91,7 @@ export default function App() {
           <span />
         </div>
       ) : null}
-      {isWelcomePage ? null : (
+      {isWelcomePage || isSelectorPage ? null : (
       <header className="site-header">
         <NavLink to="/home" className="brand" onClick={closeMenu}>
           <span className="brand-mark brand-portrait" aria-hidden="true">
@@ -151,6 +153,9 @@ export default function App() {
           <Route path="/bio" element={<Journey />} />
           <Route path="/about" element={<Journey />} />
           <Route path="/apply" element={<Apply />} />
+          <Route path="/apply/select-country" element={<LocationSelector type="country" />} />
+          <Route path="/apply/select-state" element={<LocationSelector type="state" />} />
+          <Route path="/apply/select-city" element={<LocationSelector type="city" />} />
           <Route path="/payment" element={<Payment />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/payment-cancelled" element={<PaymentCancelled />} />
@@ -201,7 +206,7 @@ export default function App() {
 
       {showLiveChat ? <LiveChatWidget /> : null}
 
-      {isWelcomePage ? null : (
+      {isWelcomePage || isSelectorPage ? null : (
       <footer className={simpleAuthFooter ? "site-footer reset-auth-footer" : "site-footer"}>
         <div className="footer-brand">
           <span className="brand-mark brand-portrait" aria-hidden="true">
