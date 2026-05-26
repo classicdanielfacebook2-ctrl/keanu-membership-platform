@@ -64,6 +64,37 @@ function SearchableLocationSelect({
     setQuery("");
   };
 
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const root = document.documentElement;
+    const updateViewportMetrics = () => {
+      const viewport = window.visualViewport;
+      const viewportHeight = viewport?.height || window.innerHeight;
+      const keyboardOffset = viewport
+        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+        : 0;
+
+      root.style.setProperty("--visual-viewport-height", `${Math.ceil(viewportHeight)}px`);
+      root.style.setProperty("--mobile-keyboard-offset", `${Math.ceil(keyboardOffset)}px`);
+    };
+
+    document.body.classList.add("location-sheet-open");
+    updateViewportMetrics();
+    window.visualViewport?.addEventListener("resize", updateViewportMetrics);
+    window.visualViewport?.addEventListener("scroll", updateViewportMetrics);
+    window.addEventListener("orientationchange", updateViewportMetrics);
+
+    return () => {
+      document.body.classList.remove("location-sheet-open");
+      root.style.removeProperty("--visual-viewport-height");
+      root.style.removeProperty("--mobile-keyboard-offset");
+      window.visualViewport?.removeEventListener("resize", updateViewportMetrics);
+      window.visualViewport?.removeEventListener("scroll", updateViewportMetrics);
+      window.removeEventListener("orientationchange", updateViewportMetrics);
+    };
+  }, [open]);
+
   return (
     <label className="location-select-field" htmlFor={id}>
       {label}
@@ -81,13 +112,18 @@ function SearchableLocationSelect({
         <>
           <div className="location-select-backdrop" aria-hidden="true" onMouseDown={() => setOpen(false)} />
           <div className="location-select-menu" role="dialog" aria-label={label}>
-            <div className="location-select-handle" aria-hidden="true" />
-            <input
-              autoFocus
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={searchPlaceholder}
-            />
+            <div className="location-select-toolbar">
+              <div className="location-select-handle" aria-hidden="true" />
+              <button className="location-select-close" type="button" onClick={() => setOpen(false)}>
+                Close
+              </button>
+              <input
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={searchPlaceholder}
+              />
+            </div>
             <div className="location-select-options" role="listbox">
               {filteredOptions.map((option) => (
                 <button
