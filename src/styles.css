@@ -5690,6 +5690,136 @@ body::after {
   gap: 0.85rem;
 }
 
+.website-checkout,
+.checkout-method-section {
+  display: grid;
+  gap: 1rem;
+}
+
+.checkout-membership-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.7fr);
+  gap: clamp(1rem, 3vw, 1.6rem);
+  align-items: start;
+  border: 1px solid rgba(244, 216, 139, 0.18);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 92% 0%, rgba(244, 216, 139, 0.12), transparent 18rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.018)),
+    rgba(0, 0, 0, 0.28);
+  padding: clamp(1rem, 3vw, 1.45rem);
+}
+
+.checkout-membership-summary h3 {
+  margin: 0.5rem 0 0.45rem;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.85rem, 4vw, 3rem);
+  line-height: 1;
+}
+
+.checkout-membership-summary strong {
+  display: block;
+  color: var(--gold-light);
+  font-size: clamp(1.35rem, 3vw, 2rem);
+}
+
+.checkout-membership-summary small {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--muted);
+}
+
+.checkout-membership-summary ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkout-membership-summary li {
+  position: relative;
+  color: #d4ccbe;
+  line-height: 1.45;
+  padding-left: 1rem;
+}
+
+.checkout-membership-summary li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.63em;
+  width: 0.34rem;
+  height: 0.34rem;
+  border-radius: 999px;
+  background: var(--gold-light);
+  box-shadow: 0 0 0.7rem rgba(244, 216, 139, 0.38);
+}
+
+.checkout-section-head {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.checkout-section-head h3 {
+  margin: 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.45rem, 3vw, 2.2rem);
+}
+
+.website-method-grid {
+  grid-template-columns: 1fr;
+  gap: 0.7rem;
+}
+
+.checkout-total-bar {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.35fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  border: 1px solid rgba(244, 216, 139, 0.2);
+  border-radius: 18px;
+  background: rgba(244, 216, 139, 0.055);
+  padding: clamp(0.95rem, 2.4vw, 1.25rem);
+}
+
+.checkout-total-bar span,
+.checkout-total-bar strong {
+  display: block;
+}
+
+.checkout-total-bar span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.checkout-total-bar strong {
+  margin-top: 0.25rem;
+  color: var(--gold-light);
+  font-size: clamp(1.35rem, 3vw, 2rem);
+}
+
+.checkout-total-bar p {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.checkout-total-bar svg {
+  flex: 0 0 auto;
+  color: var(--gold-light);
+}
+
+.checkout-continue-button {
+  min-width: min(100%, 19rem);
+}
+
 .wise-payment-shell {
   display: grid;
   gap: 1rem;
@@ -5993,6 +6123,11 @@ body::after {
     grid-template-columns: 1fr;
   }
 
+  .checkout-membership-summary,
+  .checkout-total-bar {
+    grid-template-columns: 1fr;
+  }
+
   .fee-arrival-panel {
     grid-template-columns: 1fr;
   }
@@ -6045,6 +6180,10 @@ body::after {
     z-index: 8;
     width: 100%;
     box-shadow: 0 1.2rem 2.6rem rgba(0, 0, 0, 0.42), 0 0 1.6rem rgba(244, 216, 139, 0.18);
+  }
+
+  .checkout-continue-button {
+    width: 100%;
   }
 
   .cinematic-trust-row span {

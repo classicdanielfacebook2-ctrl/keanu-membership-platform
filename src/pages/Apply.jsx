@@ -1,17 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BadgeCheck, Building2, CreditCard, ShieldCheck, Smartphone, Wallet } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, CreditCard, Landmark, ShieldCheck } from "lucide-react";
 import CardType from "../components/CardType.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import {
+  checkoutPaymentOptions,
   convertEurCents,
-  currencyOptions,
   formatPaymentAmount,
   getPaymentMethod,
-  isDelayedPaymentMethod,
-  isPaymentMethodAvailable,
-  paymentMethods
+  isDelayedPaymentMethod
 } from "../data/paymentMethods.js";
 import { saveApplication } from "../services/storage.js";
 import { createCheckoutSession } from "../services/stripeCheckout.js";
@@ -33,10 +31,8 @@ const steps = ["Choose Card", "Apply", "Review", "Payment Method"];
 const paymentIcons = {
   card: CreditCard,
   sepa: Building2,
-  google_pay: Smartphone,
-  apple_pay: Wallet,
-  amazon_pay: Wallet,
-  link: BadgeCheck
+  bank_transfer: Landmark,
+  ideal: Building2
 };
 
 export default function Apply() {
@@ -82,12 +78,7 @@ export default function Apply() {
   }, [auth.user]);
 
   const updateField = (field, value) => {
-    setForm((current) => {
-      if (field === "paymentCurrency" && !isPaymentMethodAvailable(current.paymentMethod, value)) {
-        return { ...current, paymentCurrency: value, paymentMethod: "card" };
-      }
-      return { ...current, [field]: value };
-    });
+    setForm((current) => ({ ...current, [field]: value }));
   };
 
   const canEnterStep = (targetStep) => {
@@ -285,33 +276,29 @@ export default function Apply() {
           ) : null}
 
           {step === 3 ? (
-            <div className="payment-step conversion-payment method-selection-step">
-              <div className="wise-payment-shell">
-                <div className="wise-amount-card">
-                  <span className="eyebrow">Amount to pay</span>
+            <div className="payment-step website-checkout">
+              <div className="checkout-membership-summary">
+                <div>
+                  <span className="eyebrow">Selected membership</span>
+                  <h3>{selectedCard?.name}</h3>
                   <strong>{formattedAmount}</strong>
-                  <small>{selectedCard?.name} membership</small>
                 </div>
-
-                <div className="currency-selector" aria-label="Choose currency">
-                  {currencyOptions.map((currency) => (
-                    <button
-                      key={currency.code}
-                      className={form.paymentCurrency === currency.code ? "currency-pill selected" : "currency-pill"}
-                      type="button"
-                      onClick={() => updateField("paymentCurrency", currency.code)}
-                    >
-                      <span>{currency.symbol}</span>
-                      {currency.code}
-                    </button>
+                <ul>
+                  {selectedCard?.benefits.slice(0, 3).map((benefit) => (
+                    <li key={benefit}>{benefit}</li>
                   ))}
-                </div>
+                </ul>
+              </div>
 
-                <div className="payment-method-grid wise-method-grid" role="radiogroup" aria-label="Choose payment method">
-                  {paymentMethods.map((method) => {
+              <div className="checkout-method-section">
+                <div className="checkout-section-head">
+                  <span className="eyebrow">Payment method</span>
+                  <h3>Choose a secure payment option</h3>
+                </div>
+                <div className="payment-method-grid website-method-grid" role="radiogroup" aria-label="Choose payment method">
+                  {checkoutPaymentOptions.map((method) => {
                     const Icon = paymentIcons[method.id] || CreditCard;
                     const selected = form.paymentMethod === method.id;
-                    const available = isPaymentMethodAvailable(method.id, form.paymentCurrency);
 
                     return (
                       <button
@@ -320,7 +307,6 @@ export default function Apply() {
                         type="button"
                         role="radio"
                         aria-checked={selected}
-                        disabled={!available}
                         onClick={() => updateField("paymentMethod", method.id)}
                       >
                         <span className="payment-method-icon">
@@ -328,7 +314,7 @@ export default function Apply() {
                         </span>
                         <span>
                           <strong>{method.title}</strong>
-                          <small>{available ? method.description : `Not available for ${form.paymentCurrency}`}</small>
+                          <small>{method.description}</small>
                         </span>
                       </button>
                     );
@@ -336,34 +322,16 @@ export default function Apply() {
                 </div>
               </div>
 
-              <div className="review-details">
-                <span>Selected Card</span>
-                <strong>{selectedCard?.name}</strong>
-                <span>Amount Due</span>
-                <strong>{formattedAmount}</strong>
-                <span>Estimated Confirmation</span>
-                <strong>{selectedPaymentMethod.arrival}</strong>
-                <span>Applicant Name</span>
-                <strong>{form.fullName}</strong>
-                <span>Payment Method</span>
-                <strong>{selectedPaymentMethod.title}</strong>
-              </div>
-              <div className="fee-arrival-panel">
-                <span>
-                  <strong>Total</strong>
-                  {formattedAmount}
-                </span>
-                <span>
-                  <strong>Fee note</strong>
-                  {selectedPaymentMethod.feeNote}
-                </span>
-              </div>
-              <div className="payment-note">
-                <ShieldCheck size={18} />
-                <span>
-                  Secure encrypted checkout. Payment details are entered only on the selected provider's hosted payment page.
-                  {isDelayedPaymentMethod(form.paymentMethod) ? " SEPA payments remain pending until confirmation is received." : ""}
-                </span>
+              <div className="checkout-total-bar">
+                <div>
+                  <span>Total amount</span>
+                  <strong>{formattedAmount}</strong>
+                </div>
+                <p>
+                  <ShieldCheck size={17} />
+                  Secure encrypted checkout. Payment details are collected only by the hosted payment provider.
+                  {isDelayedPaymentMethod(form.paymentMethod) ? " Bank-based payments remain pending until confirmed." : ""}
+                </p>
               </div>
             </div>
           ) : null}
@@ -381,8 +349,8 @@ export default function Apply() {
                 <ArrowRight size={17} />
               </button>
             ) : (
-              <button className="button primary wise-sticky-continue" type="submit" disabled={checkoutLoading}>
-                {checkoutLoading ? "Opening checkout..." : "Continue Securely"}
+              <button className="button primary checkout-continue-button" type="submit" disabled={checkoutLoading}>
+                {checkoutLoading ? "Opening checkout..." : "Continue to Secure Payment"}
                 <ArrowRight size={17} />
               </button>
             )}
@@ -390,7 +358,7 @@ export default function Apply() {
         </form>
       </div>
 
-      {selectedCard && step < 4 ? (
+      {selectedCard && step < 3 ? (
         <aside className="selected-card-preview">
           <CardType card={selectedCard} compact hideActions />
         </aside>

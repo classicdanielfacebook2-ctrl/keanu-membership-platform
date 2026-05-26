@@ -93,6 +93,29 @@ export const paymentMethods = [
   }
 ];
 
+export const checkoutPaymentOptions = [
+  {
+    id: "card",
+    title: "Card / Wallets",
+    description: "Pay securely by card, Apple Pay, Google Pay, or Link when available."
+  },
+  {
+    id: "sepa",
+    title: "SEPA Direct Debit",
+    description: "Pay from a supported European bank account. Confirmation may take longer."
+  },
+  {
+    id: "bank_transfer",
+    title: "Bank Transfer",
+    description: "Continue to secure hosted checkout for bank transfer instructions."
+  },
+  {
+    id: "ideal",
+    title: "iDEAL / Local bank payment",
+    description: "Use a supported local bank payment method through secure checkout."
+  }
+];
+
 export const getPaymentMethod = (id) => paymentMethods.find((method) => method.id === id) || paymentMethods[0];
 
 export const isDelayedPaymentMethod = (id) => Boolean(getPaymentMethod(id).delayed);
