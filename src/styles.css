@@ -6791,6 +6791,23 @@ body::after {
   white-space: nowrap;
 }
 
+.field-return-highlight {
+  border-radius: 10px;
+  animation: fieldReturnGlow 900ms ease both;
+}
+
+@keyframes fieldReturnGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 216, 139, 0);
+  }
+  28% {
+    box-shadow: 0 0 0 4px rgba(244, 216, 139, 0.12), 0 0 1.4rem rgba(212, 175, 55, 0.14);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 216, 139, 0);
+  }
+}
+
 .inline-choice-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

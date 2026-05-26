@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { getApplicationDraft, updateApplicationDraft } from "../services/applicationDraft.js";
+import { getApplicationDraft, saveApplicationReturn, updateApplicationDraft } from "../services/applicationDraft.js";
 
 const selectorConfig = {
   country: {
@@ -85,8 +85,12 @@ export default function LocationSelector({ type }) {
   }, [options, query]);
 
   const currentValue = type === "country" ? draft.countryCode : type === "state" ? draft.stateCode : draft.city;
+  const returnTargetId = type === "country" ? "countryField" : type === "state" ? "stateField" : "cityField";
 
-  const goBack = () => navigate("/apply", { replace: true });
+  const goBack = () => {
+    saveApplicationReturn(returnTargetId);
+    navigate("/apply", { replace: true });
+  };
 
   const selectOption = (option) => {
     if (type === "country") {

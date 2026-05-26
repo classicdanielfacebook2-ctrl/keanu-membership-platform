@@ -11,7 +11,13 @@ import {
 import { saveApplication } from "../services/storage.js";
 import { createCheckoutSession } from "../services/stripeCheckout.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { clearApplicationDraft, getApplicationDraft, saveApplicationDraft } from "../services/applicationDraft.js";
+import {
+  clearApplicationDraft,
+  consumeApplicationReturn,
+  getApplicationDraft,
+  saveApplicationDraft,
+  saveApplicationReturn
+} from "../services/applicationDraft.js";
 
 const emptyForm = {
   firstName: "",
@@ -65,6 +71,23 @@ export default function Apply() {
   useEffect(() => {
     saveApplicationDraft(form);
   }, [form]);
+
+  useEffect(() => {
+    const returnState = consumeApplicationReturn();
+    if (!returnState?.targetId) return;
+
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(returnState.targetId);
+      if (!target) {
+        window.scrollTo({ top: returnState.scrollY || 0, behavior: "auto" });
+        return;
+      }
+
+      target.scrollIntoView({ block: "center", behavior: "auto" });
+      target.classList.add("field-return-highlight");
+      window.setTimeout(() => target.classList.remove("field-return-highlight"), 900);
+    });
+  }, []);
 
   useEffect(() => {
     if (auth.loading) return;
@@ -146,6 +169,12 @@ export default function Apply() {
   const previousStep = () => {
     setStepError("");
     setStep((current) => Math.max(current - 1, 0));
+  };
+
+  const openSelector = (path, targetId) => {
+    saveApplicationDraft(form);
+    saveApplicationReturn(targetId);
+    navigate(path);
   };
 
   const handleContinueToPayment = async () => {
@@ -342,25 +371,25 @@ export default function Apply() {
                   ))}
                 </div>
               </label>
-              <label htmlFor="countrySelector">
+              <label id="countryField" htmlFor="countrySelector">
                 Country
                 <button
                   id="countrySelector"
                   className="selector-page-trigger"
                   type="button"
-                  onClick={() => navigate("/apply/select-country")}
+                  onClick={() => openSelector("/apply/select-country", "countryField")}
                 >
                   <span>{form.country || "Select country"}</span>
                 </button>
               </label>
-              <label htmlFor="stateSelector">
+              <label id="stateField" htmlFor="stateSelector">
                 State / Region
                 <button
                   id="stateSelector"
                   className="selector-page-trigger"
                   type="button"
                   disabled={!form.countryCode}
-                  onClick={() => navigate("/apply/select-state")}
+                  onClick={() => openSelector("/apply/select-state", "stateField")}
                 >
                   <span>{finalStateRegion || (form.countryCode ? "Select state or region" : "Select country first")}</span>
                 </button>
@@ -377,14 +406,14 @@ export default function Apply() {
                   />
                 </label>
               ) : null}
-              <label htmlFor="citySelector">
+              <label id="cityField" htmlFor="citySelector">
                 City
                 <button
                   id="citySelector"
                   className="selector-page-trigger"
                   type="button"
                   disabled={!form.stateCode}
-                  onClick={() => navigate("/apply/select-city")}
+                  onClick={() => openSelector("/apply/select-city", "cityField")}
                 >
                   <span>{finalCity || (form.stateCode ? "Select city" : "Select state or region first")}</span>
                 </button>

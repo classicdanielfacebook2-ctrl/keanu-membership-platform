@@ -1,4 +1,5 @@
 export const APPLICATION_DRAFT_KEY = "krMembershipApplicationDraft";
+export const APPLICATION_RETURN_KEY = "krMembershipApplicationReturn";
 
 export const getApplicationDraft = () => {
   try {
@@ -20,4 +21,25 @@ export const updateApplicationDraft = (updates) => {
 
 export const clearApplicationDraft = () => {
   sessionStorage.removeItem(APPLICATION_DRAFT_KEY);
+};
+
+export const saveApplicationReturn = (targetId) => {
+  sessionStorage.setItem(
+    APPLICATION_RETURN_KEY,
+    JSON.stringify({
+      targetId,
+      scrollY: window.scrollY || 0
+    })
+  );
+};
+
+export const consumeApplicationReturn = () => {
+  try {
+    const returnState = JSON.parse(sessionStorage.getItem(APPLICATION_RETURN_KEY) || "{}");
+    sessionStorage.removeItem(APPLICATION_RETURN_KEY);
+    return returnState;
+  } catch {
+    sessionStorage.removeItem(APPLICATION_RETURN_KEY);
+    return {};
+  }
 };
