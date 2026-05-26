@@ -32,6 +32,14 @@ const emptyForm = {
 };
 
 const steps = ["Membership", "Application", "Review", "Secure Payment"];
+const applicantOptions = [
+  { value: "1", label: "1 person" },
+  { value: "2", label: "2 people" },
+  { value: "3", label: "3 people" },
+  { value: "4", label: "4 people" },
+  { value: "5", label: "5 people" },
+  { value: "6+", label: "6 or more" }
+];
 
 function SearchableLocationSelect({
   id,
@@ -42,6 +50,7 @@ function SearchableLocationSelect({
   searchPlaceholder,
   emptyText = "No matching option found.",
   disabled = false,
+  searchable = true,
   onSelect
 }) {
   const [open, setOpen] = useState(false);
@@ -111,18 +120,20 @@ function SearchableLocationSelect({
       {open ? (
         <>
           <div className="location-select-backdrop" aria-hidden="true" onMouseDown={() => setOpen(false)} />
-          <div className="location-select-menu" role="dialog" aria-label={label}>
+          <div className={searchable ? "location-select-menu" : "location-select-menu compact"} role="dialog" aria-label={label}>
             <div className="location-select-toolbar">
               <div className="location-select-handle" aria-hidden="true" />
               <button className="location-select-close" type="button" onClick={() => setOpen(false)}>
                 Close
               </button>
-              <input
-                autoFocus
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={searchPlaceholder}
-              />
+              {searchable ? (
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={searchPlaceholder}
+                />
+              ) : null}
             </div>
             <div className="location-select-options" role="listbox">
               {filteredOptions.map((option) => (
@@ -171,6 +182,10 @@ export default function Apply() {
 
   const selectedCard = cardTypes.find((card) => card.id === form.selectedCard) || null;
   const selectedPaymentMethod = getPaymentMethod(form.paymentMethod);
+  const cardSelectOptions = useMemo(
+    () => cardTypes.map((card) => ({ value: card.id, label: card.name, meta: card.price })),
+    []
+  );
   const countryOptions = useMemo(() => {
     if (!locationApi) return [];
     return locationApi.Country.getAllCountries().map((country) => ({
@@ -483,17 +498,16 @@ export default function Apply() {
                   onChange={(e) => updateField("phone", e.target.value)}
                 />
               </label>
-              <label htmlFor="selectedCard">
-                Selected membership card
-                <select id="selectedCard" required value={form.selectedCard} onChange={(e) => updateField("selectedCard", e.target.value)}>
-                  <option value="">Select a card</option>
-                  {cardTypes.map((card) => (
-                    <option key={card.id} value={card.id}>
-                      {card.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <SearchableLocationSelect
+                id="selectedCard"
+                label="Selected membership card"
+                value={form.selectedCard}
+                options={cardSelectOptions}
+                placeholder="Select a card"
+                searchPlaceholder="Search membership card"
+                searchable={false}
+                onSelect={(option) => updateField("selectedCard", option.value)}
+              />
               <SearchableLocationSelect
                 id="country"
                 label="Country"
@@ -550,22 +564,16 @@ export default function Apply() {
                   />
                 </label>
               ) : null}
-              <label htmlFor="numberApplicants">
-                Number of applicants
-                <select
-                  id="numberApplicants"
-                  required
-                  value={form.numberApplicants}
-                  onChange={(e) => updateField("numberApplicants", e.target.value)}
-                >
-                  <option value="1">1 person</option>
-                  <option value="2">2 people</option>
-                  <option value="3">3 people</option>
-                  <option value="4">4 people</option>
-                  <option value="5">5 people</option>
-                  <option value="6+">6 or more</option>
-                </select>
-              </label>
+              <SearchableLocationSelect
+                id="numberApplicants"
+                label="Number of applicants"
+                value={form.numberApplicants}
+                options={applicantOptions}
+                placeholder="Select number of applicants"
+                searchPlaceholder="Search applicant count"
+                searchable={false}
+                onSelect={(option) => updateField("numberApplicants", option.value)}
+              />
               <label className="wide" htmlFor="message">
                 Message or special request
                 <textarea
