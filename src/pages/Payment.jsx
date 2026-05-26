@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, Building2, CreditCard, Landmark, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, CreditCard, LockKeyhole, ShieldCheck } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes, getCardPrice } from "../data/cards.js";
 import {
-  checkoutPaymentOptions,
   convertEurCents,
-  formatPaymentAmount,
-  getPaymentMethod,
-  isDelayedPaymentMethod
+  formatPaymentAmount
 } from "../data/paymentMethods.js";
 import { getApplications, updateApplication } from "../services/storage.js";
 import { createCheckoutSession, stripePublishableKey } from "../services/stripeCheckout.js";
@@ -16,12 +13,6 @@ import { useAuth } from "../context/AuthContext.jsx";
 
 const cardName = (id) => cardTypes.find((card) => card.id === id)?.name || "Selected membership card";
 const cardPrice = (id) => getCardPrice(id);
-const paymentIcons = {
-  card: CreditCard,
-  sepa: Building2,
-  bank_transfer: Landmark,
-  ideal: Building2
-};
 
 export default function Payment() {
   const [params] = useSearchParams();
@@ -30,7 +21,6 @@ export default function Payment() {
   const [applications, setApplications] = useState([]);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
-  const [selectedMethodId, setSelectedMethodId] = useState("card");
   const [selectedCurrency, setSelectedCurrency] = useState("EUR");
   const applicationId = params.get("application");
 
@@ -49,14 +39,12 @@ export default function Payment() {
   useEffect(() => {
     if (!application) return;
     if (application.paymentStatus) setStatus(application.paymentStatus);
-    setSelectedMethodId(getPaymentMethod(application.paymentMethod).id);
     setSelectedCurrency(application.paymentCurrency || "EUR");
   }, [application]);
 
   const selectedCard = cardTypes.find((card) => card.id === application?.selectedCard) || null;
   const selectedAmount = selectedCard ? convertEurCents(selectedCard.priceAmountCents, selectedCurrency) : 0;
   const formattedAmount = selectedCard ? formatPaymentAmount(selectedAmount, selectedCurrency) : cardPrice(application?.selectedCard);
-  const selectedPaymentMethod = getPaymentMethod(selectedMethodId);
 
   useEffect(() => {
     if (auth.loading) return;
@@ -77,7 +65,7 @@ export default function Payment() {
       source: "final-payment-button",
       applicationId: application?.id || application?.referenceId || "",
       selectedCard: application?.selectedCard || "",
-      paymentMethod: selectedMethodId,
+      paymentMethod: "card",
       currency: selectedCurrency
     });
 
@@ -92,17 +80,17 @@ export default function Payment() {
       }
       const updatedApplication = {
         ...application,
-        paymentMethod: selectedMethodId,
-        paymentMethodLabel: selectedPaymentMethod.title,
+        paymentMethod: "card",
+        paymentMethodLabel: "Card / Wallets",
         paymentCurrency: selectedCurrency,
         paymentAmount: formattedAmount
       };
-      const session = await createCheckoutSession(updatedApplication, selectedMethodId, selectedCurrency);
+      const session = await createCheckoutSession(updatedApplication, "card", selectedCurrency);
       if (!session.url) throw new Error("Stripe checkout URL was not returned.");
       updatePaymentStatus("Pending");
       setApplications(updateApplication(application.id, {
-        paymentMethod: selectedMethodId,
-        paymentMethodLabel: selectedPaymentMethod.title,
+        paymentMethod: "card",
+        paymentMethodLabel: "Card / Wallets",
         paymentCurrency: selectedCurrency,
         paymentAmount: formattedAmount
       }));
@@ -110,7 +98,7 @@ export default function Payment() {
         source: "final-payment-button",
         sessionId: session.id || "",
         applicationId: application.id || application.referenceId || "",
-        paymentMethod: selectedMethodId,
+        paymentMethod: "card",
         currency: selectedCurrency
       });
       window.location.href = session.url;
@@ -123,9 +111,9 @@ export default function Payment() {
   return (
     <section className="page-section payment-page">
       <SectionHeader
-        eyebrow="Payment Method"
-        title="Choose how you would like to pay."
-        copy="Select a secure payment method, then continue to the hosted payment provider."
+        eyebrow="Secure Payment"
+        title="Continue to secure checkout."
+        copy="Review your selected membership, then continue to Stripe's hosted payment page."
       />
 
       {application ? (
@@ -154,38 +142,6 @@ export default function Payment() {
               </div>
             </div>
 
-            <div className="checkout-method-section">
-              <div className="checkout-section-head">
-                <span className="eyebrow">Payment method</span>
-                <h3>Choose a secure payment option</h3>
-              </div>
-              <div className="payment-method-grid website-method-grid" role="radiogroup" aria-label="Choose payment method">
-              {checkoutPaymentOptions.map((method) => {
-                const Icon = paymentIcons[method.id] || CreditCard;
-                const selected = selectedMethodId === method.id;
-
-                return (
-                  <button
-                    key={method.id}
-                    className={selected ? "payment-method-card selected" : "payment-method-card"}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => setSelectedMethodId(method.id)}
-                  >
-                    <span className="payment-method-icon">
-                      <Icon size={20} />
-                    </span>
-                    <span>
-                      <strong>{method.title}</strong>
-                      <small>{method.description}</small>
-                    </span>
-                  </button>
-                );
-              })}
-              </div>
-            </div>
-
             <div className="checkout-total-bar">
               <div>
                 <span>Total amount</span>
@@ -193,8 +149,7 @@ export default function Payment() {
               </div>
               <p>
                 <ShieldCheck size={17} />
-                Secure encrypted checkout. Payment details are collected only by the hosted payment provider.
-                {isDelayedPaymentMethod(selectedMethodId) ? " Bank-based payments remain pending until confirmed." : ""}
+                Secure encrypted checkout. Payment details are collected only by Stripe after you continue.
               </p>
             </div>
 
@@ -206,10 +161,6 @@ export default function Payment() {
               <span>
                 <CreditCard size={17} />
                 Stripe-hosted payment page
-              </span>
-              <span>
-                <Sparkles size={17} />
-                Instant membership payment record
               </span>
             </div>
 
@@ -231,9 +182,7 @@ export default function Payment() {
 
             <div className="payment-badge">
               <ShieldCheck size={18} />
-              {isDelayedPaymentMethod(selectedMethodId)
-                ? "SEPA status remains pending until confirmed"
-                : "Verified secure payment flow"}
+              Verified secure payment flow
             </div>
           </div>
         </div>

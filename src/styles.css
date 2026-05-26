@@ -5971,6 +5971,144 @@ body::after {
   min-width: min(100%, 19rem);
 }
 
+.vip-membership-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 2.6vw, 1.5rem);
+}
+
+.vip-membership-option {
+  position: relative;
+  display: grid;
+  gap: 0.9rem;
+  min-height: 24rem;
+  overflow: hidden;
+  border: 1px solid rgba(244, 216, 139, 0.18);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.018)),
+    radial-gradient(circle at 90% 0%, rgba(244, 216, 139, 0.12), transparent 16rem),
+    #090909;
+  color: var(--ink);
+  cursor: pointer;
+  padding: clamp(1.15rem, 3vw, 1.7rem);
+  text-align: left;
+  box-shadow: 0 1.4rem 3.4rem rgba(0, 0, 0, 0.34);
+  transition: transform 260ms ease, border-color 260ms ease, box-shadow 260ms ease, background 260ms ease;
+}
+
+.vip-membership-option::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, rgba(244, 216, 139, 0.32), transparent 32%, rgba(198, 199, 194, 0.14) 64%, transparent),
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.08), transparent 14rem);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 260ms ease;
+}
+
+.vip-membership-option:hover,
+.vip-membership-option.selected {
+  transform: translateY(-6px);
+  border-color: rgba(244, 216, 139, 0.62);
+  box-shadow:
+    0 2rem 4.8rem rgba(0, 0, 0, 0.48),
+    0 0 2.2rem rgba(212, 175, 55, 0.14);
+}
+
+.vip-membership-option:hover::before,
+.vip-membership-option.selected::before {
+  opacity: 1;
+}
+
+.vip-membership-option.selected {
+  background:
+    linear-gradient(145deg, rgba(244, 216, 139, 0.1), rgba(255, 255, 255, 0.02)),
+    radial-gradient(circle at 88% 0%, rgba(244, 216, 139, 0.18), transparent 16rem),
+    #0a0a0a;
+}
+
+.vip-membership-option > * {
+  position: relative;
+  z-index: 1;
+}
+
+.vip-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(244, 216, 139, 0.36);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.46);
+  color: var(--gold-light);
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 0.34rem 0.58rem;
+  text-transform: uppercase;
+  backdrop-filter: blur(12px);
+}
+
+.vip-card-kicker {
+  color: rgba(244, 216, 139, 0.72);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.vip-card-title {
+  max-width: 12ch;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(2rem, 5vw, 3.45rem);
+  font-weight: 800;
+  line-height: 0.96;
+  text-wrap: balance;
+}
+
+.vip-card-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.42rem;
+  color: var(--gold-light);
+  font-size: clamp(1.85rem, 4.5vw, 3.1rem);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.vip-card-price small {
+  color: rgba(247, 243, 234, 0.5);
+  font-size: clamp(0.82rem, 2vw, 1rem);
+  font-weight: 600;
+}
+
+.vip-benefit-list {
+  display: grid;
+  gap: 0.66rem;
+  margin-top: 0.2rem;
+}
+
+.vip-benefit-list span {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  color: rgba(247, 243, 234, 0.72);
+  line-height: 1.45;
+}
+
+.vip-benefit-list svg {
+  flex: 0 0 auto;
+  color: var(--gold-light);
+  margin-top: 0.16rem;
+}
+
 .wise-payment-shell {
   display: grid;
   gap: 1rem;
@@ -6274,6 +6412,10 @@ body::after {
     grid-template-columns: 1fr;
   }
 
+  .vip-membership-grid {
+    grid-template-columns: 1fr;
+  }
+
   .checkout-membership-summary,
   .checkout-total-bar {
     grid-template-columns: 1fr;
@@ -6325,6 +6467,11 @@ body::after {
     padding: 0.92rem;
   }
 
+  .vip-membership-option {
+    min-height: auto;
+    border-radius: 18px;
+  }
+
   .wise-sticky-continue {
     position: sticky;
     bottom: 0.85rem;
@@ -6358,5 +6505,187 @@ body::after {
   .footer-links,
   .social-links {
     width: 100%;
+  }
+}
+
+/* Final VIP concierge overrides */
+.application-page {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(212, 175, 55, 0.1), transparent 22rem),
+    radial-gradient(circle at 88% 18%, rgba(112, 31, 36, 0.1), transparent 20rem),
+    linear-gradient(180deg, #050505 0%, #0b0b0b 46%, #050505 100%);
+}
+
+.conversion-flow {
+  border-color: rgba(212, 175, 55, 0.16);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014)),
+    rgba(9, 9, 9, 0.78);
+  box-shadow:
+    0 2.5rem 7rem rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.conversion-panel {
+  border-color: rgba(212, 175, 55, 0.13);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(244, 216, 139, 0.065), transparent 22rem),
+    rgba(0, 0, 0, 0.2);
+}
+
+.vip-membership-option {
+  isolation: isolate;
+  min-height: 25.5rem;
+  border-color: rgba(212, 175, 55, 0.22);
+  background:
+    radial-gradient(circle at 90% 8%, rgba(244, 216, 139, 0.16), transparent 15rem),
+    radial-gradient(circle at 6% 96%, rgba(173, 145, 92, 0.1), transparent 13rem),
+    linear-gradient(146deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018) 44%, rgba(112, 31, 36, 0.07)),
+    #080808;
+  box-shadow:
+    0 1.6rem 4.2rem rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.vip-membership-option::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(115deg, transparent 0 36%, rgba(255, 255, 255, 0.13) 46%, transparent 58%),
+    linear-gradient(90deg, rgba(212, 175, 55, 0.28), transparent 18%, transparent 82%, rgba(198, 199, 194, 0.15));
+  opacity: 0.16;
+  transform: translateX(-42%);
+  transition: transform 720ms ease, opacity 260ms ease;
+}
+
+.vip-membership-option:hover::after,
+.vip-membership-option.selected::after {
+  opacity: 0.34;
+  transform: translateX(42%);
+}
+
+.vip-membership-option:hover,
+.vip-membership-option.selected {
+  transform: translateY(-8px) scale(1.01);
+  border-color: rgba(244, 216, 139, 0.66);
+  box-shadow:
+    0 2.2rem 5.8rem rgba(0, 0, 0, 0.56),
+    0 0 0 1px rgba(112, 31, 36, 0.22),
+    0 0 2.4rem rgba(212, 175, 55, 0.16);
+}
+
+.vip-membership-option.selected {
+  background:
+    radial-gradient(circle at 84% 4%, rgba(244, 216, 139, 0.22), transparent 16rem),
+    radial-gradient(circle at 12% 92%, rgba(112, 31, 36, 0.13), transparent 14rem),
+    linear-gradient(146deg, rgba(244, 216, 139, 0.13), rgba(255, 255, 255, 0.024) 50%, rgba(198, 199, 194, 0.07)),
+    #090909;
+}
+
+.vip-badge {
+  border-color: rgba(244, 216, 139, 0.42);
+  background:
+    linear-gradient(135deg, rgba(244, 216, 139, 0.18), rgba(255, 255, 255, 0.04)),
+    rgba(0, 0, 0, 0.62);
+  box-shadow: 0 0 1.4rem rgba(212, 175, 55, 0.16);
+}
+
+.vip-card-title {
+  color: #fff8eb;
+  text-shadow: 0 0.8rem 1.8rem rgba(0, 0, 0, 0.42);
+}
+
+.vip-card-price {
+  letter-spacing: 0;
+  text-shadow: 0 0 1.4rem rgba(212, 175, 55, 0.16);
+}
+
+.vip-benefit-list span {
+  max-width: 34rem;
+  color: rgba(247, 243, 234, 0.76);
+}
+
+.website-checkout {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.website-checkout .checkout-membership-summary,
+.payment-page .checkout-membership-summary {
+  border-color: rgba(212, 175, 55, 0.18);
+  background:
+    radial-gradient(circle at 88% 10%, rgba(244, 216, 139, 0.12), transparent 12rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(0, 0, 0, 0.26);
+}
+
+.payment-page .single-payment-layout {
+  max-width: 56rem;
+  margin-inline: auto;
+}
+
+.payment-page .payment-panel {
+  border-color: rgba(212, 175, 55, 0.18);
+  background:
+    radial-gradient(circle at 88% 0%, rgba(244, 216, 139, 0.12), transparent 18rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    #090909;
+}
+
+.payment-page .secure-box {
+  border-color: rgba(244, 216, 139, 0.16);
+  background: rgba(244, 216, 139, 0.045);
+}
+
+.payment-page .payment-actions .button.primary {
+  width: min(100%, 22rem);
+}
+
+@media (max-width: 860px) {
+  .vip-membership-option:hover,
+  .vip-membership-option.selected {
+    transform: translateY(-4px);
+  }
+}
+
+@media (max-width: 560px) {
+  .conversion-flow {
+    border-radius: 18px;
+  }
+
+  .conversion-panel {
+    padding: 0.9rem;
+  }
+
+  .vip-membership-grid {
+    gap: 0.9rem;
+  }
+
+  .vip-membership-option {
+    min-height: auto;
+    gap: 0.72rem;
+    padding: 1.08rem;
+  }
+
+  .vip-badge {
+    position: static;
+    width: max-content;
+    margin-bottom: 0.1rem;
+  }
+
+  .vip-card-title {
+    max-width: none;
+    font-size: clamp(1.85rem, 9vw, 2.55rem);
+    line-height: 1;
+  }
+
+  .vip-card-price {
+    font-size: clamp(1.8rem, 8.6vw, 2.35rem);
+  }
+
+  .vip-benefit-list {
+    gap: 0.55rem;
   }
 }

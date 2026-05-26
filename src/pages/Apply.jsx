@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Building2, CreditCard, Landmark, ShieldCheck } from "lucide-react";
-import CardType from "../components/CardType.jsx";
+import { ArrowLeft, ArrowRight, Check, Crown, ShieldCheck } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import {
-  checkoutPaymentOptions,
   convertEurCents,
   formatPaymentAmount,
-  getPaymentMethod,
-  isDelayedPaymentMethod
+  getPaymentMethod
 } from "../data/paymentMethods.js";
 import { saveApplication } from "../services/storage.js";
 import { createCheckoutSession } from "../services/stripeCheckout.js";
@@ -26,14 +23,7 @@ const emptyForm = {
   paymentCurrency: "EUR"
 };
 
-const steps = ["Choose Card", "Apply", "Review", "Payment Method"];
-
-const paymentIcons = {
-  card: CreditCard,
-  sepa: Building2,
-  bank_transfer: Landmark,
-  ideal: Building2
-};
+const steps = ["Membership", "Application", "Review", "Secure Payment"];
 
 export default function Apply() {
   const [params] = useSearchParams();
@@ -55,14 +45,14 @@ export default function Apply() {
 
   useEffect(() => {
     if (auth.loading) return;
-    if (!auth.isAuthenticated) {
+    if (!auth.isAuthenticated && step > 0) {
       if (form.selectedCard) sessionStorage.setItem("pendingMembershipCard", form.selectedCard);
       sessionStorage.setItem("pendingMembershipAction", "apply");
       navigate(`/login?returnTo=${encodeURIComponent(form.selectedCard ? `/apply?card=${form.selectedCard}` : "/apply")}`, {
         replace: true
       });
     }
-  }, [auth.loading, auth.isAuthenticated, form.selectedCard, navigate]);
+  }, [auth.loading, auth.isAuthenticated, form.selectedCard, navigate, step]);
 
   useEffect(() => {
     if (!auth.user) return;
@@ -100,6 +90,16 @@ export default function Apply() {
   const nextStep = () => {
     if (step === 0 && !form.selectedCard) {
       setStepError("Select a membership card to begin.");
+      return;
+    }
+    if (step === 0 && auth.loading) {
+      setStepError("Preparing your membership session. Please try again in a moment.");
+      return;
+    }
+    if (step === 0 && !auth.isAuthenticated) {
+      sessionStorage.setItem("pendingMembershipCard", form.selectedCard);
+      sessionStorage.setItem("pendingMembershipAction", "apply");
+      navigate(`/login?returnTo=${encodeURIComponent(`/apply?card=${form.selectedCard}`)}`);
       return;
     }
     if (step === 1 && !applicationComplete) {
@@ -172,9 +172,9 @@ export default function Apply() {
   return (
     <section className="page-section application-page">
       <SectionHeader
-        eyebrow="Membership Application"
-        title="A clear application path from card selection to confirmation."
-        copy="Choose a membership level, complete applicant details, confirm the information, then continue to the secure payment stage."
+        eyebrow="KR Global Membership"
+        title="Select your private membership access."
+        copy="Choose a membership level, complete your details, review your request, then continue to secure checkout."
       />
 
       <div className="conversion-flow">
@@ -206,17 +206,29 @@ export default function Apply() {
         <form className="form-panel step-form conversion-panel" onSubmit={(event) => event.preventDefault()}>
           {step === 0 ? (
             <div className="select-card-step">
-              <div className="compact-card-grid">
+              <div className="vip-membership-grid">
                 {cardTypes.map((card) => (
                   <button
                     key={card.id}
-                    className={form.selectedCard === card.id ? "card-choice selected" : "card-choice"}
+                    className={form.selectedCard === card.id ? "vip-membership-option selected" : "vip-membership-option"}
                     type="button"
                     onClick={() => updateField("selectedCard", card.id)}
                   >
-                    <span>{card.name}</span>
-                    <strong>{card.price}</strong>
-                    <small>{card.benefits.slice(0, 2).join(" / ")}</small>
+                    {card.id === "vip" ? <span className="vip-badge"><Crown size={14} /> Most Popular</span> : null}
+                    <span className="vip-card-kicker">KR Global Membership</span>
+                    <span className="vip-card-title">{card.name}</span>
+                    <span className="vip-card-price">
+                      {card.price}
+                      <small>/person</small>
+                    </span>
+                    <span className="vip-benefit-list">
+                      {card.benefits.map((benefit) => (
+                        <span key={benefit}>
+                          <Check size={15} />
+                          {benefit}
+                        </span>
+                      ))}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -309,38 +321,6 @@ export default function Apply() {
                 </ul>
               </div>
 
-              <div className="checkout-method-section">
-                <div className="checkout-section-head">
-                  <span className="eyebrow">Payment method</span>
-                  <h3>Choose a secure payment option</h3>
-                </div>
-                <div className="payment-method-grid website-method-grid" role="radiogroup" aria-label="Choose payment method">
-                  {checkoutPaymentOptions.map((method) => {
-                    const Icon = paymentIcons[method.id] || CreditCard;
-                    const selected = form.paymentMethod === method.id;
-
-                    return (
-                      <button
-                        key={method.id}
-                        className={selected ? "payment-method-card selected" : "payment-method-card"}
-                        type="button"
-                        role="radio"
-                        aria-checked={selected}
-                        onClick={() => updateField("paymentMethod", method.id)}
-                      >
-                        <span className="payment-method-icon">
-                          <Icon size={20} />
-                        </span>
-                        <span>
-                          <strong>{method.title}</strong>
-                          <small>{method.description}</small>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               <div className="checkout-total-bar">
                 <div>
                   <span>Total amount</span>
@@ -348,8 +328,7 @@ export default function Apply() {
                 </div>
                 <p>
                   <ShieldCheck size={17} />
-                  Secure encrypted checkout. Payment details are collected only by the hosted payment provider.
-                  {isDelayedPaymentMethod(form.paymentMethod) ? " Bank-based payments remain pending until confirmed." : ""}
+                  Secure encrypted checkout. Payment details are collected only by Stripe after you continue.
                 </p>
               </div>
             </div>
@@ -364,7 +343,7 @@ export default function Apply() {
             </button>
             {step < 3 ? (
               <button className="button primary" type="button" onClick={nextStep}>
-                Next
+                {step === 0 ? "Continue" : "Next"}
                 <ArrowRight size={17} />
               </button>
             ) : (
@@ -377,11 +356,6 @@ export default function Apply() {
         </form>
       </div>
 
-      {selectedCard && step < 3 ? (
-        <aside className="selected-card-preview">
-          <CardType card={selectedCard} compact hideActions />
-        </aside>
-      ) : null}
     </section>
   );
 }
