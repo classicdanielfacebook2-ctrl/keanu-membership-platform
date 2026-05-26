@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, CreditCard, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, BadgeCheck, Building2, CreditCard, LockKeyhole, ShieldCheck, Smartphone, Sparkles, Wallet } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
-import { cardTypes, getCardPrice, paymentStatuses } from "../data/cards.js";
+import { cardTypes, getCardPrice } from "../data/cards.js";
+import { getPaymentMethod, isDelayedPaymentMethod, paymentMethods } from "../data/paymentMethods.js";
 import { getApplications, updateApplication } from "../services/storage.js";
 import { createCheckoutSession, stripePublishableKey } from "../services/stripeCheckout.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const cardName = (id) => cardTypes.find((card) => card.id === id)?.name || "Selected membership card";
 const cardPrice = (id) => getCardPrice(id);
+const paymentIcons = {
+  card: CreditCard,
+  sepa: Building2,
+  google_pay: Smartphone,
+  apple_pay: Wallet,
+  amazon_pay: Wallet,
+  link: BadgeCheck
+};
 
 export default function Payment() {
   const [params] = useSearchParams();
@@ -17,6 +26,7 @@ export default function Payment() {
   const [applications, setApplications] = useState([]);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const [selectedMethodId, setSelectedMethodId] = useState("card");
   const applicationId = params.get("application");
 
   useEffect(() => {
@@ -32,7 +42,9 @@ export default function Payment() {
   const [status, setStatus] = useState("Pending");
 
   useEffect(() => {
-    if (application?.paymentStatus) setStatus(application.paymentStatus);
+    if (!application) return;
+    if (application.paymentStatus) setStatus(application.paymentStatus);
+    setSelectedMethodId(getPaymentMethod(application.paymentMethod).id);
   }, [application]);
 
   useEffect(() => {
@@ -59,9 +71,18 @@ export default function Payment() {
           message: "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not configured in the frontend environment."
         });
       }
-      const session = await createCheckoutSession(application);
+      const updatedApplication = {
+        ...application,
+        paymentMethod: selectedMethodId,
+        paymentMethodLabel: getPaymentMethod(selectedMethodId).title
+      };
+      const session = await createCheckoutSession(updatedApplication, selectedMethodId);
       if (!session.url) throw new Error("Stripe checkout URL was not returned.");
       updatePaymentStatus("Pending");
+      setApplications(updateApplication(application.id, {
+        paymentMethod: selectedMethodId,
+        paymentMethodLabel: getPaymentMethod(selectedMethodId).title
+      }));
       window.location.href = session.url;
     } catch (error) {
       setCheckoutError(error?.message || "Unable to start Stripe Checkout.");
@@ -72,9 +93,9 @@ export default function Payment() {
   return (
     <section className="page-section payment-page">
       <SectionHeader
-        eyebrow="Stripe Checkout"
-        title="Secure membership payment."
-        copy="Confirm the card, amount, and applicant details before continuing to Stripe."
+        eyebrow="Payment Method"
+        title="Choose how you would like to pay."
+        copy="Select a secure payment method, then continue to the hosted payment provider."
       />
 
       {application ? (
@@ -95,15 +116,41 @@ export default function Payment() {
               <span>Applicant Name</span>
               <strong>{application.fullName}</strong>
               <span>Payment Method</span>
-              <strong>{application.paymentMethod || "Stripe Checkout"}</strong>
+              <strong>{getPaymentMethod(selectedMethodId).title}</strong>
             </div>
 
             <div className="secure-box">
               <LockKeyhole size={30} />
               <div>
-                <h3>Stripe Checkout</h3>
-                <p>Payment is completed on Stripe. Card details are never entered or stored on this website.</p>
+                <h3>Secure encrypted checkout</h3>
+                <p>Payment details are entered only on the selected provider's hosted payment page.</p>
               </div>
+            </div>
+
+            <div className="payment-method-grid" role="radiogroup" aria-label="Choose payment method">
+              {paymentMethods.map((method) => {
+                const Icon = paymentIcons[method.id] || CreditCard;
+                const selected = selectedMethodId === method.id;
+
+                return (
+                  <button
+                    key={method.id}
+                    className={selected ? "payment-method-card selected" : "payment-method-card"}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setSelectedMethodId(method.id)}
+                  >
+                    <span className="payment-method-icon">
+                      <Icon size={20} />
+                    </span>
+                    <span>
+                      <strong>{method.title}</strong>
+                      <small>{method.description}</small>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="stripe-trust-grid" aria-label="Stripe payment trust indicators">
@@ -127,30 +174,22 @@ export default function Payment() {
                 {checkoutLoading ? (
                   <>
                     <span className="button-loader" aria-hidden="true" />
-                    Opening Stripe
+                    Opening checkout
                   </>
                 ) : (
-                  "Pay Securely with Stripe"
+                  "Continue Securely"
                 )}
               </button>
             </div>
 
             {checkoutError ? <div className="notice warning">{checkoutError}</div> : null}
 
-            <label htmlFor="paymentStatus">
-              Payment status
-              <select id="paymentStatus" value={status} onChange={(e) => updatePaymentStatus(e.target.value)}>
-                {paymentStatuses.map((paymentStatus) => (
-                  <option key={paymentStatus}>{paymentStatus}</option>
-                ))}
-              </select>
-            </label>
-
             <div className="payment-badge">
               <ShieldCheck size={18} />
-              Verified Stripe payment flow
+              {isDelayedPaymentMethod(selectedMethodId)
+                ? "SEPA status remains pending until confirmed"
+                : "Verified secure payment flow"}
             </div>
-            {/* Backend later: create Stripe/PayPal checkout sessions and reconcile provider webhooks here. */}
           </div>
         </div>
       ) : (

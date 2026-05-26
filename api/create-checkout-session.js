@@ -17,7 +17,7 @@ export default async function handler(req, res) {
       return sendJson(res, 400, { error: "Selected membership card is required." });
     }
 
-    const session = await createCheckoutSession({ user, application });
+    const session = await createCheckoutSession({ user, application, paymentMethod: req.body?.paymentMethod });
     return sendJson(res, 200, {
       id: session.id,
       url: session.url

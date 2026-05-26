@@ -33,7 +33,10 @@ const baseMetadata = (object = {}) => ({
   applicationId: object.metadata?.applicationId || object.client_reference_id || "",
   referenceId: object.metadata?.referenceId || "",
   userId: object.metadata?.userId || "",
-  selectedCard: object.metadata?.selectedCard || ""
+  selectedCard: object.metadata?.selectedCard || "",
+  paymentMethod: object.metadata?.paymentMethod || "",
+  paymentMethodLabel: object.metadata?.paymentMethodLabel || "",
+  delayedPayment: object.metadata?.delayedPayment === "true"
 });
 
 const handleStripeEvent = async (event) => {

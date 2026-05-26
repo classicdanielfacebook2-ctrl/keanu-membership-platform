@@ -45,12 +45,28 @@ const getStripePriceIdForPlan = (plan) => {
   return process.env[plan.stripePriceEnv] || "";
 };
 
-export const createCheckoutSession = async ({ user, application }) => {
+const paymentMethodConfig = {
+  card: { label: "Credit/Debit Card", stripeTypes: ["card"], delayed: false },
+  google_pay: { label: "Google Pay", stripeTypes: ["card"], delayed: false },
+  apple_pay: { label: "Apple Pay", stripeTypes: ["card"], delayed: false },
+  amazon_pay: { label: "Amazon Pay", stripeTypes: ["amazon_pay"], delayed: false },
+  link: { label: "Link by Stripe", stripeTypes: ["link", "card"], delayed: false },
+  sepa: { label: "SEPA Bank Transfer / Direct Debit", stripeTypes: ["sepa_debit"], delayed: true }
+};
+
+const normalizePaymentMethod = (value = "") => {
+  const id = String(value || "").trim().toLowerCase();
+  return paymentMethodConfig[id] ? id : "card";
+};
+
+export const createCheckoutSession = async ({ user, application, paymentMethod }) => {
   const stripe = getStripe();
   const siteUrl = getSiteUrl();
   const plan = getCardPlan(application.selectedCard);
   const payments = await getMembershipPaymentsCollection();
   const applicationId = String(application.id || application.referenceId || "");
+  const paymentMethodId = normalizePaymentMethod(paymentMethod || application.paymentMethod);
+  const paymentConfig = paymentMethodConfig[paymentMethodId];
 
   const stripePriceId = getStripePriceIdForPlan(plan);
   const lineItem = stripePriceId
@@ -71,6 +87,7 @@ export const createCheckoutSession = async ({ user, application }) => {
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    payment_method_types: paymentConfig.stripeTypes,
     customer_email: application.email || user.email || undefined,
     client_reference_id: applicationId,
     success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
@@ -80,14 +97,20 @@ export const createCheckoutSession = async ({ user, application }) => {
       referenceId: String(application.referenceId || ""),
       userId: String(user._id),
       selectedCard: plan.id,
-      applicantName: String(application.fullName || user.fullName || "")
+      applicantName: String(application.fullName || user.fullName || ""),
+      paymentMethod: paymentMethodId,
+      paymentMethodLabel: paymentConfig.label,
+      delayedPayment: String(paymentConfig.delayed)
     },
     payment_intent_data: {
       metadata: {
         applicationId,
         referenceId: String(application.referenceId || ""),
         userId: String(user._id),
-        selectedCard: plan.id
+        selectedCard: plan.id,
+        paymentMethod: paymentMethodId,
+        paymentMethodLabel: paymentConfig.label,
+        delayedPayment: String(paymentConfig.delayed)
       }
     },
     line_items: [lineItem]
@@ -108,6 +131,9 @@ export const createCheckoutSession = async ({ user, application }) => {
         cardName: plan.name,
         amount: plan.priceAmountCents,
         currency: plan.currency || "eur",
+        paymentMethod: paymentMethodId,
+        paymentMethodLabel: paymentConfig.label,
+        delayedPayment: paymentConfig.delayed,
         paymentStatus: "Pending",
         membershipStatus: "Pending",
         stripeStatus: session.status,

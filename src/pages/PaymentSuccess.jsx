@@ -4,6 +4,7 @@ import SectionHeader from "../components/SectionHeader.jsx";
 import { getApplications, updateApplication } from "../services/storage.js";
 import { useEffect, useMemo } from "react";
 import { cardTypes } from "../data/cards.js";
+import { isDelayedPaymentMethod } from "../data/paymentMethods.js";
 
 const cardName = (id) => cardTypes.find((card) => card.id === id)?.name || "Membership";
 
@@ -19,12 +20,16 @@ export default function PaymentSuccess() {
 
   useEffect(() => {
     if (!sessionId || !application?.id) return;
+    const delayedPayment = isDelayedPaymentMethod(application.paymentMethod);
     updateApplication(application.id, {
-      paymentStatus: "Paid",
-      membershipStatus: "Active"
+      paymentStatus: delayedPayment ? "Pending" : "Paid",
+      membershipStatus: delayedPayment ? "Pending" : "Active"
     });
     sessionStorage.removeItem("pendingStripeApplicationId");
   }, [application, sessionId]);
+
+  const delayedPayment = isDelayedPaymentMethod(application?.paymentMethod);
+  const statusText = delayedPayment ? "Pending / Pending" : "Paid / Active";
 
   return (
     <section className="page-section payment-result-page">
@@ -37,8 +42,9 @@ export default function PaymentSuccess() {
         <CheckCircle2 size={38} />
         <h3>{application ? cardName(application.selectedCard) : "KR Global Membership"}</h3>
         <p>
-          Status: <strong>Paid / Active</strong>
+          Status: <strong>{statusText}</strong>
         </p>
+        {delayedPayment ? <p>SEPA payments remain pending until Stripe confirms settlement.</p> : null}
         {application ? <p>Application Reference: {application.referenceId || application.id}</p> : null}
         {sessionId ? <p>Stripe Session: {sessionId}</p> : null}
         <Link className="button primary" to="/support">

@@ -21,9 +21,10 @@ const normalizeApplication = (application) => ({
   paymentStatus: application.paymentStatus || "Pending",
   membershipStatus: application.membershipStatus || (application.paymentStatus === "Paid" ? "Active" : "Pending"),
   paymentMethod:
-    !application.paymentMethod || application.paymentMethod === "Secure provider checkout"
-      ? "Stripe Checkout"
+    !application.paymentMethod || application.paymentMethod === "Secure provider checkout" || application.paymentMethod === "Stripe Checkout"
+      ? "card"
       : application.paymentMethod,
+  paymentMethodLabel: application.paymentMethodLabel || "",
   cardStatus: application.cardStatus || "Not Started"
 });
 
@@ -47,7 +48,7 @@ export const saveApplication = (application) => {
       reviewStatus: "Pending",
       paymentStatus: "Pending",
       membershipStatus: "Pending",
-      paymentMethod: application.paymentMethod || "Stripe Checkout",
+      paymentMethod: application.paymentMethod || "card",
       cardStatus: "Not Started"
     },
     ...applications

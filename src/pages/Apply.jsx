@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, Building2, CreditCard, ShieldCheck, Smartphone, Wallet } from "lucide-react";
 import CardType from "../components/CardType.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
+import { getPaymentMethod, isDelayedPaymentMethod, paymentMethods } from "../data/paymentMethods.js";
 import { saveApplication } from "../services/storage.js";
 import { createCheckoutSession } from "../services/stripeCheckout.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -15,10 +16,19 @@ const emptyForm = {
   country: "",
   selectedCard: "",
   preferredContactMethod: "Email",
-  paymentMethod: "Stripe Checkout"
+  paymentMethod: "card"
 };
 
-const steps = ["Choose Card", "Apply", "Review", "Payment"];
+const steps = ["Choose Card", "Apply", "Review", "Payment Method"];
+
+const paymentIcons = {
+  card: CreditCard,
+  sepa: Building2,
+  google_pay: Smartphone,
+  apple_pay: Wallet,
+  amazon_pay: Wallet,
+  link: BadgeCheck
+};
 
 export default function Apply() {
   const [params] = useSearchParams();
@@ -32,6 +42,7 @@ export default function Apply() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const selectedCard = cardTypes.find((card) => card.id === form.selectedCard) || null;
+  const selectedPaymentMethod = getPaymentMethod(form.paymentMethod);
   const progress = ((step + 1) / steps.length) * 100;
   const applicationComplete = form.fullName && form.email && form.phone && form.country && form.preferredContactMethod;
 
@@ -114,13 +125,14 @@ export default function Apply() {
         country: form.country.trim(),
         selectedCard: selectedCard.id,
         preferredContactMethod: form.preferredContactMethod,
-        paymentMethod: "Stripe Checkout"
+        paymentMethod: form.paymentMethod,
+        paymentMethodLabel: selectedPaymentMethod.title
       });
 
       sessionStorage.setItem("pendingStripeApplicationId", saved.id);
       sessionStorage.removeItem("pendingMembershipCard");
       sessionStorage.removeItem("pendingMembershipAction");
-      const session = await createCheckoutSession(saved);
+      const session = await createCheckoutSession(saved, form.paymentMethod);
       if (!session.url) throw new Error("Stripe checkout URL was not returned.");
       window.location.href = session.url;
     } catch (error) {
@@ -255,7 +267,7 @@ export default function Apply() {
           ) : null}
 
           {step === 3 ? (
-            <div className="payment-step conversion-payment">
+            <div className="payment-step conversion-payment method-selection-step">
               <div className="secure-box payment-summary-box">
                 <CreditCard size={28} />
                 <div>
@@ -263,6 +275,31 @@ export default function Apply() {
                   <h3>{selectedCard?.name}</h3>
                   <p>{selectedCard?.price}</p>
                 </div>
+              </div>
+              <div className="payment-method-grid" role="radiogroup" aria-label="Choose payment method">
+                {paymentMethods.map((method) => {
+                  const Icon = paymentIcons[method.id] || CreditCard;
+                  const selected = form.paymentMethod === method.id;
+
+                  return (
+                    <button
+                      key={method.id}
+                      className={selected ? "payment-method-card selected" : "payment-method-card"}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => updateField("paymentMethod", method.id)}
+                    >
+                      <span className="payment-method-icon">
+                        <Icon size={20} />
+                      </span>
+                      <span>
+                        <strong>{method.title}</strong>
+                        <small>{method.description}</small>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
               <div className="review-details">
                 <span>Selected Card</span>
@@ -272,11 +309,14 @@ export default function Apply() {
                 <span>Applicant Name</span>
                 <strong>{form.fullName}</strong>
                 <span>Payment Method</span>
-                <strong>{form.paymentMethod}</strong>
+                <strong>{selectedPaymentMethod.title}</strong>
               </div>
               <div className="payment-note">
                 <ShieldCheck size={18} />
-                  <span>Payment continues through Stripe Checkout. Card details are entered only on Stripe's secure payment page.</span>
+                <span>
+                  Secure encrypted checkout. Payment details are entered only on the selected provider's hosted payment page.
+                  {isDelayedPaymentMethod(form.paymentMethod) ? " SEPA payments remain pending until confirmation is received." : ""}
+                </span>
               </div>
             </div>
           ) : null}
@@ -295,7 +335,7 @@ export default function Apply() {
               </button>
             ) : (
               <button className="button primary" type="submit" disabled={checkoutLoading}>
-                {checkoutLoading ? "Opening Stripe..." : "Pay Securely with Stripe"}
+                {checkoutLoading ? "Opening checkout..." : "Continue Securely"}
                 <ArrowRight size={17} />
               </button>
             )}
