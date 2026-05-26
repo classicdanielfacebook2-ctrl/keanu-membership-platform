@@ -6744,6 +6744,157 @@ body::after {
     inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
+.location-select-field {
+  position: relative;
+}
+
+.location-select-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  width: 100%;
+  min-height: 3.35rem;
+  border: 1px solid rgba(198, 199, 194, 0.16);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.016)),
+    rgba(0, 0, 0, 0.34);
+  color: #fff8eb;
+  cursor: pointer;
+  padding: 0.94rem 2.35rem 0.94rem 1rem;
+  text-align: left;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.location-select-trigger::after {
+  content: "";
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  width: 0.48rem;
+  height: 0.48rem;
+  border-right: 1px solid rgba(244, 216, 139, 0.9);
+  border-bottom: 1px solid rgba(244, 216, 139, 0.9);
+  transform: translateY(-62%) rotate(45deg);
+  transition: transform 180ms ease;
+}
+
+.location-select-trigger.open::after {
+  transform: translateY(-20%) rotate(225deg);
+}
+
+.location-select-trigger:hover,
+.location-select-trigger.open {
+  border-color: rgba(244, 216, 139, 0.58);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.09);
+}
+
+.location-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.location-select-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  color: #fff8eb;
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.location-select-trigger small {
+  flex: 0 0 auto;
+  color: rgba(244, 216, 139, 0.72);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.location-select-backdrop,
+.location-select-handle {
+  display: none;
+}
+
+.location-select-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  overflow: hidden;
+  border: 1px solid rgba(244, 216, 139, 0.2);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(244, 216, 139, 0.1), transparent 12rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
+    rgba(8, 8, 8, 0.98);
+  box-shadow: 0 1.4rem 3rem rgba(0, 0, 0, 0.5), 0 0 1.8rem rgba(212, 175, 55, 0.08);
+  padding: 0.72rem;
+}
+
+.location-select-menu input {
+  min-height: 2.75rem;
+  margin-bottom: 0.6rem;
+  border-radius: 10px;
+}
+
+.location-select-options {
+  display: grid;
+  gap: 0.3rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.location-select-options button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(247, 243, 234, 0.82);
+  cursor: pointer;
+  padding: 0.72rem 0.78rem;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.location-select-options button:hover,
+.location-select-options button.selected {
+  border-color: rgba(244, 216, 139, 0.2);
+  background: rgba(244, 216, 139, 0.08);
+  color: #fff8eb;
+}
+
+.location-select-options button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.location-select-options button small {
+  flex: 0 0 auto;
+  color: rgba(244, 216, 139, 0.68);
+  font-size: 0.75rem;
+}
+
+.location-select-options p {
+  margin: 0;
+  color: var(--muted);
+  padding: 0.78rem;
+  text-transform: none;
+}
+
 @media (max-width: 860px) {
   .vip-membership-option:hover,
   .vip-membership-option.selected {
@@ -6800,5 +6951,39 @@ body::after {
 
   .application-form-heading h3 {
     font-size: clamp(1.85rem, 9vw, 2.45rem);
+  }
+
+  .location-select-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 38;
+    display: block;
+    background: rgba(0, 0, 0, 0.54);
+    backdrop-filter: blur(7px);
+  }
+
+  .location-select-menu {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 39;
+    max-height: min(72vh, 34rem);
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 22px 22px 0 0;
+    padding: 0.85rem 1rem 1rem;
+  }
+
+  .location-select-handle {
+    display: block;
+    width: 2.6rem;
+    height: 0.22rem;
+    margin: 0 auto 0.75rem;
+    border-radius: 999px;
+    background: rgba(244, 216, 139, 0.34);
+  }
+
+  .location-select-options {
+    max-height: calc(72vh - 7rem);
   }
 }

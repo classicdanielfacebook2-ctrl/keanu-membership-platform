@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Check, Crown, ShieldCheck } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
-import { getCountryByName, getRegionByName, locationCountries } from "../data/locations.js";
 import {
   convertEurCents,
   formatPaymentAmount,
@@ -18,8 +17,11 @@ const emptyForm = {
   lastName: "",
   email: "",
   phone: "",
+  countryCode: "",
   country: "",
+  stateCode: "",
   stateRegion: "",
+  manualStateRegion: "",
   city: "",
   manualCity: "",
   numberApplicants: "1",
@@ -31,6 +33,82 @@ const emptyForm = {
 
 const steps = ["Membership", "Application", "Review", "Secure Payment"];
 
+function SearchableLocationSelect({
+  id,
+  label,
+  value,
+  options,
+  placeholder,
+  searchPlaceholder,
+  emptyText = "No matching option found.",
+  disabled = false,
+  onSelect
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const selectedOption = options.find((option) => option.value === value);
+  const filteredOptions = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    const manualOptions = options.filter((option) => String(option.value).startsWith("__"));
+    const dataOptions = options.filter((option) => !String(option.value).startsWith("__"));
+    if (!normalized) return [...dataOptions.slice(0, 219), ...manualOptions];
+
+    return options
+      .filter((option) => `${option.label} ${option.meta || ""}`.toLowerCase().includes(normalized))
+      .slice(0, 220);
+  }, [options, query]);
+
+  const selectOption = (option) => {
+    onSelect(option);
+    setOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <label className="location-select-field" htmlFor={id}>
+      {label}
+      <button
+        id={id}
+        className={open ? "location-select-trigger open" : "location-select-trigger"}
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span>{selectedOption?.label || placeholder}</span>
+        {selectedOption?.meta ? <small>{selectedOption.meta}</small> : null}
+      </button>
+      {open ? (
+        <>
+          <div className="location-select-backdrop" aria-hidden="true" onMouseDown={() => setOpen(false)} />
+          <div className="location-select-menu" role="dialog" aria-label={label}>
+            <div className="location-select-handle" aria-hidden="true" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={searchPlaceholder}
+            />
+            <div className="location-select-options" role="listbox">
+              {filteredOptions.map((option) => (
+                <button
+                  key={option.value}
+                  className={option.value === value ? "selected" : ""}
+                  type="button"
+                  onClick={() => selectOption(option)}
+                >
+                  <span>{option.label}</span>
+                  {option.meta ? <small>{option.meta}</small> : null}
+                </button>
+              ))}
+              {filteredOptions.length === 0 ? <p>{emptyText}</p> : null}
+            </div>
+          </div>
+        </>
+      ) : null}
+    </label>
+  );
+}
+
 export default function Apply() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -41,12 +119,61 @@ export default function Apply() {
   const [form, setForm] = useState({ ...emptyForm, selectedCard: initialCard });
   const [stepError, setStepError] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [locationApi, setLocationApi] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    import("country-state-city").then((module) => {
+      if (!active) return;
+      setLocationApi({ Country: module.Country, State: module.State, City: module.City });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const selectedCard = cardTypes.find((card) => card.id === form.selectedCard) || null;
   const selectedPaymentMethod = getPaymentMethod(form.paymentMethod);
-  const selectedCountry = getCountryByName(form.country);
-  const selectedRegion = getRegionByName(form.country, form.stateRegion);
-  const cityOptions = selectedRegion?.cities || [];
+  const countryOptions = useMemo(() => {
+    if (!locationApi) return [];
+    return locationApi.Country.getAllCountries().map((country) => ({
+      value: country.isoCode,
+      label: country.name,
+      meta: country.flag || country.isoCode,
+      country
+    }));
+  }, [locationApi]);
+  const stateOptions = useMemo(() => {
+    if (!locationApi || !form.countryCode) return [];
+    const states = locationApi.State.getStatesOfCountry(form.countryCode);
+
+    return states.map((state) => ({
+      value: state.isoCode,
+      label: state.name,
+      meta: state.isoCode,
+      state
+    }));
+  }, [form.countryCode, locationApi]);
+  const stateSelectOptions = useMemo(
+    () => [...stateOptions, { value: "__manual_state__", label: "State / region not listed", meta: "Type manually" }],
+    [stateOptions]
+  );
+  const cityOptions = useMemo(() => {
+    if (!locationApi || !form.countryCode || !form.stateCode) return [];
+    if (form.stateCode === "__manual_state__") return [];
+    return locationApi.City.getCitiesOfState(form.countryCode, form.stateCode).map((city) => ({
+      value: city.name,
+      label: city.name,
+      meta: city.stateCode || form.stateCode,
+      city
+    }));
+  }, [form.countryCode, form.stateCode, locationApi]);
+  const citySelectOptions = useMemo(
+    () => [...cityOptions, { value: "__manual__", label: "City not listed", meta: "Type manually" }],
+    [cityOptions]
+  );
+  const finalStateRegion = form.stateCode === "__manual_state__" ? form.manualStateRegion.trim() : form.stateRegion;
   const finalCity = form.city === "__manual__" ? form.manualCity.trim() : form.city;
   const selectedAmount = selectedCard ? convertEurCents(selectedCard.priceAmountCents, form.paymentCurrency) : 0;
   const formattedAmount = selectedCard ? formatPaymentAmount(selectedAmount, form.paymentCurrency) : "";
@@ -57,7 +184,7 @@ export default function Apply() {
     form.email &&
     form.phone &&
     form.country &&
-    form.stateRegion &&
+    finalStateRegion &&
     finalCity &&
     form.numberApplicants;
 
@@ -88,8 +215,12 @@ export default function Apply() {
 
   const updateField = (field, value) => {
     setForm((current) => {
-      if (field === "country") return { ...current, country: value, stateRegion: "", city: "", manualCity: "" };
-      if (field === "stateRegion") return { ...current, stateRegion: value, city: "", manualCity: "" };
+      if (field === "countryCode") {
+        return { ...current, countryCode: value.code, country: value.name, stateCode: "", stateRegion: "", manualStateRegion: "", city: "", manualCity: "" };
+      }
+      if (field === "stateCode") {
+        return { ...current, stateCode: value.code, stateRegion: value.name, manualStateRegion: "", city: "", manualCity: "" };
+      }
       if (field === "city" && value !== "__manual__") return { ...current, city: value, manualCity: "" };
       return { ...current, [field]: value };
     });
@@ -168,7 +299,7 @@ export default function Apply() {
         email: form.email.trim(),
         phone: form.phone.trim(),
         country: form.country.trim(),
-        stateRegion: form.stateRegion.trim(),
+        stateRegion: finalStateRegion,
         city: finalCity,
         numberApplicants: form.numberApplicants,
         message: form.message.trim(),
@@ -327,52 +458,50 @@ export default function Apply() {
                   ))}
                 </select>
               </label>
-              <label htmlFor="country">
-                Country
-                <select id="country" required value={form.country} onChange={(e) => updateField("country", e.target.value)}>
-                  <option value="">Select country</option>
-                  {locationCountries.map((country) => (
-                    <option key={country.id} value={country.name}>
-                      {country.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label htmlFor="stateRegion">
-                State / Region
-                <select
-                  id="stateRegion"
-                  required
-                  value={form.stateRegion}
-                  onChange={(e) => updateField("stateRegion", e.target.value)}
-                  disabled={!selectedCountry}
-                >
-                  <option value="">Select state or region</option>
-                  {selectedCountry?.regions.map((region) => (
-                    <option key={region.name} value={region.name}>
-                      {region.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label htmlFor="city">
-                City
-                <select
-                  id="city"
-                  required
-                  value={form.city}
-                  onChange={(e) => updateField("city", e.target.value)}
-                  disabled={!selectedRegion}
-                >
-                  <option value="">Select a city</option>
-                  {cityOptions.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                  <option value="__manual__">City not listed</option>
-                </select>
-              </label>
+              <SearchableLocationSelect
+                id="country"
+                label="Country"
+                value={form.countryCode}
+                options={countryOptions}
+                placeholder={locationApi ? "Select country" : "Loading countries"}
+                searchPlaceholder="Search country"
+                disabled={!locationApi}
+                onSelect={(option) => updateField("countryCode", { code: option.value, name: option.label })}
+              />
+              <SearchableLocationSelect
+                id="stateRegion"
+                label="State / Region"
+                value={form.stateCode}
+                options={stateSelectOptions}
+                placeholder={form.countryCode ? "Select state or region" : "Select country first"}
+                searchPlaceholder="Search state or region"
+                disabled={!form.countryCode}
+                emptyText="No state or region found for this country."
+                onSelect={(option) => updateField("stateCode", { code: option.value, name: option.label })}
+              />
+              {form.stateCode === "__manual_state__" ? (
+                <label htmlFor="manualStateRegion">
+                  Type state / region manually
+                  <input
+                    id="manualStateRegion"
+                    required
+                    placeholder="Enter your state or region"
+                    value={form.manualStateRegion}
+                    onChange={(e) => updateField("manualStateRegion", e.target.value)}
+                  />
+                </label>
+              ) : null}
+              <SearchableLocationSelect
+                id="city"
+                label="City"
+                value={form.city}
+                options={citySelectOptions}
+                placeholder={form.stateCode ? "Select a city" : "Select state or region first"}
+                searchPlaceholder="Search city"
+                disabled={!form.stateCode}
+                emptyText="No city found. Choose manual entry."
+                onSelect={(option) => updateField("city", option.value)}
+              />
               {form.city === "__manual__" ? (
                 <label htmlFor="manualCity">
                   Type city manually
@@ -427,7 +556,7 @@ export default function Apply() {
                 <span>Country</span>
                 <strong>{form.country}</strong>
                 <span>State / Region</span>
-                <strong>{form.stateRegion}</strong>
+                <strong>{finalStateRegion}</strong>
                 <span>City</span>
                 <strong>{finalCity}</strong>
                 <span>Applicants</span>
