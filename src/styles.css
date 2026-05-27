@@ -6156,6 +6156,13 @@ body::after {
   font-size: clamp(1.45rem, 3vw, 2.2rem);
 }
 
+.checkout-section-head p {
+  margin: 0;
+  color: rgba(245, 239, 225, 0.68);
+  line-height: 1.6;
+  max-width: 44rem;
+}
+
 .website-method-grid {
   grid-template-columns: 1fr;
   gap: 0.7rem;
@@ -6207,6 +6214,20 @@ body::after {
 
 .checkout-continue-button {
   min-width: min(100%, 19rem);
+}
+
+.payment-method-required {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.8rem;
+  border: 1px solid rgba(244, 216, 139, 0.16);
+  border-radius: 999px;
+  background: rgba(244, 216, 139, 0.055);
+  color: rgba(245, 239, 225, 0.72);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0 0.95rem;
 }
 
 .vip-membership-grid {

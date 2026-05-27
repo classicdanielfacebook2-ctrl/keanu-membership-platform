@@ -20,6 +20,7 @@ import {
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import {
+  checkoutPaymentOptions,
   convertEurCents,
   formatPaymentAmount,
   getPaymentMethod
@@ -50,11 +51,17 @@ const emptyForm = {
   numberApplicants: "1",
   message: "",
   selectedCard: "",
-  paymentMethod: "card",
+  paymentMethod: "",
   paymentCurrency: "EUR"
 };
 
-const steps = ["Membership", "Application", "Review", "Secure Payment"];
+const steps = ["Membership", "Application", "Review", "Payment Method"];
+const paymentMethodIcons = {
+  card: CreditCard,
+  sepa: BadgeCheck,
+  bank_transfer: Building2,
+  ideal: Globe2
+};
 
 function ReviewSummaryCard({ title, items }) {
   return (
@@ -96,7 +103,7 @@ export default function Apply() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const selectedCard = cardTypes.find((card) => card.id === form.selectedCard) || null;
-  const selectedPaymentMethod = getPaymentMethod(form.paymentMethod);
+  const selectedPaymentMethod = form.paymentMethod ? getPaymentMethod(form.paymentMethod) : null;
   const finalStateRegion = form.stateCode === "__manual_state__" ? form.manualStateRegion.trim() : form.stateRegion;
   const finalCity = form.city === "__manual__" ? form.manualCity.trim() : form.city;
   const selectedAmount = selectedCard ? convertEurCents(selectedCard.priceAmountCents, form.paymentCurrency) : 0;
@@ -258,14 +265,15 @@ export default function Apply() {
       currency: form.paymentCurrency
     });
 
-    if (!selectedCard || !applicationComplete) {
+    if (!selectedCard || !applicationComplete || !selectedPaymentMethod) {
       console.info("[checkout/blocked]", {
         source: "final-payment-button",
-        reason: "missing_application_details",
+        reason: !selectedPaymentMethod ? "missing_payment_method" : "missing_application_details",
         hasSelectedCard: Boolean(selectedCard),
-        applicationComplete: Boolean(applicationComplete)
+        applicationComplete: Boolean(applicationComplete),
+        hasPaymentMethod: Boolean(selectedPaymentMethod)
       });
-      setStepError("Review the selected card and applicant details before payment.");
+      setStepError("Select a payment method before continuing to secure checkout.");
       return;
     }
     setCheckoutLoading(true);
@@ -606,6 +614,36 @@ export default function Apply() {
                 </ul>
               </div>
 
+              <div className="checkout-method-section">
+                <div className="checkout-section-head">
+                  <span className="eyebrow">Payment Method</span>
+                  <h3>Choose Payment Method</h3>
+                  <p>Select how you would like to continue. Stripe Checkout securely collects all payment details on the next screen.</p>
+                </div>
+
+                <div className="payment-method-grid website-method-grid" aria-label="Payment method options">
+                  {checkoutPaymentOptions.map((method) => {
+                    const Icon = paymentMethodIcons[method.id] || CreditCard;
+                    return (
+                      <button
+                        key={method.id}
+                        className={form.paymentMethod === method.id ? "payment-method-card selected" : "payment-method-card"}
+                        type="button"
+                        onClick={() => updateField("paymentMethod", method.id)}
+                      >
+                        <span className="payment-method-icon" aria-hidden="true">
+                          <Icon size={18} />
+                        </span>
+                        <span>
+                          <strong>{method.title}</strong>
+                          <small>{method.description}</small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="checkout-total-bar">
                 <div>
                   <span>Total amount</span>
@@ -628,14 +666,16 @@ export default function Apply() {
             </button>
             {step < 3 ? (
               <button className={step === 2 ? "button primary review-continue-button" : "button primary"} type="button" onClick={nextStep}>
-                {step === 0 ? "Continue" : step === 1 ? "Submit Application" : "Continue to Secure Payment"}
+                {step === 0 ? "Continue" : step === 1 ? "Submit Application" : "Choose Payment Method"}
+                <ArrowRight size={17} />
+              </button>
+            ) : form.paymentMethod ? (
+              <button className="button primary checkout-continue-button" type="button" onClick={handleContinueToPayment} disabled={checkoutLoading}>
+                {checkoutLoading ? "Opening checkout..." : "Continue to Secure Checkout"}
                 <ArrowRight size={17} />
               </button>
             ) : (
-              <button className="button primary checkout-continue-button" type="button" onClick={handleContinueToPayment} disabled={checkoutLoading}>
-                {checkoutLoading ? "Opening checkout..." : "Continue to Secure Payment"}
-                <ArrowRight size={17} />
-              </button>
+              <span className="payment-method-required">Select a payment method to continue.</span>
             )}
           </div>
         </form>
