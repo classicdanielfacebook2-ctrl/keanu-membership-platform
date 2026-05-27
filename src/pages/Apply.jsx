@@ -1,6 +1,22 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, Crown, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BadgeCheck,
+  Building2,
+  Check,
+  Crown,
+  CreditCard,
+  Globe2,
+  Mail,
+  MapPin,
+  MapPinned,
+  Phone,
+  ShieldCheck,
+  User,
+  Users
+} from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import {
@@ -39,6 +55,28 @@ const emptyForm = {
 };
 
 const steps = ["Membership", "Application", "Review", "Secure Payment"];
+
+function ReviewSummaryCard({ title, items }) {
+  return (
+    <article className="review-summary-card">
+      <h4>{title}</h4>
+      <div className="review-summary-list">
+        {items.map(({ label, value, Icon }) => (
+          <div className="review-summary-row" key={label}>
+            <span className="review-row-icon" aria-hidden="true">
+              <Icon size={16} />
+            </span>
+            <span className="review-row-copy">
+              <small>{label}</small>
+              <strong>{value || "Not provided"}</strong>
+            </span>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 export default function Apply() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -460,31 +498,61 @@ export default function Apply() {
           ) : null}
 
           {step === 2 ? (
-            <div className="review-panel conversion-review">
-              <div className="review-details">
-                <span>Applicant</span>
-                <strong>{`${form.firstName} ${form.lastName}`.trim()}</strong>
-                <span>Email</span>
-                <strong>{form.email}</strong>
-                <span>Phone</span>
-                <strong>{form.phone}</strong>
-                <span>Country</span>
-                <strong>{form.country}</strong>
-                <span>State / Region</span>
-                <strong>{finalStateRegion}</strong>
-                <span>City</span>
-                <strong>{finalCity}</strong>
-                <span>Applicants</span>
-                <strong>{form.numberApplicants}</strong>
-                <span>Selected Card</span>
-                <strong>{selectedCard?.name}</strong>
-                {form.message ? (
-                  <>
-                    <span>Message</span>
-                    <strong>{form.message}</strong>
-                  </>
-                ) : null}
+            <div className="review-premium-panel conversion-review">
+              <div className="review-premium-heading">
+                <span className="eyebrow">Application Review</span>
+                <h3>Review Your Application</h3>
+                <p>Please confirm your details before secure payment.</p>
               </div>
+
+              <div className="review-membership-hero">
+                <div className="review-membership-title">
+                  <span>Selected membership</span>
+                  <strong>{selectedCard?.name}</strong>
+                  <small>{selectedCard?.benefits?.[0]}</small>
+                </div>
+                <div className="review-price-block">
+                  <strong>{formattedAmount}</strong>
+                  <span>
+                    <BadgeCheck size={14} />
+                    Ready for payment
+                  </span>
+                </div>
+              </div>
+
+              <div className="review-summary-grid">
+                <ReviewSummaryCard
+                  title="Applicant details"
+                  items={[
+                    { label: "Full name", value: `${form.firstName} ${form.lastName}`.trim(), Icon: User },
+                    { label: "Email", value: form.email, Icon: Mail },
+                    { label: "Phone", value: form.phone, Icon: Phone }
+                  ]}
+                />
+                <ReviewSummaryCard
+                  title="Location"
+                  items={[
+                    { label: "Country", value: form.country, Icon: Globe2 },
+                    { label: "State / Region", value: finalStateRegion, Icon: MapPinned },
+                    { label: "City", value: finalCity, Icon: MapPin }
+                  ]}
+                />
+                <ReviewSummaryCard
+                  title="Membership"
+                  items={[
+                    { label: "Selected card", value: selectedCard?.name, Icon: CreditCard },
+                    { label: "Number of applicants", value: form.numberApplicants, Icon: Users },
+                    { label: "Total amount", value: formattedAmount, Icon: Building2 }
+                  ]}
+                />
+              </div>
+
+              {form.message ? (
+                <article className="review-message-card">
+                  <span>Message or special request</span>
+                  <p>{form.message}</p>
+                </article>
+              ) : null}
             </div>
           ) : null}
 
@@ -524,8 +592,8 @@ export default function Apply() {
               Back
             </button>
             {step < 3 ? (
-              <button className="button primary" type="button" onClick={nextStep}>
-                {step === 0 ? "Continue" : step === 1 ? "Submit Application" : "Next"}
+              <button className={step === 2 ? "button primary review-continue-button" : "button primary"} type="button" onClick={nextStep}>
+                {step === 0 ? "Continue" : step === 1 ? "Submit Application" : "Continue to Secure Payment"}
                 <ArrowRight size={17} />
               </button>
             ) : (
