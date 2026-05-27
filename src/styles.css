@@ -2007,6 +2007,10 @@ button:disabled {
   gap: 1rem;
 }
 
+.application-step-anchor {
+  scroll-margin-top: 7.25rem;
+}
+
 .conversion-progress {
   border: 1px solid rgba(244, 216, 139, 0.16);
   border-radius: var(--radius);

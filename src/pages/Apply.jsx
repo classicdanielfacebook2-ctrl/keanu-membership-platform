@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -81,6 +81,12 @@ export default function Apply() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const auth = useAuth();
+  const membershipRef = useRef(null);
+  const applicationRef = useRef(null);
+  const reviewRef = useRef(null);
+  const paymentRef = useRef(null);
+  const previousStepRef = useRef(null);
+  const skipStepScrollRef = useRef(false);
   const requestedCard = params.get("card") || sessionStorage.getItem("pendingMembershipCard") || "";
   const savedDraft = getApplicationDraft();
   const initialCard = cardTypes.some((card) => card.id === requestedCard) ? requestedCard : "";
@@ -114,18 +120,47 @@ export default function Apply() {
     const returnState = consumeApplicationReturn();
     if (!returnState?.targetId) return;
 
+    skipStepScrollRef.current = true;
     window.requestAnimationFrame(() => {
       const target = document.getElementById(returnState.targetId);
       if (!target) {
         window.scrollTo({ top: returnState.scrollY || 0, behavior: "auto" });
+        window.setTimeout(() => {
+          skipStepScrollRef.current = false;
+        }, 300);
         return;
       }
 
       target.scrollIntoView({ block: "center", behavior: "auto" });
       target.classList.add("field-return-highlight");
-      window.setTimeout(() => target.classList.remove("field-return-highlight"), 900);
+      window.setTimeout(() => {
+        target.classList.remove("field-return-highlight");
+        skipStepScrollRef.current = false;
+      }, 900);
     });
   }, []);
+
+  useEffect(() => {
+    if (previousStepRef.current === null) {
+      previousStepRef.current = step;
+      return;
+    }
+
+    if (previousStepRef.current === step) return;
+    previousStepRef.current = step;
+
+    if (skipStepScrollRef.current) return;
+
+    const stepRefs = [membershipRef, applicationRef, reviewRef, paymentRef];
+    const activeRef = stepRefs[step];
+
+    window.requestAnimationFrame(() => {
+      activeRef?.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    });
+  }, [step]);
 
   useEffect(() => {
     if (auth.loading) return;
@@ -311,7 +346,7 @@ export default function Apply() {
 
         <form className="form-panel step-form conversion-panel" onSubmit={(event) => event.preventDefault()}>
           {step === 0 ? (
-            <div className="select-card-step">
+            <div className="select-card-step application-step-anchor" ref={membershipRef}>
               <div className="vip-membership-grid">
                 {cardTypes.map((card) => (
                   <button
@@ -342,7 +377,7 @@ export default function Apply() {
           ) : null}
 
           {step === 1 ? (
-            <div className="membership-application-form">
+            <div className="membership-application-form application-step-anchor" ref={applicationRef}>
               <div className="application-form-heading">
                 <span className="eyebrow">Membership details</span>
                 <h3>Complete Your Membership Application</h3>
@@ -498,7 +533,7 @@ export default function Apply() {
           ) : null}
 
           {step === 2 ? (
-            <div className="review-premium-panel conversion-review">
+            <div className="review-premium-panel conversion-review application-step-anchor" ref={reviewRef}>
               <div className="review-premium-heading">
                 <span className="eyebrow">Application Review</span>
                 <h3>Review Your Application</h3>
@@ -557,7 +592,7 @@ export default function Apply() {
           ) : null}
 
           {step === 3 ? (
-            <div className="payment-step website-checkout">
+            <div className="payment-step website-checkout application-step-anchor" ref={paymentRef}>
               <div className="checkout-membership-summary">
                 <div>
                   <span className="eyebrow">Selected membership</span>
