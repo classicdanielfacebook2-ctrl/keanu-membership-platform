@@ -9,9 +9,12 @@ export default function Welcome() {
   const [entering, setEntering] = useState(false);
   const [introActive, setIntroActive] = useState(false);
   const [muted, setMuted] = useState(false);
-  const audioContextRef = useRef(null);
-  const mutedRef = useRef(false);
+  const [introVideoFailed, setIntroVideoFailed] = useState(false);
+  const introVideoRef = useRef(null);
+  const introAudioRef = useRef(null);
   const timersRef = useRef([]);
+  const introVideoSrc = "/intro/keanu-intro.mp4";
+  const introAudioSrc = "/audio/intro-sound.mp3";
   const heroImage = getApprovedHomeImages().find((image) => image.id === "official-portrait" || image.id === "press-photo");
   const heroVideo = getApprovedHomeVideos().find((video) => video.isDirectVideo);
 
@@ -21,9 +24,9 @@ export default function Welcome() {
   };
 
   const stopIntroAudio = () => {
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => {});
-      audioContextRef.current = null;
+    if (introAudioRef.current) {
+      introAudioRef.current.pause();
+      introAudioRef.current.currentTime = 0;
     }
   };
 
@@ -32,42 +35,27 @@ export default function Welcome() {
     stopIntroAudio();
   }, []);
 
-  const playIntroAudio = () => {
-    if (mutedRef.current || audioContextRef.current) return;
+  useEffect(() => {
+    if (!introActive) return;
 
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) return;
-
-      const context = new AudioContext();
-      audioContextRef.current = context;
-      const master = context.createGain();
-      master.gain.setValueAtTime(0.0001, context.currentTime);
-      master.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.35);
-      master.gain.exponentialRampToValueAtTime(0.018, context.currentTime + 5.7);
-      master.connect(context.destination);
-
-      const createTone = (type, start, duration, fromFrequency, toFrequency, volume) => {
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        oscillator.type = type;
-        oscillator.frequency.setValueAtTime(fromFrequency, context.currentTime + start);
-        oscillator.frequency.exponentialRampToValueAtTime(toFrequency, context.currentTime + start + duration);
-        gain.gain.setValueAtTime(0.0001, context.currentTime + start);
-        gain.gain.exponentialRampToValueAtTime(volume, context.currentTime + start + 0.18);
-        gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + start + duration);
-        oscillator.connect(gain);
-        gain.connect(master);
-        oscillator.start(context.currentTime + start);
-        oscillator.stop(context.currentTime + start + duration + 0.12);
-      };
-
-      createTone("sine", 0, 5.4, 82, 130, 0.38);
-      createTone("triangle", 0.55, 3.7, 220, 520, 0.08);
-      createTone("sine", 4.4, 1.4, 392, 784, 0.055);
-    } catch {
-      stopIntroAudio();
+    if (introVideoRef.current) {
+      introVideoRef.current.currentTime = 0;
+      introVideoRef.current.play().catch(() => setIntroVideoFailed(true));
     }
+
+    if (introAudioRef.current) {
+      introAudioRef.current.volume = 0.55;
+      introAudioRef.current.muted = muted;
+      introAudioRef.current.play().catch(() => {});
+    }
+  }, [introActive, muted]);
+
+  const playIntroAudio = () => {
+    if (!introAudioRef.current) return;
+    introAudioRef.current.currentTime = 0;
+    introAudioRef.current.volume = 0.55;
+    introAudioRef.current.muted = muted;
+    introAudioRef.current.play().catch(() => {});
   };
 
   const enterPlatform = () => {
@@ -93,11 +81,11 @@ export default function Welcome() {
   const toggleMute = () => {
     setMuted((current) => {
       const next = !current;
-      mutedRef.current = next;
-      if (next) {
-        stopIntroAudio();
-      } else if (introActive || entering) {
-        window.setTimeout(playIntroAudio, 0);
+      if (introAudioRef.current) {
+        introAudioRef.current.muted = next;
+        if (!next && introActive) {
+          introAudioRef.current.play().catch(() => {});
+        }
       }
       return next;
     });
@@ -105,6 +93,7 @@ export default function Welcome() {
 
   return (
     <section className={entering ? "welcome-landing entering" : "welcome-landing"} aria-label="Official website welcome">
+      <audio ref={introAudioRef} src={introAudioSrc} preload="auto" onError={() => {}} />
       <div className="welcome-media" aria-hidden="true">
         {heroVideo ? (
           <video src={heroVideo.videoUrl} autoPlay muted loop playsInline preload="auto" />
@@ -130,10 +119,20 @@ export default function Welcome() {
 
       {introActive ? (
         <div className="official-intro" role="dialog" aria-label="Official platform introduction">
+          <div className={introVideoFailed ? "official-intro-video failed" : "official-intro-video"} aria-hidden="true">
+            {!introVideoFailed ? (
+              <video
+                ref={introVideoRef}
+                src={introVideoSrc}
+                playsInline
+                muted
+                preload="auto"
+                onError={() => setIntroVideoFailed(true)}
+              />
+            ) : null}
+          </div>
+          <div className="official-intro-overlay" aria-hidden="true" />
           <div className="official-intro-bg" aria-hidden="true">
-            <span />
-            <span />
-            <span />
             <i />
             <i />
           </div>
@@ -148,9 +147,9 @@ export default function Welcome() {
               <span>KR</span>
             </div>
             <div className="intro-copy-sequence">
-              <span>Official Membership Access</span>
-              <span>Premium Digital Membership Cards</span>
-              <span>Exclusive recognition for dedicated supporters</span>
+              <span>Premium Membership Access</span>
+              <span>Digital Membership Cards</span>
+              <span>Created for dedicated supporters worldwide</span>
             </div>
             <strong>Choose your membership. Grab yours now.</strong>
           </div>

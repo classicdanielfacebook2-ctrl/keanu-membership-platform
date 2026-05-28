@@ -5299,8 +5299,49 @@ textarea {
   animation: introSceneIn 520ms ease both;
 }
 
+.official-intro-video,
+.official-intro-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.official-intro-video {
+  opacity: 0;
+  background:
+    radial-gradient(circle at 24% 22%, rgba(244, 216, 139, 0.16), transparent 22rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.055), transparent 30%),
+    #030303;
+  animation: introVideoReveal 900ms ease 220ms forwards;
+}
+
+.official-intro-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.78) contrast(1.14) brightness(0.72);
+  transform: scale(1.06);
+  animation: introVideoZoom 7.2s ease-out forwards;
+}
+
+.official-intro-video.failed {
+  opacity: 1;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(244, 216, 139, 0.2), transparent 20rem),
+    radial-gradient(circle at 78% 30%, rgba(198, 199, 194, 0.08), transparent 24rem),
+    linear-gradient(115deg, rgba(255, 255, 255, 0.04), transparent 40%),
+    #030303;
+}
+
+.official-intro-overlay {
+  z-index: 1;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.88), rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.86)),
+    radial-gradient(circle at 50% 42%, transparent 0 18%, rgba(0, 0, 0, 0.5) 64%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.92));
+}
+
 .official-intro-bg,
-.official-intro-bg span,
 .official-intro-bg i {
   position: absolute;
   inset: 0;
@@ -5308,6 +5349,7 @@ textarea {
 }
 
 .official-intro-bg {
+  z-index: 2;
   overflow: hidden;
 }
 
@@ -5319,33 +5361,6 @@ textarea {
     linear-gradient(90deg, rgba(244, 216, 139, 0.06), transparent 18%, transparent 82%, rgba(244, 216, 139, 0.055)),
     radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.74) 76%);
   animation: introVignette 7s ease-in-out both;
-}
-
-.official-intro-bg span {
-  width: 0.28rem;
-  height: 0.28rem;
-  border-radius: 999px;
-  background: rgba(244, 216, 139, 0.74);
-  box-shadow: 0 0 1.2rem rgba(244, 216, 139, 0.58);
-  opacity: 0;
-  animation: introParticle 5.8s ease-in-out infinite;
-}
-
-.official-intro-bg span:nth-child(1) {
-  left: 18%;
-  top: 62%;
-}
-
-.official-intro-bg span:nth-child(2) {
-  left: 72%;
-  top: 24%;
-  animation-delay: 0.65s;
-}
-
-.official-intro-bg span:nth-child(3) {
-  left: 82%;
-  top: 70%;
-  animation-delay: 1.35s;
 }
 
 .official-intro-bg i {
@@ -5410,7 +5425,7 @@ textarea {
 
 .official-intro-content {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   display: grid;
   justify-items: center;
   gap: clamp(1.1rem, 3vw, 1.65rem);
@@ -5536,18 +5551,15 @@ textarea {
   }
 }
 
-@keyframes introParticle {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 2rem, 0) scale(0.7);
+@keyframes introVideoReveal {
+  to {
+    opacity: 1;
   }
-  35%,
-  70% {
-    opacity: 0.74;
-  }
-  100% {
-    opacity: 0;
-    transform: translate3d(2rem, -6rem, 0) scale(1.25);
+}
+
+@keyframes introVideoZoom {
+  to {
+    transform: scale(1);
   }
 }
 
