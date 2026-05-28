@@ -5139,6 +5139,7 @@ textarea {
 .welcome-media {
   opacity: 0.46;
   filter: saturate(0.82) contrast(1.08);
+  transition: transform 900ms cubic-bezier(0.16, 0.78, 0.24, 1), filter 900ms ease, opacity 900ms ease;
 }
 
 .welcome-media video,
@@ -5284,6 +5285,12 @@ textarea {
   animation: welcomeContentExit 760ms cubic-bezier(0.6, 0, 0.24, 1) forwards;
 }
 
+.welcome-landing.entering .welcome-media {
+  opacity: 0.62;
+  filter: saturate(0.92) contrast(1.16) brightness(0.8);
+  transform: scale(1.08);
+}
+
 .official-intro {
   position: fixed;
   inset: 0;
@@ -5320,8 +5327,8 @@ textarea {
   height: 100%;
   object-fit: cover;
   filter: saturate(0.78) contrast(1.14) brightness(0.72);
-  transform: scale(1.06);
-  animation: introVideoZoom 7.2s ease-out forwards;
+  transform: scale(1.12);
+  animation: introVideoZoom 29s ease-out forwards;
 }
 
 .official-intro-video.failed {
@@ -5342,6 +5349,7 @@ textarea {
 }
 
 .official-intro-bg,
+.official-intro-bg span,
 .official-intro-bg i {
   position: absolute;
   inset: 0;
@@ -5361,6 +5369,39 @@ textarea {
     linear-gradient(90deg, rgba(244, 216, 139, 0.06), transparent 18%, transparent 82%, rgba(244, 216, 139, 0.055)),
     radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.74) 76%);
   animation: introVignette 7s ease-in-out both;
+}
+
+.official-intro-bg span {
+  width: 0.24rem;
+  height: 0.24rem;
+  border-radius: 999px;
+  background: rgba(244, 216, 139, 0.72);
+  box-shadow: 0 0 1.2rem rgba(244, 216, 139, 0.55);
+  opacity: 0;
+  animation: premiumDust 9s ease-in-out infinite;
+}
+
+.official-intro-bg span:nth-child(1) {
+  left: 12%;
+  top: 62%;
+}
+
+.official-intro-bg span:nth-child(2) {
+  left: 34%;
+  top: 24%;
+  animation-delay: 1.4s;
+}
+
+.official-intro-bg span:nth-child(3) {
+  left: 72%;
+  top: 68%;
+  animation-delay: 2.8s;
+}
+
+.official-intro-bg span:nth-child(4) {
+  left: 86%;
+  top: 32%;
+  animation-delay: 4.2s;
 }
 
 .official-intro-bg i {
@@ -5436,8 +5477,8 @@ textarea {
 .intro-logo-reveal {
   position: relative;
   display: grid;
-  width: clamp(6.4rem, 18vw, 11rem);
-  height: clamp(6.4rem, 18vw, 11rem);
+  width: clamp(5.4rem, 14vw, 8.5rem);
+  height: clamp(5.4rem, 14vw, 8.5rem);
   place-items: center;
   border: 1px solid rgba(244, 216, 139, 0.52);
   border-radius: 50%;
@@ -5446,7 +5487,6 @@ textarea {
     linear-gradient(145deg, rgba(244, 216, 139, 0.15), rgba(0, 0, 0, 0.72)),
     #080705;
   box-shadow: 0 0 4rem rgba(244, 216, 139, 0.16), inset 0 0 1.4rem rgba(244, 216, 139, 0.08);
-  animation: introLogoReveal 1.35s cubic-bezier(0.16, 0.78, 0.24, 1) both;
 }
 
 .intro-logo-reveal::before {
@@ -5458,6 +5498,17 @@ textarea {
   animation: introLogoRing 2.4s ease-in-out infinite;
 }
 
+.intro-logo-reveal::after {
+  content: "";
+  position: absolute;
+  inset: 0.5rem;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 20%, rgba(255, 248, 219, 0.28) 48%, transparent 72%);
+  opacity: 0;
+  transform: translateX(-120%) rotate(18deg);
+  animation: logoGoldSweep 4.2s ease-in-out infinite;
+}
+
 .intro-logo-reveal span {
   color: #f5dc91;
   font-family: "Playfair Display", Georgia, serif;
@@ -5467,31 +5518,25 @@ textarea {
   text-shadow: 0 0 2rem rgba(244, 216, 139, 0.28);
 }
 
-.intro-copy-sequence {
+.intro-scene-window {
   display: grid;
-  gap: 0.55rem;
+  min-height: clamp(8rem, 24vw, 15rem);
+  place-items: center;
+  width: min(100%, 64rem);
 }
 
-.intro-copy-sequence span {
+.intro-scene-title {
+  display: block;
   color: rgba(255, 249, 235, 0.9);
   font-family: "Playfair Display", Georgia, serif;
-  font-size: clamp(1.55rem, 5vw, 3.4rem);
-  line-height: 1.02;
-  opacity: 0;
-  transform: translateY(0.9rem);
-  animation: introTextReveal 1.3s ease forwards;
-}
-
-.intro-copy-sequence span:nth-child(1) {
-  animation-delay: 1.05s;
-}
-
-.intro-copy-sequence span:nth-child(2) {
-  animation-delay: 2.45s;
-}
-
-.intro-copy-sequence span:nth-child(3) {
-  animation-delay: 3.85s;
+  font-size: clamp(2rem, 7vw, 6.2rem);
+  font-weight: 800;
+  letter-spacing: clamp(0.02em, 0.7vw, 0.12em);
+  line-height: 0.96;
+  max-width: 14ch;
+  text-wrap: balance;
+  text-transform: uppercase;
+  text-shadow: 0 0 3rem rgba(244, 216, 139, 0.22);
 }
 
 .official-intro-content strong {
@@ -5503,10 +5548,8 @@ textarea {
   font-size: clamp(0.85rem, 2vw, 1.02rem);
   letter-spacing: 0.11em;
   line-height: 1.4;
-  opacity: 0;
   padding: 0.72rem 1rem;
   text-transform: uppercase;
-  animation: introFinalCall 1s ease 5.2s forwards;
 }
 
 @keyframes welcomeReveal {
@@ -5563,6 +5606,21 @@ textarea {
   }
 }
 
+@keyframes premiumDust {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 3rem, 0) scale(0.55);
+  }
+  30%,
+  68% {
+    opacity: 0.58;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(1.6rem, -8rem, 0) scale(1.35);
+  }
+}
+
 @keyframes introLightStreak {
   0% {
     opacity: 0;
@@ -5599,6 +5657,21 @@ textarea {
   50% {
     opacity: 0.9;
     transform: scale(1.08);
+  }
+}
+
+@keyframes logoGoldSweep {
+  0%,
+  58% {
+    opacity: 0;
+    transform: translateX(-120%) rotate(18deg);
+  }
+  70% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(120%) rotate(18deg);
   }
 }
 
@@ -5645,12 +5718,13 @@ textarea {
     padding: 1rem;
   }
 
-  .intro-copy-sequence {
-    gap: 0.72rem;
+  .intro-scene-window {
+    min-height: 12rem;
   }
 
-  .intro-copy-sequence span {
-    font-size: clamp(1.35rem, 8vw, 2.15rem);
+  .intro-scene-title {
+    font-size: clamp(1.8rem, 11vw, 3.4rem);
+    max-width: 10ch;
   }
 
   .official-intro-content strong {
