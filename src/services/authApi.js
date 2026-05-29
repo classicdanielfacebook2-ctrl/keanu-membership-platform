@@ -35,6 +35,11 @@ export const register = (payload) =>
     method: "POST",
     body: JSON.stringify(payload)
   });
+export const bootstrapAdmin = (payload) =>
+  authRequest("/api/auth/bootstrap-admin", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 export const verifyOtp = (payload) =>
   authRequest("/api/auth/verify-otp", {
     method: "POST",

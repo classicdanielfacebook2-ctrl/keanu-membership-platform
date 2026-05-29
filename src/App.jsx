@@ -23,6 +23,7 @@ import PaymentCancelled from "./pages/PaymentCancelled.jsx";
 import Support from "./pages/Support.jsx";
 import Admin from "./pages/Admin.jsx";
 import SupportAdmin from "./pages/SupportAdmin.jsx";
+import AdminSetup from "./pages/AdminSetup.jsx";
 import ProtectionCenter from "./pages/ProtectionCenter.jsx";
 import ProtectionAdmin from "./pages/ProtectionAdmin.jsx";
 import PolicyPage from "./pages/PolicyPage.jsx";
@@ -161,6 +162,7 @@ export default function App() {
           <Route path="/payment-cancelled" element={<PaymentCancelled />} />
           <Route path="/support" element={<Support />} />
           <Route path="/protection" element={<ProtectionCenter />} />
+          <Route path="/admin/setup" element={<AdminSetup />} />
           <Route
             path="/admin"
             element={

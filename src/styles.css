@@ -6776,6 +6776,32 @@ body::after {
   animation: spin 800ms linear infinite;
 }
 
+.admin-setup-page {
+  min-height: calc(100dvh - 6rem);
+}
+
+.admin-setup-card {
+  max-width: 31rem;
+}
+
+.admin-setup-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid rgba(244, 216, 139, 0.18);
+  border-radius: 14px;
+  background: rgba(244, 216, 139, 0.055);
+  color: rgba(245, 239, 225, 0.76);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  padding: 0.85rem 0.9rem;
+}
+
+.admin-setup-notice svg {
+  flex: 0 0 auto;
+  color: var(--gold-light);
+}
+
 .site-footer {
   align-items: flex-start;
   gap: 2rem;

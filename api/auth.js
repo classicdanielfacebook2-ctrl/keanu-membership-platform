@@ -160,6 +160,79 @@ async function register(req, res) {
   });
 }
 
+async function bootstrapAdmin(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+
+  const expectedToken = process.env.ADMIN_SETUP_TOKEN;
+  if (!expectedToken) {
+    console.error("[auth/bootstrap-admin]", { message: "ADMIN_SETUP_TOKEN is not configured." });
+    return sendJson(res, 500, {
+      error: "Admin setup is not configured. Add ADMIN_SETUP_TOKEN in Vercel environment variables."
+    });
+  }
+
+  const setupToken = String(req.body?.setupToken || "");
+  if (setupToken !== expectedToken) {
+    return sendJson(res, 403, { error: "Invalid admin setup token." });
+  }
+
+  const fullName = String(req.body?.fullName || "Management Admin").trim();
+  const email = normalizeAuthIdentifier(req.body?.email);
+  const password = String(req.body?.password || "");
+
+  if (!fullName || !isEmailIdentifier(email) || password.length < 12) {
+    return sendJson(res, 400, {
+      error: "Full name, a valid email address, and a password of at least 12 characters are required."
+    });
+  }
+
+  const users = await getUsersCollection();
+  const existingAdmin = await users.findOne({ role: "admin" });
+  if (existingAdmin) {
+    return sendJson(res, 409, { error: "An admin account already exists. Sign in with that account." });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const existingUser = await users.findOne({ $or: [{ identifier: email }, { email }] });
+
+  if (existingUser) {
+    await users.updateOne(
+      { _id: existingUser._id },
+      {
+        $set: {
+          fullName,
+          identifier: email,
+          email,
+          passwordHash,
+          role: "admin",
+          verified: true,
+          isVerified: true,
+          updatedAt: new Date()
+        }
+      }
+    );
+    const adminUser = await users.findOne({ _id: existingUser._id });
+    setSessionCookie(res, signToken(adminUser));
+    return sendJson(res, 200, { user: publicUser(adminUser), message: "Admin account activated." });
+  }
+
+  const result = await users.insertOne({
+    fullName,
+    identifier: email,
+    email,
+    phone: "",
+    phoneCountry: "",
+    passwordHash,
+    role: "admin",
+    verified: true,
+    isVerified: true,
+    createdAt: new Date()
+  });
+  const adminUser = await users.findOne({ _id: result.insertedId });
+  setSessionCookie(res, signToken(adminUser));
+  return sendJson(res, 201, { user: publicUser(adminUser), message: "Admin account created." });
+}
+
 async function verifyOtp(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
 
@@ -321,6 +394,7 @@ async function supabaseResetPassword(req, res) {
 }
 
 const handlers = {
+  "bootstrap-admin": bootstrapAdmin,
   "forgot-password": forgotPassword,
   login,
   logout,
