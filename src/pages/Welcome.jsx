@@ -1,4 +1,4 @@
-import { ArrowRight, Volume2, VolumeX } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -6,13 +6,10 @@ import { getApprovedHomeImages } from "../data/homeImages.js";
 import { getApprovedHomeVideos } from "../data/homeVideos.js";
 
 const introScenes = [
-  "WELCOME TO THE OFFICIAL PLATFORM",
-  "A PRIVATE EXPERIENCE FOR TRUE SUPPORTERS",
-  "EXCLUSIVE MEMBERSHIP ACCESS",
-  "LIVE EVENTS • VIP BENEFITS • PREMIUM EXPERIENCE",
-  "CONNECT • SUPPORT • EXPERIENCE",
-  "THIS IS MORE THAN A MEMBERSHIP",
-  "WELCOME TO KR GLOBAL"
+  { lead: "OFFICIAL", highlight: "MEMBERSHIP ACCESS" },
+  { lead: "PRIVATE DIGITAL", highlight: "MEMBERSHIP CARDS" },
+  { lead: "CREATED FOR", highlight: "DEDICATED SUPPORTERS" },
+  { lead: "GRAB YOUR", highlight: "MEMBERSHIP NOW" }
 ];
 
 export default function Welcome() {
@@ -20,14 +17,10 @@ export default function Welcome() {
   const [entering, setEntering] = useState(false);
   const [introActive, setIntroActive] = useState(false);
   const [introScene, setIntroScene] = useState(0);
-  const [muted, setMuted] = useState(false);
   const [introVideoFailed, setIntroVideoFailed] = useState(false);
   const introVideoRef = useRef(null);
-  const introAudioRef = useRef(null);
-  const voiceRef = useRef(null);
   const timersRef = useRef([]);
-  const introVideoSrc = "/intro/keanu-intro.mp4";
-  const introAudioSrc = "/audio/intro-sound.mp3";
+  const introVideoSrc = "/intro/intro-video.mp4";
   const heroImage = getApprovedHomeImages().find((image) => image.id === "official-portrait" || image.id === "press-photo");
   const heroVideo = getApprovedHomeVideos().find((video) => video.isDirectVideo);
 
@@ -36,24 +29,8 @@ export default function Welcome() {
     timersRef.current = [];
   };
 
-  const stopIntroAudio = () => {
-    if (introAudioRef.current) {
-      introAudioRef.current.pause();
-      introAudioRef.current.currentTime = 0;
-    }
-  };
-
-  const stopNarration = () => {
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-    voiceRef.current = null;
-  };
-
   useEffect(() => () => {
     clearIntroTimers();
-    stopIntroAudio();
-    stopNarration();
   }, []);
 
   useEffect(() => {
@@ -65,83 +42,21 @@ export default function Welcome() {
       introVideoRef.current.play().catch(() => setIntroVideoFailed(true));
     }
 
-    if (introAudioRef.current) {
-      introAudioRef.current.volume = 0.55;
-      introAudioRef.current.muted = muted;
-      introAudioRef.current.play().catch(() => {});
-    }
-
     introScenes.forEach((_, index) => {
       if (index === 0) return;
-      timersRef.current.push(window.setTimeout(() => setIntroScene(index), index * 3600));
+      timersRef.current.push(window.setTimeout(() => setIntroScene(index), index * 1450));
     });
 
     timersRef.current.push(
       window.setTimeout(() => {
-        stopIntroAudio();
-        stopNarration();
         navigate("/home");
-      }, 28600)
+      }, 6500)
     );
   }, [introActive, navigate]);
-
-  useEffect(() => {
-    if (introAudioRef.current) {
-      introAudioRef.current.muted = muted;
-    }
-  }, [muted]);
-
-  const playIntroAudio = () => {
-    if (!introAudioRef.current) return;
-    introAudioRef.current.currentTime = 0;
-    introAudioRef.current.volume = 0.55;
-    introAudioRef.current.muted = muted;
-    introAudioRef.current.play().catch(() => {});
-  };
-
-  const playClickSound = () => {
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext || muted) return;
-      const context = new AudioContext();
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = "triangle";
-      oscillator.frequency.setValueAtTime(720, context.currentTime);
-      oscillator.frequency.exponentialRampToValueAtTime(180, context.currentTime + 0.18);
-      gain.gain.setValueAtTime(0.0001, context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.025);
-      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.24);
-      oscillator.connect(gain);
-      gain.connect(context.destination);
-      oscillator.start();
-      oscillator.stop(context.currentTime + 0.26);
-      window.setTimeout(() => context.close().catch(() => {}), 420);
-    } catch {
-      // Sound is decorative; ignore unavailable audio APIs.
-    }
-  };
-
-  const playNarration = (force = false) => {
-    if ((!force && muted) || !("speechSynthesis" in window)) return;
-    stopNarration();
-    const narration = new SpeechSynthesisUtterance(`${introScenes.join(". ")}. Choose your membership. Grab yours now.`);
-    narration.rate = 0.78;
-    narration.pitch = 0.82;
-    narration.volume = 0.82;
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find((voice) => /male|david|mark|daniel|english/i.test(`${voice.name} ${voice.lang}`));
-    if (preferredVoice) narration.voice = preferredVoice;
-    voiceRef.current = narration;
-    window.speechSynthesis.speak(narration);
-  };
 
   const enterPlatform = () => {
     if (entering) return;
     setEntering(true);
-    playClickSound();
-    playIntroAudio();
-    playNarration();
 
     timersRef.current.push(
       window.setTimeout(() => setIntroActive(true), 760)
@@ -150,30 +65,11 @@ export default function Welcome() {
 
   const skipIntro = () => {
     clearIntroTimers();
-    stopIntroAudio();
-    stopNarration();
     navigate("/home");
-  };
-
-  const toggleMute = () => {
-    setMuted((current) => {
-      const next = !current;
-      if (introAudioRef.current) {
-        introAudioRef.current.muted = next;
-        if (!next && introActive) {
-          introAudioRef.current.play().catch(() => {});
-          playNarration(true);
-        } else if (next) {
-          stopNarration();
-        }
-      }
-      return next;
-    });
   };
 
   return (
     <section className={entering ? "welcome-landing entering" : "welcome-landing"} aria-label="Official website welcome">
-      <audio ref={introAudioRef} src={introAudioSrc} preload="auto" onError={() => {}} />
       <div className="welcome-media" aria-hidden="true">
         {heroVideo ? (
           <video src={heroVideo.videoUrl} autoPlay muted loop playsInline preload="auto" />
@@ -206,6 +102,7 @@ export default function Welcome() {
                 src={introVideoSrc}
                 playsInline
                 muted
+                loop
                 preload="auto"
                 onError={() => setIntroVideoFailed(true)}
               />
@@ -220,9 +117,6 @@ export default function Welcome() {
             <i />
             <i />
           </div>
-          <button className="intro-audio-toggle" type="button" onClick={toggleMute} aria-label={muted ? "Unmute intro audio" : "Mute intro audio"}>
-            {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
-          </button>
           <button className="intro-skip-button" type="button" onClick={skipIntro}>
             Skip Intro
           </button>
@@ -239,20 +133,22 @@ export default function Welcome() {
             <div className="intro-scene-window">
               <AnimatePresence mode="wait">
                 <motion.span
-                  key={introScenes[introScene]}
+                  key={`${introScenes[introScene].lead}-${introScenes[introScene].highlight}`}
                   className="intro-scene-title"
-                  initial={{ opacity: 0, y: 26, scale: 0.96, filter: "blur(14px)" }}
-                  animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -22, scale: 1.025, filter: "blur(12px)" }}
-                  transition={{ duration: 0.95, ease: [0.16, 0.78, 0.24, 1] }}
+                  initial={{ "--reveal": "0%", opacity: 0, y: 18 }}
+                  animate={{ "--reveal": "100%", opacity: 1, y: 0 }}
+                  exit={{ "--reveal": "100%", opacity: 0, y: -12 }}
+                  transition={{ duration: 0.78, ease: [0.16, 0.78, 0.24, 1] }}
                 >
-                  {introScenes[introScene]}
+                  <span>{introScenes[introScene].lead}</span>
+                  <strong>{introScenes[introScene].highlight}</strong>
                 </motion.span>
               </AnimatePresence>
             </div>
             <motion.strong
+              className="intro-final-call"
               initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: introScene >= 5 ? 1 : 0, y: introScene >= 5 ? 0 : 16 }}
+              animate={{ opacity: introScene >= 3 ? 1 : 0, y: introScene >= 3 ? 0 : 16 }}
               transition={{ duration: 0.75, ease: "easeOut" }}
             >
               Choose your membership. Grab yours now.

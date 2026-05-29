@@ -5238,6 +5238,16 @@ textarea {
   transition: transform 220ms ease, box-shadow 260ms ease, opacity 260ms ease;
 }
 
+.welcome-enter-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(110deg, transparent 0%, rgba(255, 248, 221, 0.62) 42%, rgba(244, 216, 139, 0.3) 52%, transparent 70%);
+  opacity: 0;
+  transform: translateX(-120%) skewX(-18deg);
+}
+
 .welcome-enter-button::after {
   content: "";
   position: absolute;
@@ -5262,9 +5272,13 @@ textarea {
 }
 
 .welcome-landing.entering .welcome-enter-button {
-  transform: translateY(3px) scale(0.985);
+  transform: translateY(4px) scale(0.972);
   box-shadow: 0 0 4rem rgba(244, 216, 139, 0.42), 0 1.4rem 3rem rgba(0, 0, 0, 0.42);
   pointer-events: none;
+}
+
+.welcome-landing.entering .welcome-enter-button::before {
+  animation: buttonGoldSweep 760ms cubic-bezier(0.16, 0.78, 0.24, 1) forwards;
 }
 
 .welcome-landing.entering .welcome-enter-button::after {
@@ -5328,7 +5342,7 @@ textarea {
   object-fit: cover;
   filter: saturate(0.78) contrast(1.14) brightness(0.72);
   transform: scale(1.12);
-  animation: introVideoZoom 29s ease-out forwards;
+  animation: introVideoZoom 6.6s ease-out forwards;
 }
 
 .official-intro-video.failed {
@@ -5526,7 +5540,8 @@ textarea {
 }
 
 .intro-scene-title {
-  display: block;
+  display: grid;
+  gap: clamp(0.18rem, 0.8vw, 0.55rem);
   color: rgba(255, 249, 235, 0.9);
   font-family: "Playfair Display", Georgia, serif;
   font-size: clamp(2rem, 7vw, 6.2rem);
@@ -5539,7 +5554,25 @@ textarea {
   text-shadow: 0 0 3rem rgba(244, 216, 139, 0.22);
 }
 
-.official-intro-content strong {
+.intro-scene-title span,
+.intro-scene-title strong {
+  display: block;
+  clip-path: inset(0 calc(100% - var(--reveal, 100%)) 0 0);
+}
+
+.intro-scene-title span {
+  color: rgba(255, 249, 235, 0.86);
+}
+
+.intro-scene-title strong {
+  background: linear-gradient(100deg, #fff8e4 0%, #f4d88b 36%, #b8893c 70%, #fff0bd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 2rem rgba(244, 216, 139, 0.16);
+}
+
+.intro-final-call {
   display: inline-flex;
   border: 1px solid rgba(244, 216, 139, 0.3);
   border-radius: 999px;
@@ -5570,6 +5603,21 @@ textarea {
     opacity: 0;
     transform: translateY(-1.1rem) scale(0.985);
     filter: blur(10px);
+  }
+}
+
+@keyframes buttonGoldSweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  30%,
+  70% {
+    opacity: 0.82;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(120%) skewX(-18deg);
   }
 }
 
@@ -5727,7 +5775,7 @@ textarea {
     max-width: 10ch;
   }
 
-  .official-intro-content strong {
+  .intro-final-call {
     width: min(100%, 21rem);
     justify-content: center;
     border-radius: 14px;
