@@ -63,6 +63,39 @@ const paymentMethodIcons = {
   ideal: Globe2
 };
 
+const membershipExperienceFeatures = [
+  {
+    number: "01",
+    title: "Official Recognition",
+    copy: "Your membership card gives you a unique member identity and confirms your place within the official membership platform."
+  },
+  {
+    number: "02",
+    title: "Premium Digital Access",
+    copy: "Receive access to a refined digital membership experience created for serious supporters worldwide."
+  },
+  {
+    number: "03",
+    title: "Priority Support",
+    copy: "Members receive guided assistance, account support, and faster responses through the official support channel."
+  },
+  {
+    number: "04",
+    title: "Exclusive Updates",
+    copy: "Stay connected with selected membership updates, announcements, and platform information before the general public."
+  },
+  {
+    number: "05",
+    title: "Member Identity",
+    copy: "Each membership includes a unique reference/member ID, helping identify your selected access level clearly and professionally."
+  },
+  {
+    number: "06",
+    title: "Limited Membership Access",
+    copy: "Membership availability may be limited by tier, review status, and platform approval. Choose your card while access is available."
+  }
+];
+
 function ReviewSummaryCard({ title, items }) {
   return (
     <article className="review-summary-card">
@@ -355,6 +388,27 @@ export default function Apply() {
         <form className="form-panel step-form conversion-panel" onSubmit={(event) => event.preventDefault()}>
           {step === 0 ? (
             <div className="select-card-step application-step-anchor" ref={membershipRef}>
+              <section className="why-join-section" aria-labelledby="membership-experience-title">
+                <div className="why-join-heading">
+                  <span className="eyebrow">The Membership Experience</span>
+                  <h3 id="membership-experience-title">More Than a Card. A Private Membership Experience.</h3>
+                  <p>
+                    This membership is designed for dedicated supporters who want a more personal, premium, and recognized connection
+                    to the official platform. Each card represents access, identity, priority support, and a place within an exclusive
+                    digital membership community.
+                  </p>
+                </div>
+                <div className="why-join-grid">
+                  {membershipExperienceFeatures.map((feature) => (
+                    <article className="why-join-card" key={feature.number}>
+                      <span className="why-join-number">{feature.number}</span>
+                      <h4>{feature.title}</h4>
+                      <p>{feature.copy}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
               <div className="vip-membership-grid">
                 {cardTypes.map((card) => (
                   <button
