@@ -388,27 +388,6 @@ export default function Apply() {
         <form className="form-panel step-form conversion-panel" onSubmit={(event) => event.preventDefault()}>
           {step === 0 ? (
             <div className="select-card-step application-step-anchor" ref={membershipRef}>
-              <section className="why-join-section" aria-labelledby="membership-experience-title">
-                <div className="why-join-heading">
-                  <span className="eyebrow">The Membership Experience</span>
-                  <h3 id="membership-experience-title">More Than a Card. A Private Membership Experience.</h3>
-                  <p>
-                    This membership is designed for dedicated supporters who want a more personal, premium, and recognized connection
-                    to the official platform. Each card represents access, identity, priority support, and a place within an exclusive
-                    digital membership community.
-                  </p>
-                </div>
-                <div className="why-join-grid">
-                  {membershipExperienceFeatures.map((feature) => (
-                    <article className="why-join-card" key={feature.number}>
-                      <span className="why-join-number">{feature.number}</span>
-                      <h4>{feature.title}</h4>
-                      <p>{feature.copy}</p>
-                    </article>
-                  ))}
-                </div>
-              </section>
-
               <div className="vip-membership-grid">
                 {cardTypes.map((card) => (
                   <button
@@ -732,6 +711,29 @@ export default function Apply() {
               <span className="payment-method-required">Select a payment method to continue.</span>
             )}
           </div>
+
+          {step === 0 ? (
+            <section className="why-join-section" aria-labelledby="membership-experience-title">
+              <div className="why-join-heading">
+                <span className="eyebrow">The Membership Experience</span>
+                <h3 id="membership-experience-title">More Than a Card. A Private Membership Experience.</h3>
+                <p>
+                  This membership is designed for dedicated supporters who want a more personal, premium, and recognized connection
+                  to the official platform. Each card represents access, identity, priority support, and a place within an exclusive
+                  digital membership community.
+                </p>
+              </div>
+              <div className="why-join-grid">
+                {membershipExperienceFeatures.map((feature) => (
+                  <article className="why-join-card" key={feature.number}>
+                    <span className="why-join-number">{feature.number}</span>
+                    <h4>{feature.title}</h4>
+                    <p>{feature.copy}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </form>
       </div>
 
