@@ -18,6 +18,7 @@ import {
   Users
 } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
+import { getBankTransferRegion } from "../data/bankTransferRegions.js";
 import { cardTypes } from "../data/cards.js";
 import {
   checkoutPaymentOptions,
@@ -140,6 +141,7 @@ export default function Apply() {
 
   const selectedCard = cardTypes.find((card) => card.id === form.selectedCard) || null;
   const selectedPaymentMethod = form.paymentMethod ? getPaymentMethod(form.paymentMethod) : null;
+  const bankTransferRegion = getBankTransferRegion(form.countryCode);
   const finalStateRegion = form.stateCode === "__manual_state__" ? form.manualStateRegion.trim() : form.stateRegion;
   const finalCity = form.city === "__manual__" ? form.manualCity.trim() : form.city;
   const selectedAmount = selectedCard ? convertEurCents(selectedCard.priceAmountCents, form.paymentCurrency) : 0;
@@ -224,7 +226,7 @@ export default function Apply() {
     setPaymentAvailabilityLoading(true);
     setCheckoutError(null);
 
-    getAvailableCheckoutPaymentMethods(form.paymentCurrency)
+    getAvailableCheckoutPaymentMethods(form.paymentCurrency, form.countryCode)
       .then((data) => {
         if (!active) return;
         const enabled = Array.isArray(data.enabledPaymentMethods) && data.enabledPaymentMethods.length ? data.enabledPaymentMethods : ["card"];
@@ -243,7 +245,7 @@ export default function Apply() {
     return () => {
       active = false;
     };
-  }, [auth.isAuthenticated, form.paymentCurrency, step]);
+  }, [auth.isAuthenticated, form.countryCode, form.paymentCurrency, step]);
 
   useEffect(() => {
     if (!auth.user) return;
@@ -262,8 +264,24 @@ export default function Apply() {
   const updateField = (field, value) => {
     if (field === "paymentMethod") setCheckoutError(null);
     setForm((current) => {
+      if (field === "paymentMethod" && value === "bank_transfer") {
+        const region = getBankTransferRegion(current.countryCode);
+        return { ...current, paymentMethod: value, paymentCurrency: region?.currency?.toUpperCase() || current.paymentCurrency };
+      }
       if (field === "countryCode") {
-        return { ...current, countryCode: value.code, country: value.name, stateCode: "", stateRegion: "", manualStateRegion: "", city: "", manualCity: "" };
+        const nextRegion = getBankTransferRegion(value.code);
+        return {
+          ...current,
+          countryCode: value.code,
+          country: value.name,
+          stateCode: "",
+          stateRegion: "",
+          manualStateRegion: "",
+          city: "",
+          manualCity: "",
+          paymentMethod: current.paymentMethod === "bank_transfer" && !nextRegion ? "card" : current.paymentMethod,
+          paymentCurrency: current.paymentMethod === "bank_transfer" && nextRegion ? nextRegion.currency.toUpperCase() : current.paymentCurrency
+        };
       }
       if (field === "stateCode") {
         return { ...current, stateCode: value.code, stateRegion: value.name, manualStateRegion: "", city: "", manualCity: "" };
@@ -361,6 +379,7 @@ export default function Apply() {
         fullName: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
+        countryCode: form.countryCode,
         country: form.country.trim(),
         stateRegion: finalStateRegion,
         city: finalCity,
@@ -369,14 +388,14 @@ export default function Apply() {
         selectedCard: selectedCard.id,
         paymentMethod: form.paymentMethod,
         paymentMethodLabel: selectedPaymentMethod.title,
-        paymentCurrency: form.paymentCurrency,
+        paymentCurrency: form.paymentMethod === "bank_transfer" && bankTransferRegion ? bankTransferRegion.currency.toUpperCase() : form.paymentCurrency,
         paymentAmount: formattedAmount
       });
 
       sessionStorage.setItem("pendingStripeApplicationId", saved.id);
       sessionStorage.removeItem("pendingMembershipCard");
       sessionStorage.removeItem("pendingMembershipAction");
-      const session = await createCheckoutSession(saved, form.paymentMethod, form.paymentCurrency);
+      const session = await createCheckoutSession(saved, form.paymentMethod, saved.paymentCurrency);
       if (!session.url) throw new Error("Stripe checkout URL was not returned.");
       clearApplicationDraft();
       console.info("[checkout/redirect]", {

@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { ObjectId } from "mongodb";
+import { getBankTransferRegion } from "../src/data/bankTransferRegions.js";
 import { cardTypes } from "../src/data/cards.js";
 import { getMongoDatabase } from "./authCore.js";
 
@@ -85,6 +86,9 @@ const normalizeCurrency = (value = "eur") => {
   return supportedCurrencies.includes(currency) ? currency : "eur";
 };
 
+const getApplicationCountryCode = (application = {}) =>
+  String(application.countryCode || application.countryIso || application.countryISO || "").trim().toUpperCase();
+
 const convertPlanAmount = (plan, currency) => {
   const rate = currencyRatesFromEur[currency] || 1;
   const converted = plan.priceAmountCents * rate;
@@ -122,14 +126,19 @@ const getDefaultPaymentMethodConfiguration = async (stripe) => {
   }
 };
 
-export const getEnabledCheckoutPaymentMethodIds = async ({ currency = "eur" } = {}) => {
+export const getEnabledCheckoutPaymentMethodIds = async ({ currency = "eur", countryCode = "" } = {}) => {
   const stripe = getStripe();
   const selectedCurrency = normalizeCurrency(currency);
   const configuration = await getDefaultPaymentMethodConfiguration(stripe);
+  const bankTransferRegion = getBankTransferRegion(countryCode);
 
   return checkoutMethodIds.filter((methodId) => {
     const config = paymentMethodConfig[methodId];
     if (!config) return false;
+    if (methodId === "bank_transfer") {
+      if (!bankTransferRegion) return false;
+      return isConfigMethodEnabled(configuration, methodId);
+    }
     if (config.currencies && !config.currencies.includes(selectedCurrency)) return false;
     return isConfigMethodEnabled(configuration, methodId);
   });
@@ -216,15 +225,10 @@ const ensureStripeCustomer = async ({ stripe, user, application }) => {
   return customer.id;
 };
 
-const getBankTransferOptions = () => ({
+const getBankTransferOptions = (region) => ({
   customer_balance: {
     funding_type: "bank_transfer",
-    bank_transfer: {
-      type: "eu_bank_transfer",
-      eu_bank_transfer: {
-        country: process.env.STRIPE_EU_BANK_TRANSFER_COUNTRY || "DE"
-      }
-    }
+    bank_transfer: region.stripeOptions
   }
 });
 
@@ -299,7 +303,15 @@ const recordCheckoutSession = async ({
 const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, payments, applicationId, user, application }) => {
   const paymentMethodId = "bank_transfer";
   const paymentConfig = paymentMethodConfig[paymentMethodId];
-  const selectedCurrency = "eur";
+  const bankTransferRegion = getBankTransferRegion(getApplicationCountryCode(application));
+  if (!bankTransferRegion) {
+    const error = new Error("This payment method is currently unavailable.");
+    error.status = 400;
+    error.publicMessage = "This payment method is currently unavailable.";
+    throw error;
+  }
+
+  const selectedCurrency = bankTransferRegion.currency;
   const selectedAmount = convertPlanAmount(plan, selectedCurrency);
   const stripeCustomerId = await ensureStripeCustomer({ stripe, user, application });
   console.log("[stripe/bank-transfer/customer]", {
@@ -330,7 +342,7 @@ const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, paymen
       customer: stripeCustomerId,
       mode: "payment",
       payment_method_types: ["customer_balance"],
-      payment_method_options: getBankTransferOptions(),
+      payment_method_options: getBankTransferOptions(bankTransferRegion),
       client_reference_id: applicationId,
       success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/payment-cancelled`,
@@ -349,13 +361,19 @@ const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, paymen
       message: error?.message,
       type: error?.type,
       code: error?.code,
-      param: error?.param
+      param: error?.param,
+      countryCode: bankTransferRegion.countryCode,
+      transferType: bankTransferRegion.transferType,
+      currency: selectedCurrency
     });
     throw error;
   }
   console.log("[stripe/bank-transfer/session]", {
     sessionId: session.id,
-    customerId: stripeCustomerId
+    customerId: stripeCustomerId,
+    countryCode: bankTransferRegion.countryCode,
+    transferType: bankTransferRegion.transferType,
+    currency: selectedCurrency
   });
 
   await recordCheckoutSession({
@@ -384,10 +402,13 @@ export const createCheckoutSession = async ({ user, application, paymentMethod, 
   const paymentConfig = paymentMethodConfig[paymentMethodId];
   const selectedCurrency =
     paymentMethodId === "bank_transfer"
-      ? "eur"
+      ? getBankTransferRegion(getApplicationCountryCode(application))?.currency || "eur"
       : normalizeCurrency(currency || application.paymentCurrency || plan.currency || "eur");
   assertPaymentMethodAvailable(paymentConfig, selectedCurrency);
-  const enabledPaymentMethods = await getEnabledCheckoutPaymentMethodIds({ currency: selectedCurrency });
+  const enabledPaymentMethods = await getEnabledCheckoutPaymentMethodIds({
+    currency: selectedCurrency,
+    countryCode: getApplicationCountryCode(application)
+  });
   if (!enabledPaymentMethods.includes(paymentMethodId)) {
     const error = new Error("This payment method is currently unavailable.");
     error.status = 400;

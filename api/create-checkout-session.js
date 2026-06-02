@@ -11,7 +11,8 @@ export default async function handler(req, res) {
     const user = await requireAuth(req);
     if (req.method === "GET") {
       const currency = req.query?.currency || "EUR";
-      const enabledPaymentMethods = await getEnabledCheckoutPaymentMethodIds({ currency });
+      const countryCode = req.query?.countryCode || "";
+      const enabledPaymentMethods = await getEnabledCheckoutPaymentMethodIds({ currency, countryCode });
       return sendJson(res, 200, {
         enabledPaymentMethods: enabledPaymentMethods.length ? enabledPaymentMethods : ["card"]
       });
