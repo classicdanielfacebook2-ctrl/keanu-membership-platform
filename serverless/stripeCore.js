@@ -161,7 +161,13 @@ const ensureStripeCustomer = async ({ stripe, user, application }) => {
   if (existingCustomerId) {
     try {
       const existing = await stripe.customers.retrieve(existingCustomerId);
-      if (!existing?.deleted && (!email || existing.email === email)) return existingCustomerId;
+      if (!existing?.deleted && (!email || existing.email === email)) {
+        console.log("[stripe/bank-transfer/customer]", {
+          action: "retrieved_from_user",
+          customerId: existingCustomerId
+        });
+        return existingCustomerId;
+      }
     } catch (error) {
       console.error("[stripe/customer/retrieve]", { message: error?.message, name: error?.name });
     }
@@ -169,6 +175,10 @@ const ensureStripeCustomer = async ({ stripe, user, application }) => {
 
   const customerByEmail = await findStripeCustomerByEmail(stripe, email);
   if (customerByEmail) {
+    console.log("[stripe/bank-transfer/customer]", {
+      action: "retrieved_by_email",
+      customerId: customerByEmail
+    });
     const db = await getMongoDatabase();
     await db.collection("users").updateOne(
       { _id: user._id },
@@ -188,6 +198,10 @@ const ensureStripeCustomer = async ({ stripe, user, application }) => {
     metadata: {
       userId: String(user._id)
     }
+  });
+  console.log("[stripe/bank-transfer/customer]", {
+    action: "created",
+    customerId: customer.id
   });
   const db = await getMongoDatabase();
   await db.collection("users").updateOne(
@@ -285,6 +299,10 @@ const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, paymen
   const selectedCurrency = "eur";
   const selectedAmount = convertPlanAmount(plan, selectedCurrency);
   const stripeCustomerId = await ensureStripeCustomer({ stripe, user, application });
+  console.log("[stripe/bank-transfer/customer]", {
+    action: "ready_for_checkout",
+    customerId: stripeCustomerId
+  });
 
   if (!stripeCustomerId) {
     const error = new Error("This payment method is currently unavailable.");
@@ -303,23 +321,38 @@ const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, paymen
     selectedCurrency
   });
 
-  const session = await stripe.checkout.sessions.create({
-    customer: stripeCustomerId,
-    mode: "payment",
-    payment_method_types: ["customer_balance"],
-    payment_method_options: getBankTransferOptions(),
-    client_reference_id: applicationId,
-    success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${siteUrl}/payment-cancelled`,
-    metadata: sessionMetadata,
-    line_items: [
-      buildInlineLineItem({
-        siteUrl,
-        plan,
-        currency: selectedCurrency,
-        amount: selectedAmount
-      })
-    ]
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      customer: stripeCustomerId,
+      mode: "payment",
+      payment_method_types: ["customer_balance"],
+      payment_method_options: getBankTransferOptions(),
+      client_reference_id: applicationId,
+      success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/payment-cancelled`,
+      metadata: sessionMetadata,
+      line_items: [
+        buildInlineLineItem({
+          siteUrl,
+          plan,
+          currency: selectedCurrency,
+          amount: selectedAmount
+        })
+      ]
+    });
+  } catch (error) {
+    console.error("[stripe/bank-transfer/checkout-error]", {
+      message: error?.message,
+      type: error?.type,
+      code: error?.code,
+      param: error?.param
+    });
+    throw error;
+  }
+  console.log("[stripe/bank-transfer/session]", {
+    sessionId: session.id,
+    customerId: stripeCustomerId
   });
 
   await recordCheckoutSession({
