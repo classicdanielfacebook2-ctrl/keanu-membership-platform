@@ -220,7 +220,10 @@ const getBankTransferOptions = () => ({
   customer_balance: {
     funding_type: "bank_transfer",
     bank_transfer: {
-      type: "eu_bank_transfer"
+      type: "eu_bank_transfer",
+      eu_bank_transfer: {
+        country: process.env.STRIPE_EU_BANK_TRANSFER_COUNTRY || "DE"
+      }
     }
   }
 });
