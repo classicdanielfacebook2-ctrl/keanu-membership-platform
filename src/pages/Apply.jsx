@@ -390,6 +390,10 @@ export default function Apply() {
     } catch (error) {
       setCheckoutLoading(false);
       setStepError("");
+      if (form.paymentMethod === "bank_transfer") {
+        setAvailablePaymentMethods(["card"]);
+        setForm((current) => ({ ...current, paymentMethod: "card" }));
+      }
       setCheckoutError({
         title: "Checkout unavailable",
         body: "This payment method is currently unavailable. Please choose another payment method."
