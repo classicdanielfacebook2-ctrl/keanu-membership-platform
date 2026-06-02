@@ -26,7 +26,7 @@ import {
   getPaymentMethod
 } from "../data/paymentMethods.js";
 import { saveApplication } from "../services/storage.js";
-import { createCheckoutSession } from "../services/stripeCheckout.js";
+import { createCheckoutSession, getAvailableCheckoutPaymentMethods } from "../services/stripeCheckout.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
   clearApplicationDraft,
@@ -134,6 +134,9 @@ export default function Apply() {
   const [form, setForm] = useState({ ...emptyForm, ...savedDraft, selectedCard: initialCard || savedDraft.selectedCard || "" });
   const [stepError, setStepError] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [availablePaymentMethods, setAvailablePaymentMethods] = useState(["card"]);
+  const [paymentAvailabilityLoading, setPaymentAvailabilityLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState(null);
 
   const selectedCard = cardTypes.find((card) => card.id === form.selectedCard) || null;
   const selectedPaymentMethod = form.paymentMethod ? getPaymentMethod(form.paymentMethod) : null;
@@ -141,6 +144,7 @@ export default function Apply() {
   const finalCity = form.city === "__manual__" ? form.manualCity.trim() : form.city;
   const selectedAmount = selectedCard ? convertEurCents(selectedCard.priceAmountCents, form.paymentCurrency) : 0;
   const formattedAmount = selectedCard ? formatPaymentAmount(selectedAmount, form.paymentCurrency) : "";
+  const visibleCheckoutPaymentOptions = checkoutPaymentOptions.filter((method) => availablePaymentMethods.includes(method.id));
   const progress = ((step + 1) / steps.length) * 100;
   const applicationComplete =
     form.firstName &&
@@ -214,6 +218,34 @@ export default function Apply() {
   }, [auth.loading, auth.isAuthenticated, form.selectedCard, navigate, step]);
 
   useEffect(() => {
+    if (step !== 3 || !auth.isAuthenticated) return;
+
+    let active = true;
+    setPaymentAvailabilityLoading(true);
+    setCheckoutError(null);
+
+    getAvailableCheckoutPaymentMethods(form.paymentCurrency)
+      .then((data) => {
+        if (!active) return;
+        const enabled = Array.isArray(data.enabledPaymentMethods) && data.enabledPaymentMethods.length ? data.enabledPaymentMethods : ["card"];
+        setAvailablePaymentMethods(enabled);
+        setForm((current) => (enabled.includes(current.paymentMethod) ? current : { ...current, paymentMethod: "card" }));
+      })
+      .catch(() => {
+        if (!active) return;
+        setAvailablePaymentMethods(["card"]);
+        setForm((current) => (current.paymentMethod === "card" ? current : { ...current, paymentMethod: "card" }));
+      })
+      .finally(() => {
+        if (active) setPaymentAvailabilityLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [auth.isAuthenticated, form.paymentCurrency, step]);
+
+  useEffect(() => {
     if (!auth.user) return;
     const identifier = auth.user.identifier || "";
     const identifierIsEmail = identifier.includes("@");
@@ -228,6 +260,7 @@ export default function Apply() {
   }, [auth.user]);
 
   const updateField = (field, value) => {
+    if (field === "paymentMethod") setCheckoutError(null);
     setForm((current) => {
       if (field === "countryCode") {
         return { ...current, countryCode: value.code, country: value.name, stateCode: "", stateRegion: "", manualStateRegion: "", city: "", manualCity: "" };
@@ -309,8 +342,17 @@ export default function Apply() {
       setStepError("Select a payment method before continuing to secure checkout.");
       return;
     }
+    if (!availablePaymentMethods.includes(form.paymentMethod)) {
+      setStepError("");
+      setCheckoutError({
+        title: "Payment method unavailable",
+        body: "This payment method is currently unavailable. Please choose another payment method."
+      });
+      return;
+    }
     setCheckoutLoading(true);
     setStepError("");
+    setCheckoutError(null);
 
     try {
       const saved = saveApplication({
@@ -347,7 +389,11 @@ export default function Apply() {
       window.location.href = session.url;
     } catch (error) {
       setCheckoutLoading(false);
-      setStepError(error?.message || "Unable to open Stripe Checkout.");
+      setStepError("");
+      setCheckoutError({
+        title: "Checkout unavailable",
+        body: "This payment method is currently unavailable. Please choose another payment method."
+      });
     }
   };
 
@@ -654,8 +700,12 @@ export default function Apply() {
                   <p>Select how you would like to continue. Stripe Checkout securely collects all payment details on the next screen.</p>
                 </div>
 
+                {paymentAvailabilityLoading ? (
+                  <div className="payment-method-loading">Checking available payment methods...</div>
+                ) : null}
+
                 <div className="payment-method-grid website-method-grid" aria-label="Payment method options">
-                  {checkoutPaymentOptions.map((method) => {
+                  {visibleCheckoutPaymentOptions.map((method) => {
                     const Icon = paymentMethodIcons[method.id] || CreditCard;
                     return (
                       <button
@@ -676,6 +726,13 @@ export default function Apply() {
                   })}
                 </div>
               </div>
+
+              {checkoutError ? (
+                <div className="checkout-error-card" role="alert">
+                  <strong>{checkoutError.title}</strong>
+                  <p>{checkoutError.body}</p>
+                </div>
+              ) : null}
 
               <div className="checkout-total-bar">
                 <div>

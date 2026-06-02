@@ -58,20 +58,21 @@ const currencyRatesFromEur = {
 };
 
 const paymentMethodConfig = {
-  card: { label: "Credit/Debit Card", stripeTypes: ["card"], delayed: false },
-  google_pay: { label: "Google Pay", stripeTypes: ["card"], delayed: false },
-  apple_pay: { label: "Apple Pay", stripeTypes: ["card"], delayed: false },
-  amazon_pay: { label: "Amazon Pay", stripeTypes: ["amazon_pay"], currencies: ["eur", "usd", "gbp"], delayed: false },
-  link: { label: "Link by Stripe", stripeTypes: ["link", "card"], delayed: false },
-  sepa: { label: "SEPA Direct Debit", stripeTypes: ["sepa_debit"], currencies: ["eur"], delayed: true },
+  card: { label: "Credit/Debit Card", stripeTypes: ["card"], configKey: "card", delayed: false },
+  google_pay: { label: "Google Pay", stripeTypes: ["card"], configKey: "google_pay", delayed: false },
+  apple_pay: { label: "Apple Pay", stripeTypes: ["card"], configKey: "apple_pay", delayed: false },
+  amazon_pay: { label: "Amazon Pay", stripeTypes: ["amazon_pay"], configKey: "amazon_pay", currencies: ["eur", "usd", "gbp"], delayed: false },
+  link: { label: "Link by Stripe", stripeTypes: ["link", "card"], configKey: "link", delayed: false },
+  sepa: { label: "SEPA Direct Debit", stripeTypes: ["sepa_debit"], configKey: "sepa_debit", currencies: ["eur"], delayed: true },
   bank_transfer: {
     label: "Bank Transfer",
     stripeTypes: ["customer_balance"],
+    configKey: "customer_balance",
     currencies: ["eur", "usd", "gbp"],
     delayed: true
   },
-  ideal: { label: "iDEAL", stripeTypes: ["ideal"], currencies: ["eur"], delayed: false },
-  open_banking: { label: "Open Banking", stripeTypes: ["pay_by_bank"], currencies: ["gbp"], delayed: false }
+  ideal: { label: "iDEAL", stripeTypes: ["ideal"], configKey: "ideal", currencies: ["eur"], delayed: false },
+  open_banking: { label: "Open Banking", stripeTypes: ["pay_by_bank"], configKey: "pay_by_bank", currencies: ["gbp"], delayed: false }
 };
 
 const normalizePaymentMethod = (value = "") => {
@@ -92,8 +93,78 @@ const convertPlanAmount = (plan, currency) => {
 
 const assertPaymentMethodAvailable = (paymentConfig, currency) => {
   if (paymentConfig.currencies && !paymentConfig.currencies.includes(currency)) {
-    throw new Error(`${paymentConfig.label} is not available for ${currency.toUpperCase()} payments.`);
+    const error = new Error("This payment method is currently unavailable.");
+    error.status = 400;
+    error.publicMessage = "This payment method is currently unavailable.";
+    throw error;
   }
+};
+
+const checkoutMethodIds = ["card", "sepa", "bank_transfer", "ideal"];
+
+const isConfigMethodEnabled = (configuration, methodId) => {
+  if (methodId === "card") return true;
+  const key = paymentMethodConfig[methodId]?.configKey;
+  const method = key ? configuration?.[key] : null;
+  const preference = method?.display_preference?.value || method?.display_preference?.preference || "";
+  return Boolean(method?.available && preference !== "off");
+};
+
+const getDefaultPaymentMethodConfiguration = async (stripe) => {
+  try {
+    const configurations = await stripe.paymentMethodConfigurations.list({ limit: 10 });
+    return configurations.data.find((configuration) => configuration.active && configuration.is_default) || configurations.data.find((configuration) => configuration.active) || null;
+  } catch (error) {
+    console.error("[stripe/payment-method-configurations]", {
+      message: error?.message,
+      name: error?.name
+    });
+    return null;
+  }
+};
+
+export const getEnabledCheckoutPaymentMethodIds = async ({ currency = "eur" } = {}) => {
+  const stripe = getStripe();
+  const selectedCurrency = normalizeCurrency(currency);
+  const configuration = await getDefaultPaymentMethodConfiguration(stripe);
+
+  return checkoutMethodIds.filter((methodId) => {
+    const config = paymentMethodConfig[methodId];
+    if (!config) return false;
+    if (config.currencies && !config.currencies.includes(selectedCurrency)) return false;
+    return isConfigMethodEnabled(configuration, methodId);
+  });
+};
+
+const ensureStripeCustomer = async ({ stripe, user, application }) => {
+  const existingCustomerId = String(user?.stripeCustomerId || "");
+  if (existingCustomerId) {
+    try {
+      const existing = await stripe.customers.retrieve(existingCustomerId);
+      if (!existing?.deleted) return existingCustomerId;
+    } catch (error) {
+      console.error("[stripe/customer/retrieve]", { message: error?.message, name: error?.name });
+    }
+  }
+
+  const customer = await stripe.customers.create({
+    email: application.email || user.email || undefined,
+    name: application.fullName || user.fullName || undefined,
+    metadata: {
+      userId: String(user._id)
+    }
+  });
+  const db = await getMongoDatabase();
+  await db.collection("users").updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        stripeCustomerId: customer.id,
+        updatedAt: new Date()
+      }
+    }
+  );
+  return customer.id;
 };
 
 const getBankTransferOptions = (currency) => {
@@ -122,6 +193,13 @@ export const createCheckoutSession = async ({ user, application, paymentMethod, 
   const paymentConfig = paymentMethodConfig[paymentMethodId];
   const selectedCurrency = normalizeCurrency(currency || application.paymentCurrency || plan.currency || "eur");
   assertPaymentMethodAvailable(paymentConfig, selectedCurrency);
+  const enabledPaymentMethods = await getEnabledCheckoutPaymentMethodIds({ currency: selectedCurrency });
+  if (!enabledPaymentMethods.includes(paymentMethodId)) {
+    const error = new Error("This payment method is currently unavailable.");
+    error.status = 400;
+    error.publicMessage = "This payment method is currently unavailable.";
+    throw error;
+  }
   const selectedAmount = convertPlanAmount(plan, selectedCurrency);
 
   const stripePriceId = getStripePriceIdForPlan(plan);
@@ -142,10 +220,17 @@ export const createCheckoutSession = async ({ user, application, paymentMethod, 
         }
       };
 
+  const stripeCustomerId =
+    paymentMethodId === "bank_transfer"
+      ? await ensureStripeCustomer({ stripe, user, application })
+      : "";
+
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     payment_method_types: paymentConfig.stripeTypes,
-    customer_email: application.email || user.email || undefined,
+    ...(stripeCustomerId
+      ? { customer: stripeCustomerId }
+      : { customer_email: application.email || user.email || undefined }),
     client_reference_id: applicationId,
     success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${siteUrl}/payment-cancelled`,
@@ -174,7 +259,6 @@ export const createCheckoutSession = async ({ user, application, paymentMethod, 
     },
     ...(paymentMethodId === "bank_transfer"
       ? {
-          customer_creation: "always",
           payment_method_options: getBankTransferOptions(selectedCurrency)
         }
       : {}),

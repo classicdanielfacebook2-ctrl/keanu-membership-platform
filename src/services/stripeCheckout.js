@@ -11,3 +11,8 @@ export const createCheckoutSession = (
     method: "POST",
     body: JSON.stringify({ application, paymentMethod, currency })
   });
+
+export const getAvailableCheckoutPaymentMethods = (currency = "EUR") =>
+  authRequest(`/api/create-checkout-session?currency=${encodeURIComponent(currency)}`, {
+    method: "GET"
+  });
