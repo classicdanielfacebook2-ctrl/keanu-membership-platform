@@ -202,99 +202,52 @@ const ensureStripeCustomer = async ({ stripe, user, application }) => {
   return customer.id;
 };
 
-const getBankTransferOptions = (currency) => {
-  return {
-    customer_balance: {
-      funding_type: "bank_transfer",
-      bank_transfer: {
-        type: "eu_bank_transfer"
-      }
+const getBankTransferOptions = () => ({
+  customer_balance: {
+    funding_type: "bank_transfer",
+    bank_transfer: {
+      type: "eu_bank_transfer"
     }
-  };
-};
-
-export const createCheckoutSession = async ({ user, application, paymentMethod, currency }) => {
-  const stripe = getStripe();
-  const siteUrl = getSiteUrl();
-  const plan = getCardPlan(application.selectedCard);
-  const payments = await getMembershipPaymentsCollection();
-  const applicationId = String(application.id || application.referenceId || "");
-  const paymentMethodId = normalizePaymentMethod(paymentMethod || application.paymentMethod);
-  const paymentConfig = paymentMethodConfig[paymentMethodId];
-  const selectedCurrency =
-    paymentMethodId === "bank_transfer"
-      ? "eur"
-      : normalizeCurrency(currency || application.paymentCurrency || plan.currency || "eur");
-  assertPaymentMethodAvailable(paymentConfig, selectedCurrency);
-  const enabledPaymentMethods = await getEnabledCheckoutPaymentMethodIds({ currency: selectedCurrency });
-  if (!enabledPaymentMethods.includes(paymentMethodId)) {
-    const error = new Error("This payment method is currently unavailable.");
-    error.status = 400;
-    error.publicMessage = "This payment method is currently unavailable.";
-    throw error;
   }
-  const selectedAmount = convertPlanAmount(plan, selectedCurrency);
+});
 
-  const stripePriceId = getStripePriceIdForPlan(plan);
-  const canUseStripePriceId = stripePriceId && selectedCurrency === (plan.currency || "eur").toLowerCase();
-  const lineItem = canUseStripePriceId
-    ? { price: stripePriceId, quantity: 1 }
-    : {
-        // Temporary inline price_data fallback. Add STRIPE_PRICE_SILVER/GOLD/VIP/PREMIUM in Vercel to use live Stripe Price IDs.
-        quantity: 1,
-        price_data: {
-          currency: selectedCurrency,
-          unit_amount: selectedAmount,
-          product_data: {
-            name: `KR Global Membership - ${plan.name}`,
-            description: plan.benefits.slice(0, 3).join(" / "),
-            images: [`${siteUrl}/brand/kr-stripe-icon.png`]
-          }
-        }
-      };
-
-  const stripeCustomerId =
-    paymentMethodId === "bank_transfer"
-      ? await ensureStripeCustomer({ stripe, user, application })
-      : "";
-  if (paymentMethodId === "bank_transfer" && !stripeCustomerId) {
-    const error = new Error("This payment method is currently unavailable.");
-    error.status = 400;
-    error.publicMessage = "This payment method is currently unavailable.";
-    throw error;
+const buildInlineLineItem = ({ siteUrl, plan, currency, amount }) => ({
+  quantity: 1,
+  price_data: {
+    currency,
+    unit_amount: amount,
+    product_data: {
+      name: `KR Global Membership - ${plan.name}`,
+      description: plan.benefits.slice(0, 3).join(" / "),
+      images: [`${siteUrl}/brand/kr-stripe-icon.png`]
+    }
   }
+});
 
-  const sessionMetadata = {
-    applicationId,
-    referenceId: String(application.referenceId || ""),
-    userId: String(user._id),
-    selectedCard: plan.id,
-    applicantName: String(application.fullName || user.fullName || ""),
-    paymentMethod: paymentMethodId,
-    paymentMethodLabel: paymentConfig.label,
-    paymentCurrency: selectedCurrency,
-    delayedPayment: String(paymentConfig.delayed)
-  };
-  const checkoutParams = {
-    mode: "payment",
-    payment_method_types: paymentConfig.stripeTypes,
-    ...(stripeCustomerId
-      ? { customer: stripeCustomerId }
-      : { customer_email: application.email || user.email || undefined }),
-    client_reference_id: applicationId,
-    success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${siteUrl}/payment-cancelled`,
-    metadata: sessionMetadata,
-    ...(paymentMethodId !== "bank_transfer" ? { payment_intent_data: { metadata: sessionMetadata } } : {}),
-    ...(paymentMethodId === "bank_transfer"
-      ? {
-          payment_method_options: getBankTransferOptions(selectedCurrency)
-        }
-      : {}),
-    line_items: [lineItem]
-  };
-  const session = await stripe.checkout.sessions.create(checkoutParams);
+const buildSessionMetadata = ({ applicationId, application, user, plan, paymentMethodId, paymentConfig, selectedCurrency }) => ({
+  applicationId,
+  referenceId: String(application.referenceId || ""),
+  userId: String(user._id),
+  selectedCard: plan.id,
+  applicantName: String(application.fullName || user.fullName || ""),
+  paymentMethod: paymentMethodId,
+  paymentMethodLabel: paymentConfig.label,
+  paymentCurrency: selectedCurrency,
+  delayedPayment: String(paymentConfig.delayed)
+});
 
+const recordCheckoutSession = async ({
+  payments,
+  session,
+  application,
+  applicationId,
+  user,
+  plan,
+  selectedAmount,
+  selectedCurrency,
+  paymentMethodId,
+  paymentConfig
+}) => {
   await payments.updateOne(
     { checkoutSessionId: session.id },
     {
@@ -324,6 +277,146 @@ export const createCheckoutSession = async ({ user, application, paymentMethod, 
     },
     { upsert: true }
   );
+};
+
+const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, payments, applicationId, user, application }) => {
+  const paymentMethodId = "bank_transfer";
+  const paymentConfig = paymentMethodConfig[paymentMethodId];
+  const selectedCurrency = "eur";
+  const selectedAmount = convertPlanAmount(plan, selectedCurrency);
+  const stripeCustomerId = await ensureStripeCustomer({ stripe, user, application });
+
+  if (!stripeCustomerId) {
+    const error = new Error("This payment method is currently unavailable.");
+    error.status = 400;
+    error.publicMessage = "This payment method is currently unavailable.";
+    throw error;
+  }
+
+  const sessionMetadata = buildSessionMetadata({
+    applicationId,
+    application,
+    user,
+    plan,
+    paymentMethodId,
+    paymentConfig,
+    selectedCurrency
+  });
+
+  const session = await stripe.checkout.sessions.create({
+    customer: stripeCustomerId,
+    mode: "payment",
+    payment_method_types: ["customer_balance"],
+    payment_method_options: getBankTransferOptions(),
+    client_reference_id: applicationId,
+    success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${siteUrl}/payment-cancelled`,
+    metadata: sessionMetadata,
+    line_items: [
+      buildInlineLineItem({
+        siteUrl,
+        plan,
+        currency: selectedCurrency,
+        amount: selectedAmount
+      })
+    ]
+  });
+
+  await recordCheckoutSession({
+    payments,
+    session,
+    application,
+    applicationId,
+    user,
+    plan,
+    selectedAmount,
+    selectedCurrency,
+    paymentMethodId,
+    paymentConfig
+  });
+
+  return session;
+};
+
+export const createCheckoutSession = async ({ user, application, paymentMethod, currency }) => {
+  const stripe = getStripe();
+  const siteUrl = getSiteUrl();
+  const plan = getCardPlan(application.selectedCard);
+  const payments = await getMembershipPaymentsCollection();
+  const applicationId = String(application.id || application.referenceId || "");
+  const paymentMethodId = normalizePaymentMethod(paymentMethod || application.paymentMethod);
+  const paymentConfig = paymentMethodConfig[paymentMethodId];
+  const selectedCurrency =
+    paymentMethodId === "bank_transfer"
+      ? "eur"
+      : normalizeCurrency(currency || application.paymentCurrency || plan.currency || "eur");
+  assertPaymentMethodAvailable(paymentConfig, selectedCurrency);
+  const enabledPaymentMethods = await getEnabledCheckoutPaymentMethodIds({ currency: selectedCurrency });
+  if (!enabledPaymentMethods.includes(paymentMethodId)) {
+    const error = new Error("This payment method is currently unavailable.");
+    error.status = 400;
+    error.publicMessage = "This payment method is currently unavailable.";
+    throw error;
+  }
+  const selectedAmount = convertPlanAmount(plan, selectedCurrency);
+
+  if (paymentMethodId === "bank_transfer") {
+    return createBankTransferCheckoutSession({
+      stripe,
+      siteUrl,
+      plan,
+      payments,
+      applicationId,
+      user,
+      application
+    });
+  }
+
+  const stripePriceId = getStripePriceIdForPlan(plan);
+  const canUseStripePriceId = stripePriceId && selectedCurrency === (plan.currency || "eur").toLowerCase();
+  const lineItem = canUseStripePriceId
+    ? { price: stripePriceId, quantity: 1 }
+    : buildInlineLineItem({
+        siteUrl,
+        plan,
+        currency: selectedCurrency,
+        amount: selectedAmount
+      });
+
+  const sessionMetadata = buildSessionMetadata({
+    applicationId,
+    application,
+    user,
+    plan,
+    paymentMethodId,
+    paymentConfig,
+    selectedCurrency
+  });
+  const checkoutParams = {
+    mode: "payment",
+    payment_method_types: paymentConfig.stripeTypes,
+    customer_email: application.email || user.email || undefined,
+    client_reference_id: applicationId,
+    success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${siteUrl}/payment-cancelled`,
+    metadata: sessionMetadata,
+    payment_intent_data: { metadata: sessionMetadata },
+    line_items: [lineItem]
+  };
+  const session = await stripe.checkout.sessions.create(checkoutParams);
+
+  await recordCheckoutSession({
+    payments,
+    session,
+    application,
+    applicationId,
+    user,
+    plan,
+    selectedAmount,
+    selectedCurrency,
+    paymentMethodId,
+    paymentConfig
+  });
 
   return session;
 };
