@@ -137,7 +137,7 @@ export const getEnabledCheckoutPaymentMethodIds = async ({ currency = "eur", cou
     if (!config) return false;
     if (methodId === "bank_transfer") {
       if (!bankTransferRegion) return false;
-      return isConfigMethodEnabled(configuration, methodId);
+      return true;
     }
     if (config.currencies && !config.currencies.includes(selectedCurrency)) return false;
     return isConfigMethodEnabled(configuration, methodId);
