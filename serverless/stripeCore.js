@@ -4,6 +4,7 @@ import { cardTypes } from "../src/data/cards.js";
 import { getMongoDatabase } from "./authCore.js";
 
 let stripeClient;
+let stripeAccountPromise;
 
 const requiredEnv = (name) => {
   const value = process.env[name];
@@ -101,6 +102,59 @@ const assertPaymentMethodAvailable = (paymentConfig, currency) => {
 };
 
 const checkoutMethodIds = ["card", "sepa", "bank_transfer", "ideal"];
+const sepaAccountCountries = new Set([
+  "AT",
+  "BE",
+  "BG",
+  "CY",
+  "CZ",
+  "DE",
+  "DK",
+  "EE",
+  "ES",
+  "FI",
+  "FR",
+  "GI",
+  "GR",
+  "HR",
+  "HU",
+  "IE",
+  "IS",
+  "IT",
+  "LI",
+  "LT",
+  "LU",
+  "LV",
+  "MC",
+  "MT",
+  "NL",
+  "NO",
+  "PL",
+  "PT",
+  "RO",
+  "SE",
+  "SI",
+  "SK",
+  "SM"
+]);
+const bankTransferAccountCountryByCurrency = {
+  gbp: new Set(["GB"]),
+  usd: new Set(["US"])
+};
+
+const getStripeAccount = async (stripe) => {
+  if (!stripeAccountPromise) {
+    stripeAccountPromise = stripe.accounts.retrieve();
+  }
+  return stripeAccountPromise;
+};
+
+const isBankTransferSupportedForAccount = (account, currency) => {
+  const accountCountry = String(account?.country || "").toUpperCase();
+  if (!accountCountry) return false;
+  if (currency === "eur") return sepaAccountCountries.has(accountCountry);
+  return Boolean(bankTransferAccountCountryByCurrency[currency]?.has(accountCountry));
+};
 
 const isConfigMethodEnabled = (configuration, methodId) => {
   if (methodId === "card") return true;
@@ -127,11 +181,16 @@ export const getEnabledCheckoutPaymentMethodIds = async ({ currency = "eur" } = 
   const stripe = getStripe();
   const selectedCurrency = normalizeCurrency(currency);
   const configuration = await getDefaultPaymentMethodConfiguration(stripe);
+  const account = await getStripeAccount(stripe).catch((error) => {
+    console.error("[stripe/account]", { message: error?.message, name: error?.name });
+    return null;
+  });
 
   return checkoutMethodIds.filter((methodId) => {
     const config = paymentMethodConfig[methodId];
     if (!config) return false;
     if (config.currencies && !config.currencies.includes(selectedCurrency)) return false;
+    if (methodId === "bank_transfer" && !isBankTransferSupportedForAccount(account, selectedCurrency)) return false;
     return isConfigMethodEnabled(configuration, methodId);
   });
 };
