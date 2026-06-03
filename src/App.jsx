@@ -12,12 +12,14 @@ import {
   MessagesSquare,
   ShieldAlert,
   Sparkles,
+  UserCircle,
   X
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Welcome from "./pages/Welcome.jsx";
 import Home from "./pages/Home.jsx";
 import Apply from "./pages/Apply.jsx";
+import Account from "./pages/Account.jsx";
 import Payment from "./pages/Payment.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import PaymentCancelled from "./pages/PaymentCancelled.jsx";
@@ -136,10 +138,16 @@ export default function App() {
               ))
             : null}
           {auth.isAuthenticated ? (
-            <button className="nav-auth-button" type="button" onClick={handleLogout}>
-              <LogOut size={17} />
-              Logout
-            </button>
+            <>
+              <NavLink to="/account" onClick={closeMenu}>
+                <UserCircle size={17} />
+                My Account
+              </NavLink>
+              <button className="nav-auth-button" type="button" onClick={handleLogout}>
+                <LogOut size={17} />
+                Logout
+              </button>
+            </>
           ) : (
             <NavLink to="/login" onClick={closeMenu}>
               <LogIn size={17} />
@@ -161,6 +169,38 @@ export default function App() {
           <Route path="/apply/select-country" element={<LocationSelector type="country" />} />
           <Route path="/apply/select-state" element={<LocationSelector type="state" />} />
           <Route path="/apply/select-city" element={<LocationSelector type="city" />} />
+          <Route
+            path="/account"
+            element={
+              <ProtectedRoute>
+                <Account />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/applications"
+            element={
+              <ProtectedRoute>
+                <Account view="applications" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/payments"
+            element={
+              <ProtectedRoute>
+                <Account view="payments" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/payment/:applicationId"
+            element={
+              <ProtectedRoute>
+                <PaymentStatus />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/payment" element={<Payment />} />
           <Route
             path="/payment/status/:applicationId"

@@ -29,3 +29,8 @@ export const getAdminPayments = () =>
   authRequest("/api/create-checkout-session?action=admin-payments", {
     method: "GET"
   });
+
+export const getAccountPayments = () =>
+  authRequest("/api/create-checkout-session?action=account-payments", {
+    method: "GET"
+  });

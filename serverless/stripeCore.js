@@ -405,6 +405,58 @@ const sendMembershipPaymentFailureEmail = async (payment = {}) => {
   }
 };
 
+const sendBankTransferDashboardEmail = async ({ payment = {}, siteUrl = "" }) => {
+  const apiKey = process.env.RESEND_API_KEY || "";
+  const to = payment.customerEmail || payment.applicant_email || "";
+  if (!apiKey || !to) return;
+
+  const applicationId = payment.applicationId || payment.application_id || payment.referenceId || "";
+  const dashboardUrl = `${siteUrl}/account/payment/${encodeURIComponent(applicationId)}`;
+  const reference = payment.referenceId || applicationId || "Membership application";
+  const html = `
+    <div style="margin:0;padding:32px;background:#050505;color:#f7f3ea;font-family:Inter,Arial,sans-serif;">
+      <div style="max-width:560px;margin:0 auto;border:1px solid rgba(244,216,139,.34);background:#0d0d0d;padding:32px;">
+        <p style="margin:0 0 12px;color:#f4d88b;font-size:12px;letter-spacing:.18em;text-transform:uppercase;">KR Global Membership</p>
+        <h1 style="margin:0 0 18px;font-family:Georgia,serif;font-size:30px;line-height:1.15;color:#fff9ed;">Bank transfer instructions saved</h1>
+        <p style="margin:0 0 18px;line-height:1.7;color:#cfc7ba;">Your application is awaiting bank transfer confirmation. Use the IBAN, BIC, amount, and reference shown by Stripe.</p>
+        <div style="margin:22px 0;padding:16px;border:1px solid rgba(244,216,139,.28);background:#060606;">
+          <p style="margin:0 0 8px;color:#a9a197;">Application reference</p>
+          <strong style="color:#f4d88b;">${escapeHtml(reference)}</strong>
+        </div>
+        <a href="${escapeHtml(dashboardUrl)}" style="display:inline-block;margin:8px 0 20px;padding:14px 20px;border-radius:999px;background:#d4af37;color:#080808;text-decoration:none;font-weight:800;">View Account Payment Status</a>
+        <p style="margin:0;color:#a9a197;line-height:1.7;">Your membership activates only after Stripe confirms the transfer.</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: "KR Global Membership <support@keanureeves.company>",
+        to,
+        subject: "Bank transfer instructions saved",
+        html
+      })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      console.error("[stripe/bank-transfer-dashboard-email]", {
+        message: data?.message || "Resend rejected the bank transfer dashboard email.",
+        reference
+      });
+    } else {
+      console.log("[stripe/bank-transfer-dashboard-email]", { message: "Bank transfer dashboard email sent", reference });
+    }
+  } catch (error) {
+    console.error("[stripe/bank-transfer-dashboard-email]", { message: error?.message, reference });
+  }
+};
+
 const recordCheckoutSession = async ({
   payments,
   session,
@@ -462,6 +514,8 @@ const recordCheckoutSession = async ({
     },
     { upsert: true }
   );
+
+  return payments.findOne({ checkoutSessionId: session.id });
 };
 
 const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, payments, applicationId, user, application }) => {
@@ -508,7 +562,7 @@ const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, paymen
       payment_method_types: ["customer_balance"],
       payment_method_options: getBankTransferOptions(bankTransferRegion),
       client_reference_id: applicationId,
-      success_url: `${siteUrl}/payment/status/${encodeURIComponent(applicationId)}?session_id={CHECKOUT_SESSION_ID}&instructions=saved`,
+      success_url: `${siteUrl}/account/payment/${encodeURIComponent(applicationId)}?session_id={CHECKOUT_SESSION_ID}&instructions=saved`,
       cancel_url: `${siteUrl}/payment-cancelled`,
       metadata: sessionMetadata,
       line_items: [
@@ -540,7 +594,7 @@ const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, paymen
     currency: selectedCurrency
   });
 
-  await recordCheckoutSession({
+  const paymentRecord = await recordCheckoutSession({
     payments,
     session,
     application,
@@ -553,6 +607,7 @@ const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, paymen
     paymentConfig,
     stripeCustomerId
   });
+  await sendBankTransferDashboardEmail({ payment: paymentRecord, siteUrl });
 
   return session;
 };
@@ -746,6 +801,12 @@ export const getPaymentRecordForUser = async ({ user, applicationId }) => {
     ]
   });
   return payment ? publicPaymentRecord(payment) : null;
+};
+
+export const getPaymentRecordsForUser = async ({ user }) => {
+  const payments = await getMembershipPaymentsCollection();
+  const rows = await payments.find({ userId: String(user._id) }).sort({ createdAt: -1, updatedAt: -1 }).limit(100).toArray();
+  return rows.map(publicPaymentRecord);
 };
 
 export const getAdminPaymentRecords = async ({ user }) => {

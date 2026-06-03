@@ -3,7 +3,8 @@ import {
   createCheckoutSession,
   getAdminPaymentRecords,
   getEnabledCheckoutPaymentMethodIds,
-  getPaymentRecordForUser
+  getPaymentRecordForUser,
+  getPaymentRecordsForUser
 } from "../serverless/stripeCore.js";
 
 export default async function handler(req, res) {
@@ -25,6 +26,10 @@ export default async function handler(req, res) {
       }
       if (action === "admin-payments") {
         const payments = await getAdminPaymentRecords({ user });
+        return sendJson(res, 200, { payments });
+      }
+      if (action === "account-payments") {
+        const payments = await getPaymentRecordsForUser({ user });
         return sendJson(res, 200, { payments });
       }
 

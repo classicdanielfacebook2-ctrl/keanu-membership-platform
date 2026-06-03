@@ -6280,6 +6280,97 @@ body::after {
   gap: 1rem;
 }
 
+.account-welcome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.account-welcome h3,
+.account-welcome p {
+  margin: 0;
+}
+
+.account-welcome h3 {
+  margin-top: 0.35rem;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.55rem, 3vw, 2.3rem);
+}
+
+.account-welcome p {
+  margin-top: 0.35rem;
+  color: var(--muted);
+}
+
+.account-record-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.account-record-card {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.account-record-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.account-record-top h3 {
+  margin: 0.35rem 0 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.35rem, 2.6vw, 1.9rem);
+}
+
+.account-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.account-detail-grid div {
+  min-width: 0;
+  border: 1px solid rgba(214, 208, 194, 0.12);
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 14px;
+  padding: 0.85rem;
+}
+
+.account-detail-grid span,
+.account-detail-grid strong {
+  display: block;
+}
+
+.account-detail-grid span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.account-detail-grid strong {
+  margin-top: 0.35rem;
+  color: var(--ivory);
+  overflow-wrap: anywhere;
+}
+
+.account-empty-state {
+  color: var(--muted);
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.centered-actions {
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
 .checkout-continue-button {
   min-width: min(100%, 19rem);
 }
@@ -7582,6 +7673,18 @@ body::after {
 }
 
 @media (max-width: 860px) {
+  .account-welcome,
+  .account-record-top,
+  .admin-payments-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-detail-grid,
+  .payment-status-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .review-summary-grid {
     grid-template-columns: 1fr;
   }
@@ -7602,6 +7705,22 @@ body::after {
 }
 
 @media (max-width: 560px) {
+  .account-detail-grid,
+  .payment-status-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .account-welcome .payment-actions,
+  .account-record-card .payment-actions {
+    width: 100%;
+  }
+
+  .account-welcome .button,
+  .account-record-card .button {
+    justify-content: center;
+    width: 100%;
+  }
+
   .conversion-flow {
     border-radius: 18px;
   }
