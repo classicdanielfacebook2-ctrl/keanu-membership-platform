@@ -4,7 +4,7 @@ import { ArrowRight, Clock3, CreditCard, FileText, RefreshCcw, ShieldCheck } fro
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import { formatPaymentAmount } from "../data/paymentMethods.js";
-import { getAccountPayments } from "../services/stripeCheckout.js";
+import { getAccountPayments, renewBankTransferInstructions } from "../services/stripeCheckout.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const statusSet = ["Awaiting Bank Transfer", "Processing", "Paid", "Failed", "Expired", "Refunded"];
@@ -13,7 +13,15 @@ const cardName = (id, fallback = "") => cardTypes.find((card) => card.id === id)
 
 const money = (payment) => formatPaymentAmount(payment.amount || 0, String(payment.currency || "EUR").toUpperCase());
 
-function AccountRows({ payments, emptyText = "No payment records found." }) {
+const isBankTransfer = (payment) => payment?.paymentMethod === "bank_transfer" || payment?.payment_method === "bank_transfer";
+const isAwaitingTransfer = (payment) => isBankTransfer(payment) && payment?.paymentStatus === "Awaiting Bank Transfer";
+const canShowTransferAction = (payment) => isBankTransfer(payment) && ["Awaiting Bank Transfer", "Expired"].includes(payment?.paymentStatus);
+const sessionExpired = (payment) => {
+  const expiresAt = payment?.stripeSessionExpiresAt || payment?.stripe_session_expires_at || "";
+  return expiresAt ? new Date(expiresAt).getTime() <= Date.now() : false;
+};
+
+function AccountRows({ payments, emptyText = "No payment records found.", onRenew, onRefresh, renewingId = "" }) {
   if (!payments.length) {
     return <div className="empty-cell account-empty-state">{emptyText}</div>;
   }
@@ -57,6 +65,43 @@ function AccountRows({ payments, emptyText = "No payment records found." }) {
               <span>Membership status</span>
               <strong>{payment.membershipStatus || "Pending"}</strong>
             </div>
+          </div>
+
+          {isAwaitingTransfer(payment) || (isBankTransfer(payment) && payment.paymentStatus === "Expired") ? (
+            <div className="bank-transfer-message">
+              <strong>{payment.paymentStatus === "Expired" ? "Transfer Instructions Expired" : "Awaiting Bank Transfer"}</strong>
+              <p>
+                Your bank transfer instructions have been generated. If you have already sent the transfer, please wait while
+                Stripe confirms receipt. SEPA Instant may confirm quickly, while normal bank transfer may take 1-3 business days.
+              </p>
+              {sessionExpired(payment) || payment.paymentStatus === "Expired" ? (
+                <span>This transfer instruction expired. Create a new bank transfer session.</span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="payment-actions">
+            {canShowTransferAction(payment) ? (
+              <button className="button primary" type="button" onClick={() => onRenew(payment)} disabled={renewingId === payment.applicationId}>
+                {sessionExpired(payment) || payment.paymentStatus === "Expired" ? "Generate New Transfer Instructions" : "View Transfer Instructions"}
+                <ArrowRight size={17} />
+              </button>
+            ) : null}
+            <button className="button secondary" type="button" onClick={onRefresh}>
+              <RefreshCcw size={17} />
+              Refresh Payment Status
+            </button>
+            <Link className="button secondary" to={`/support?reference=${encodeURIComponent(payment.referenceId || payment.applicationId || "")}`}>
+              Contact Support
+            </Link>
+            <Link className="button secondary" to={`/account/payment/${payment.applicationId}`}>
+              View Details
+              <ArrowRight size={17} />
+            </Link>
+          </div>
+
+          <details className="technical-details">
+            <summary>Technical details</summary>
             <div>
               <span>Stripe checkout session</span>
               <strong>{payment.stripeCheckoutSessionId || "Not available"}</strong>
@@ -65,14 +110,7 @@ function AccountRows({ payments, emptyText = "No payment records found." }) {
               <span>Stripe payment intent</span>
               <strong>{payment.stripePaymentIntentId || "Not available"}</strong>
             </div>
-          </div>
-
-          <div className="payment-actions">
-            <Link className="button secondary" to={`/account/payment/${payment.applicationId}`}>
-              View Details
-              <ArrowRight size={17} />
-            </Link>
-          </div>
+          </details>
         </article>
       ))}
     </div>
@@ -84,6 +122,7 @@ export default function Account({ view = "dashboard" }) {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [renewingId, setRenewingId] = useState("");
 
   const loadPayments = async () => {
     setLoading(true);
@@ -101,6 +140,25 @@ export default function Account({ view = "dashboard" }) {
   useEffect(() => {
     loadPayments();
   }, []);
+
+  const handleTransferInstructions = async (payment) => {
+    const checkoutUrl = payment.stripeCheckoutUrl || payment.stripe_checkout_url || "";
+    if (checkoutUrl && !sessionExpired(payment)) {
+      window.location.href = checkoutUrl;
+      return;
+    }
+
+    setRenewingId(payment.applicationId);
+    setError("");
+    try {
+      const session = await renewBankTransferInstructions(payment.applicationId);
+      if (!session.url) throw new Error("Transfer instructions could not be generated.");
+      window.location.href = session.url;
+    } catch (err) {
+      setError(err?.message || "Transfer instructions could not be generated.");
+      setRenewingId("");
+    }
+  };
 
   const stats = useMemo(
     () => [
@@ -172,6 +230,9 @@ export default function Account({ view = "dashboard" }) {
         <AccountRows
           payments={visiblePayments}
           emptyText={view === "applications" ? "No applications have been submitted yet." : "No payment records found."}
+          onRenew={handleTransferInstructions}
+          onRefresh={loadPayments}
+          renewingId={renewingId}
         />
       )}
 

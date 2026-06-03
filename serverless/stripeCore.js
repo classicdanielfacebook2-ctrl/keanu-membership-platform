@@ -100,17 +100,17 @@ const paymentLifecycle = {
   failed: {
     status: "payment_failed",
     paymentStatus: "Failed",
-    membershipStatus: "Inactive"
+    membershipStatus: "Pending"
   },
   expired: {
     status: "expired",
     paymentStatus: "Expired",
-    membershipStatus: "Inactive"
+    membershipStatus: "Pending"
   },
   refunded: {
     status: "refunded",
     paymentStatus: "Refunded",
-    membershipStatus: "Inactive"
+    membershipStatus: "Refunded"
   }
 };
 
@@ -472,13 +472,23 @@ const recordCheckoutSession = async ({
 }) => {
   const initialLifecycle = paymentMethodId === "bank_transfer" ? paymentLifecycle.awaitingBankTransfer : paymentLifecycle.processing;
   const stripePaymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || "";
+  const recordQuery =
+    paymentMethodId === "bank_transfer"
+      ? { applicationId, userId: String(user._id), paymentMethod: "bank_transfer" }
+      : { checkoutSessionId: session.id };
   await payments.updateOne(
-    { checkoutSessionId: session.id },
+    recordQuery,
     {
       $set: {
         status: initialLifecycle.status,
+        payment_status: initialLifecycle.status,
+        membership_status: initialLifecycle.membershipStatus.toLowerCase(),
         checkoutSessionId: session.id,
         stripe_checkout_session_id: session.id,
+        stripeCheckoutUrl: session.url || "",
+        stripe_checkout_url: session.url || "",
+        stripeSessionExpiresAt: session.expires_at ? new Date(session.expires_at * 1000) : null,
+        stripe_session_expires_at: session.expires_at ? new Date(session.expires_at * 1000) : null,
         paymentIntentId: stripePaymentIntentId,
         stripe_payment_intent_id: stripePaymentIntentId,
         stripeCustomerId,
@@ -493,6 +503,8 @@ const recordCheckoutSession = async ({
         applicant_name: application.fullName || user.fullName || "",
         applicantPhone: application.phone || user.phone || "",
         applicant_phone: application.phone || user.phone || "",
+        countryCode: application.countryCode || application.country_code || "",
+        country_code: application.countryCode || application.country_code || "",
         fullName: application.fullName || user.fullName || "",
         selectedCard: plan.id,
         selected_card: plan.id,
@@ -506,16 +518,18 @@ const recordCheckoutSession = async ({
         paymentStatus: initialLifecycle.paymentStatus,
         membershipStatus: initialLifecycle.membershipStatus,
         stripeStatus: session.status,
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        updated_at: new Date()
       },
       $setOnInsert: {
-        createdAt: new Date()
+        createdAt: new Date(),
+        created_at: new Date()
       }
     },
     { upsert: true }
   );
 
-  return payments.findOne({ checkoutSessionId: session.id });
+  return payments.findOne(recordQuery);
 };
 
 const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, payments, applicationId, user, application }) => {
@@ -705,8 +719,17 @@ export const markPaymentFromStripe = async ({ lookup = {}, updates = {} }) => {
   if (!Object.keys(query).length) return null;
 
   const existingPayment = await payments.findOne(query);
+  if (!existingPayment && lookup.checkoutSessionId) {
+    console.warn("[stripe/webhook/payment-not-found]", {
+      checkoutSessionId: lookup.checkoutSessionId,
+      eventStatus: updates.status || updates.paymentStatus || ""
+    });
+    return null;
+  }
   const normalizedUpdates = {
     ...updates,
+    ...(updates.status ? { payment_status: updates.status } : {}),
+    ...(updates.membershipStatus ? { membership_status: updates.membershipStatus.toLowerCase() } : {}),
     ...(updates.checkoutSessionId ? { stripe_checkout_session_id: updates.checkoutSessionId } : {}),
     ...(updates.paymentIntentId ? { stripe_payment_intent_id: updates.paymentIntentId } : {}),
     ...(updates.customerEmail ? { applicant_email: updates.customerEmail } : {}),
@@ -719,13 +742,14 @@ export const markPaymentFromStripe = async ({ lookup = {}, updates = {} }) => {
     {
       $set: {
         ...normalizedUpdates,
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        updated_at: new Date()
       },
       $setOnInsert: {
         createdAt: new Date()
       }
     },
-    { upsert: true }
+    { upsert: !lookup.checkoutSessionId }
   );
 
   const payment = await payments.findOne(query);
@@ -765,6 +789,8 @@ const publicPaymentRecord = (payment = {}) => ({
   applicantName: payment.applicantName || payment.applicant_name || payment.fullName || "",
   applicantEmail: payment.customerEmail || payment.applicant_email || "",
   applicantPhone: payment.applicantPhone || payment.applicant_phone || "",
+  countryCode: payment.countryCode || payment.country_code || "",
+  country_code: payment.countryCode || payment.country_code || "",
   selectedCard: payment.selectedCard || payment.selected_card || "",
   selected_card: payment.selectedCard || payment.selected_card || "",
   cardName: payment.cardName || "",
@@ -777,6 +803,10 @@ const publicPaymentRecord = (payment = {}) => ({
   stripe_customer_id: payment.stripeCustomerId || payment.stripe_customer_id || "",
   stripeCheckoutSessionId: payment.checkoutSessionId || payment.stripe_checkout_session_id || "",
   stripe_checkout_session_id: payment.checkoutSessionId || payment.stripe_checkout_session_id || "",
+  stripeCheckoutUrl: payment.stripeCheckoutUrl || payment.stripe_checkout_url || "",
+  stripe_checkout_url: payment.stripeCheckoutUrl || payment.stripe_checkout_url || "",
+  stripeSessionExpiresAt: payment.stripeSessionExpiresAt || payment.stripe_session_expires_at || "",
+  stripe_session_expires_at: payment.stripeSessionExpiresAt || payment.stripe_session_expires_at || "",
   stripePaymentIntentId: payment.paymentIntentId || payment.stripe_payment_intent_id || "",
   stripe_payment_intent_id: payment.paymentIntentId || payment.stripe_payment_intent_id || "",
   stripeStatus: payment.stripeStatus || "",
@@ -807,6 +837,38 @@ export const getPaymentRecordsForUser = async ({ user }) => {
   const payments = await getMembershipPaymentsCollection();
   const rows = await payments.find({ userId: String(user._id) }).sort({ createdAt: -1, updatedAt: -1 }).limit(100).toArray();
   return rows.map(publicPaymentRecord);
+};
+
+export const renewBankTransferCheckoutForUser = async ({ user, applicationId }) => {
+  const existing = await getPaymentRecordForUser({ user, applicationId });
+  if (!existing) {
+    const error = new Error("Payment record was not found.");
+    error.status = 404;
+    throw error;
+  }
+  if ((existing.paymentMethod || existing.payment_method) !== "bank_transfer") {
+    const error = new Error("Bank transfer is not available for this payment.");
+    error.status = 400;
+    error.publicMessage = "Bank transfer is not available for this payment.";
+    throw error;
+  }
+
+  return createCheckoutSession({
+    user,
+    application: {
+      id: existing.applicationId,
+      referenceId: existing.referenceId,
+      fullName: existing.applicantName,
+      email: existing.applicantEmail,
+      phone: existing.applicantPhone,
+      selectedCard: existing.selectedCard,
+      paymentMethod: "bank_transfer",
+      paymentCurrency: String(existing.currency || "EUR").toUpperCase(),
+      countryCode: existing.countryCode || existing.country_code || ""
+    },
+    paymentMethod: "bank_transfer",
+    currency: existing.currency
+  });
 };
 
 export const getAdminPaymentRecords = async ({ user }) => {

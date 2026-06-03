@@ -24,6 +24,7 @@ export default function AdminPayments() {
   const [activeStatus, setActiveStatus] = useState("All");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [supportNotes, setSupportNotes] = useState({});
 
   const loadPayments = async () => {
     setLoading(true);
@@ -48,14 +49,22 @@ export default function AdminPayments() {
   );
 
   const stats = useMemo(
-    () =>
-      statuses.slice(1).map((status) => ({
+    () => [
+      { status: "Total applications", count: payments.length, icon: CreditCard },
+      ...statuses.slice(1).map((status) => ({
         status,
         count: payments.filter((payment) => payment.paymentStatus === status).length,
         icon: statusIcons[status] || CreditCard
-      })),
+      }))
+    ],
     [payments]
   );
+
+  const markSupportNote = (payment) => {
+    const note = window.prompt("Add support note for this payment:", supportNotes[payment.id] || "");
+    if (note === null) return;
+    setSupportNotes((current) => ({ ...current, [payment.id]: note.trim() || "Support follow-up marked" }));
+  };
 
   return (
     <section className="page-section wide-page admin-page">
@@ -148,14 +157,16 @@ export default function AdminPayments() {
                     </td>
                     <td>
                       <div className="admin-actions">
-                        <a href={`/payment/status/${payment.applicationId}`} target="_blank" rel="noreferrer">
-                          View Status
+                        <a href={`/account/payment/${payment.applicationId}`} target="_blank" rel="noreferrer">
+                          View Details
                         </a>
-                        {sessionId ? (
-                          <button type="button" onClick={() => navigator.clipboard?.writeText(sessionId)}>
-                            Copy Session
-                          </button>
-                        ) : null}
+                        <button type="button" onClick={() => markSupportNote(payment)}>
+                          Mark Support Note
+                        </button>
+                        <a href={`mailto:${payment.applicantEmail}?subject=KR Global Membership ${payment.referenceId || payment.applicationId}`}>
+                          Contact User
+                        </a>
+                        {supportNotes[payment.id] ? <small>{supportNotes[payment.id]}</small> : null}
                       </div>
                     </td>
                   </tr>

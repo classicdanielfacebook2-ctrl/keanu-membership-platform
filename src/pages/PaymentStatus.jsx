@@ -4,7 +4,7 @@ import { ArrowRight, Clock3, CreditCard, Landmark, RefreshCcw, ShieldCheck } fro
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import { formatPaymentAmount } from "../data/paymentMethods.js";
-import { getPaymentStatus } from "../services/stripeCheckout.js";
+import { getPaymentStatus, renewBankTransferInstructions } from "../services/stripeCheckout.js";
 
 const statusCopy = {
   "Awaiting Bank Transfer": {
@@ -40,12 +40,19 @@ const statusCopy = {
 };
 
 const cardName = (id, fallback = "") => cardTypes.find((card) => card.id === id)?.name || fallback || "Membership";
+const isBankTransfer = (payment) => payment?.paymentMethod === "bank_transfer" || payment?.payment_method === "bank_transfer";
+const canShowTransferAction = (payment) => isBankTransfer(payment) && ["Awaiting Bank Transfer", "Expired"].includes(payment?.paymentStatus);
+const sessionExpired = (payment) => {
+  const expiresAt = payment?.stripeSessionExpiresAt || payment?.stripe_session_expires_at || "";
+  return expiresAt ? new Date(expiresAt).getTime() <= Date.now() : false;
+};
 
 export default function PaymentStatus() {
   const { applicationId = "" } = useParams();
   const [params] = useSearchParams();
   const [payment, setPayment] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [renewing, setRenewing] = useState(false);
   const [error, setError] = useState("");
   const instructionsSaved = params.get("instructions") === "saved";
 
@@ -65,6 +72,26 @@ export default function PaymentStatus() {
   useEffect(() => {
     loadPayment();
   }, [applicationId]);
+
+  const handleTransferInstructions = async () => {
+    if (!payment) return;
+    const checkoutUrl = payment.stripeCheckoutUrl || payment.stripe_checkout_url || "";
+    if (checkoutUrl && !sessionExpired(payment)) {
+      window.location.href = checkoutUrl;
+      return;
+    }
+
+    setRenewing(true);
+    setError("");
+    try {
+      const session = await renewBankTransferInstructions(applicationId);
+      if (!session.url) throw new Error("Transfer instructions could not be generated.");
+      window.location.href = session.url;
+    } catch (err) {
+      setError(err?.message || "Transfer instructions could not be generated.");
+      setRenewing(false);
+    }
+  };
 
   const displayStatus = payment?.paymentStatus || "Processing";
   const current = statusCopy[displayStatus] || statusCopy.Processing;
@@ -103,10 +130,19 @@ export default function PaymentStatus() {
             <Icon size={40} />
             <h3>{current.title}</h3>
             <p>{current.copy}</p>
-            {payment?.paymentMethod === "bank_transfer" || payment?.payment_method === "bank_transfer" ? (
+            {isBankTransfer(payment) ? (
               <>
-                <p>Please send the exact amount using the IBAN and reference shown by Stripe.</p>
-                <p>Your membership will activate automatically after Stripe confirms the payment.</p>
+                <div className="bank-transfer-message">
+                  <strong>Awaiting Bank Transfer</strong>
+                  <p>
+                    Your bank transfer instructions have been generated. If you have already sent the transfer, please wait
+                    while Stripe confirms receipt. SEPA Instant may confirm quickly, while normal bank transfer may take 1-3
+                    business days.
+                  </p>
+                  {sessionExpired(payment) || displayStatus === "Expired" ? (
+                    <span>This transfer instruction expired. Create a new bank transfer session.</span>
+                  ) : null}
+                </div>
               </>
             ) : null}
             <div className="checkout-total-bar payment-status-summary">
@@ -127,19 +163,38 @@ export default function PaymentStatus() {
                 <strong>{payment?.referenceId || payment?.applicationId}</strong>
               </div>
             </div>
-            {payment?.stripeCheckoutSessionId ? <p>Stripe Session: {payment.stripeCheckoutSessionId}</p> : null}
             <div className="payment-actions">
+              {canShowTransferAction(payment) ? (
+                <button className="button primary" type="button" onClick={handleTransferInstructions} disabled={renewing}>
+                  {sessionExpired(payment) || displayStatus === "Expired" ? "Generate New Transfer Instructions" : "View Transfer Instructions"}
+                  <ArrowRight size={17} />
+                </button>
+              ) : null}
               <button className="button secondary" type="button" onClick={loadPayment}>
                 <RefreshCcw size={17} />
                 Refresh Status
               </button>
-              {["Failed", "Expired"].includes(displayStatus) ? (
+              <Link className="button secondary" to={`/support?reference=${encodeURIComponent(payment?.referenceId || payment?.applicationId || "")}`}>
+                Contact Support
+              </Link>
+              {displayStatus === "Failed" ? (
                 <Link className="button primary" to="/apply">
                   Create New Checkout
                   <ArrowRight size={17} />
                 </Link>
               ) : null}
             </div>
+            <details className="technical-details">
+              <summary>Technical details</summary>
+              <div>
+                <span>Stripe checkout session</span>
+                <strong>{payment?.stripeCheckoutSessionId || "Not available"}</strong>
+              </div>
+              <div>
+                <span>Stripe payment intent</span>
+                <strong>{payment?.stripePaymentIntentId || "Not available"}</strong>
+              </div>
+            </details>
           </>
         )}
       </div>

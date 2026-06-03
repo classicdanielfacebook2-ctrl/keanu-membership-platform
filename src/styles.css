@@ -6312,6 +6312,10 @@ body::after {
 .account-record-card {
   display: grid;
   gap: 1.1rem;
+  border-color: rgba(244, 216, 139, 0.24);
+  background:
+    linear-gradient(145deg, rgba(244, 216, 139, 0.075), rgba(255, 255, 255, 0.018)),
+    rgba(9, 9, 9, 0.94);
 }
 
 .account-record-top {
@@ -6336,7 +6340,7 @@ body::after {
 .account-detail-grid div {
   min-width: 0;
   border: 1px solid rgba(214, 208, 194, 0.12);
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(0, 0, 0, 0.28);
   border-radius: 14px;
   padding: 0.85rem;
 }
@@ -6364,6 +6368,65 @@ body::after {
   color: var(--muted);
   text-align: center;
   padding: 1.5rem;
+}
+
+.bank-transfer-message {
+  border: 1px solid rgba(244, 216, 139, 0.28);
+  border-radius: 16px;
+  background: rgba(244, 216, 139, 0.07);
+  color: var(--muted);
+  line-height: 1.6;
+  padding: 1rem;
+}
+
+.bank-transfer-message strong {
+  display: block;
+  color: var(--gold-light);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.2rem;
+  margin-bottom: 0.35rem;
+}
+
+.bank-transfer-message p,
+.bank-transfer-message span {
+  margin: 0;
+}
+
+.bank-transfer-message span {
+  display: block;
+  margin-top: 0.55rem;
+  color: var(--ivory);
+}
+
+.technical-details {
+  border-top: 1px solid rgba(214, 208, 194, 0.12);
+  padding-top: 0.85rem;
+}
+
+.technical-details summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.technical-details div {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+}
+
+.technical-details span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.technical-details strong {
+  color: var(--ivory);
+  overflow-wrap: anywhere;
 }
 
 .centered-actions {

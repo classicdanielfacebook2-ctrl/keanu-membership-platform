@@ -70,7 +70,7 @@ const handleStripeEvent = async (event) => {
           stripePaymentStatus: object.payment_status,
           status: "expired",
           paymentStatus: "Expired",
-          membershipStatus: "Inactive"
+          membershipStatus: "Pending"
         }
       });
       break;
@@ -102,7 +102,7 @@ const handleStripeEvent = async (event) => {
           stripePaymentStatus: object.payment_status,
           status: "payment_failed",
           paymentStatus: "Failed",
-          membershipStatus: "Inactive"
+          membershipStatus: "Pending"
         }
       });
       break;
@@ -143,7 +143,7 @@ const handleStripeEvent = async (event) => {
           paymentIntentId: object.id,
           status: "payment_failed",
           paymentStatus: "Failed",
-          membershipStatus: "Inactive",
+          membershipStatus: "Pending",
           stripePaymentStatus: object.status,
           failureMessage: object.last_payment_error?.message || ""
         }
@@ -172,7 +172,7 @@ const handleStripeEvent = async (event) => {
         updates: {
           status: "refunded",
           paymentStatus: "Refunded",
-          membershipStatus: "Inactive",
+          membershipStatus: "Refunded",
           refundStatus: object.status || "updated",
           chargeId: object.charge || object.id
         }

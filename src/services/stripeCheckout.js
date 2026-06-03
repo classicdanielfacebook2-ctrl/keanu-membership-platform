@@ -34,3 +34,9 @@ export const getAccountPayments = () =>
   authRequest("/api/create-checkout-session?action=account-payments", {
     method: "GET"
   });
+
+export const renewBankTransferInstructions = (applicationId) =>
+  authRequest("/api/create-checkout-session", {
+    method: "POST",
+    body: JSON.stringify({ action: "renew-bank-transfer", applicationId })
+  });

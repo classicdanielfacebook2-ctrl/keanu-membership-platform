@@ -4,7 +4,8 @@ import {
   getAdminPaymentRecords,
   getEnabledCheckoutPaymentMethodIds,
   getPaymentRecordForUser,
-  getPaymentRecordsForUser
+  getPaymentRecordsForUser,
+  renewBankTransferCheckoutForUser
 } from "../serverless/stripeCore.js";
 
 export default async function handler(req, res) {
@@ -38,6 +39,16 @@ export default async function handler(req, res) {
       const enabledPaymentMethods = await getEnabledCheckoutPaymentMethodIds({ currency, countryCode });
       return sendJson(res, 200, {
         enabledPaymentMethods: enabledPaymentMethods.length ? enabledPaymentMethods : ["card"]
+      });
+    }
+
+    if (req.body?.action === "renew-bank-transfer") {
+      const applicationId = req.body?.applicationId || req.body?.application_id || "";
+      if (!applicationId) return sendJson(res, 400, { error: "Application reference is required." });
+      const session = await renewBankTransferCheckoutForUser({ user, applicationId });
+      return sendJson(res, 200, {
+        id: session.id,
+        url: session.url
       });
     }
 
