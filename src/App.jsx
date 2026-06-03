@@ -1,6 +1,7 @@
 import { NavLink, Route, Routes, useLocation } from "react-router-dom";
 import {
   BadgeCheck,
+  CreditCard,
   FileText,
   Headset,
   Image,
@@ -20,8 +21,10 @@ import Apply from "./pages/Apply.jsx";
 import Payment from "./pages/Payment.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import PaymentCancelled from "./pages/PaymentCancelled.jsx";
+import PaymentStatus from "./pages/PaymentStatus.jsx";
 import Support from "./pages/Support.jsx";
 import Admin from "./pages/Admin.jsx";
+import AdminPayments from "./pages/AdminPayments.jsx";
 import SupportAdmin from "./pages/SupportAdmin.jsx";
 import AdminSetup from "./pages/AdminSetup.jsx";
 import ProtectionCenter from "./pages/ProtectionCenter.jsx";
@@ -46,6 +49,7 @@ const navItems = [
 
 const adminNavItems = [
   { to: "/admin", label: "Admin", icon: LayoutDashboard },
+  { to: "/admin/payments", label: "Payments", icon: CreditCard },
   { to: "/admin/support", label: "Support Desk", icon: MessagesSquare },
   { to: "/admin/protection", label: "Protection", icon: ShieldAlert },
   { to: "/media-review", label: "Media", icon: Image }
@@ -158,6 +162,14 @@ export default function App() {
           <Route path="/apply/select-state" element={<LocationSelector type="state" />} />
           <Route path="/apply/select-city" element={<LocationSelector type="city" />} />
           <Route path="/payment" element={<Payment />} />
+          <Route
+            path="/payment/status/:applicationId"
+            element={
+              <ProtectedRoute>
+                <PaymentStatus />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/payment-cancelled" element={<PaymentCancelled />} />
           <Route path="/support" element={<Support />} />
@@ -176,6 +188,14 @@ export default function App() {
             element={
               <ProtectedRoute adminOnly>
                 <SupportAdmin />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/payments"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminPayments />
               </ProtectedRoute>
             }
           />

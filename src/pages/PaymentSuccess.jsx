@@ -64,8 +64,8 @@ export default function PaymentSuccess() {
         ) : null}
         {application ? <p>Application Reference: {application.referenceId || application.id}</p> : null}
         {sessionId ? <p>Stripe Session: {sessionId}</p> : null}
-        <Link className="button primary" to="/support">
-          Contact Member Services
+        <Link className="button primary" to={application ? `/payment/status/${application.id}` : "/support"}>
+          {bankTransfer ? "View Payment Status" : "Contact Member Services"}
           <CreditCard size={17} />
         </Link>
       </div>

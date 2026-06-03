@@ -432,10 +432,15 @@ const recordCheckoutSession = async ({
         stripeCustomerId,
         stripe_customer_id: stripeCustomerId,
         applicationId,
+        application_id: applicationId,
         referenceId: application.referenceId || "",
         userId: String(user._id),
         customerEmail: application.email || user.email || "",
         applicant_email: application.email || user.email || "",
+        applicantName: application.fullName || user.fullName || "",
+        applicant_name: application.fullName || user.fullName || "",
+        applicantPhone: application.phone || user.phone || "",
+        applicant_phone: application.phone || user.phone || "",
         fullName: application.fullName || user.fullName || "",
         selectedCard: plan.id,
         selected_card: plan.id,
@@ -503,7 +508,7 @@ const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, paymen
       payment_method_types: ["customer_balance"],
       payment_method_options: getBankTransferOptions(bankTransferRegion),
       client_reference_id: applicationId,
-      success_url: `${siteUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${siteUrl}/payment/status/${encodeURIComponent(applicationId)}?session_id={CHECKOUT_SESSION_ID}&instructions=saved`,
       cancel_url: `${siteUrl}/payment-cancelled`,
       metadata: sessionMetadata,
       line_items: [
@@ -692,6 +697,66 @@ export const markPaymentFromStripe = async ({ lookup = {}, updates = {} }) => {
   }
 
   return payment;
+};
+
+const publicPaymentRecord = (payment = {}) => ({
+  id: String(payment._id || ""),
+  status: payment.status || "",
+  paymentStatus: payment.paymentStatus || "Pending",
+  membershipStatus: payment.membershipStatus || "Pending",
+  applicationId: payment.applicationId || payment.application_id || "",
+  application_id: payment.applicationId || payment.application_id || "",
+  referenceId: payment.referenceId || "",
+  applicantName: payment.applicantName || payment.applicant_name || payment.fullName || "",
+  applicantEmail: payment.customerEmail || payment.applicant_email || "",
+  applicantPhone: payment.applicantPhone || payment.applicant_phone || "",
+  selectedCard: payment.selectedCard || payment.selected_card || "",
+  selected_card: payment.selectedCard || payment.selected_card || "",
+  cardName: payment.cardName || "",
+  amount: payment.amount || 0,
+  currency: payment.currency || "eur",
+  paymentMethod: payment.paymentMethod || payment.payment_method || "",
+  payment_method: payment.paymentMethod || payment.payment_method || "",
+  paymentMethodLabel: payment.paymentMethodLabel || "",
+  stripeCustomerId: payment.stripeCustomerId || payment.stripe_customer_id || "",
+  stripe_customer_id: payment.stripeCustomerId || payment.stripe_customer_id || "",
+  stripeCheckoutSessionId: payment.checkoutSessionId || payment.stripe_checkout_session_id || "",
+  stripe_checkout_session_id: payment.checkoutSessionId || payment.stripe_checkout_session_id || "",
+  stripePaymentIntentId: payment.paymentIntentId || payment.stripe_payment_intent_id || "",
+  stripe_payment_intent_id: payment.paymentIntentId || payment.stripe_payment_intent_id || "",
+  stripeStatus: payment.stripeStatus || "",
+  stripePaymentStatus: payment.stripePaymentStatus || "",
+  refundStatus: payment.refundStatus || "",
+  failureMessage: payment.failureMessage || "",
+  createdAt: payment.createdAt || "",
+  updatedAt: payment.updatedAt || ""
+});
+
+export const getPaymentRecordForUser = async ({ user, applicationId }) => {
+  const payments = await getMembershipPaymentsCollection();
+  const id = String(applicationId || "").trim();
+  const payment = await payments.findOne({
+    userId: String(user._id),
+    $or: [
+      { applicationId: id },
+      { application_id: id },
+      { referenceId: id },
+      { checkoutSessionId: id },
+      { stripe_checkout_session_id: id }
+    ]
+  });
+  return payment ? publicPaymentRecord(payment) : null;
+};
+
+export const getAdminPaymentRecords = async ({ user }) => {
+  if (user.role !== "admin") {
+    const error = new Error("Admin access is required.");
+    error.status = 403;
+    throw error;
+  }
+  const payments = await getMembershipPaymentsCollection();
+  const rows = await payments.find({}).sort({ createdAt: -1, updatedAt: -1 }).limit(250).toArray();
+  return rows.map(publicPaymentRecord);
 };
 
 export const mapCheckoutStatus = (session) => {

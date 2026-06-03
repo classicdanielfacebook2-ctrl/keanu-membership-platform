@@ -19,3 +19,13 @@ export const getAvailableCheckoutPaymentMethods = (currency = "EUR", countryCode
       method: "GET"
     }
   );
+
+export const getPaymentStatus = (applicationId) =>
+  authRequest(`/api/create-checkout-session?action=status&applicationId=${encodeURIComponent(applicationId)}`, {
+    method: "GET"
+  });
+
+export const getAdminPayments = () =>
+  authRequest("/api/create-checkout-session?action=admin-payments", {
+    method: "GET"
+  });

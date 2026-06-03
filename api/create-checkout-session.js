@@ -1,5 +1,10 @@
 import { requireAuth, sendJson } from "../serverless/authCore.js";
-import { createCheckoutSession, getEnabledCheckoutPaymentMethodIds } from "../serverless/stripeCore.js";
+import {
+  createCheckoutSession,
+  getAdminPaymentRecords,
+  getEnabledCheckoutPaymentMethodIds,
+  getPaymentRecordForUser
+} from "../serverless/stripeCore.js";
 
 export default async function handler(req, res) {
   if (!["GET", "POST"].includes(req.method)) {
@@ -10,6 +15,19 @@ export default async function handler(req, res) {
   try {
     const user = await requireAuth(req);
     if (req.method === "GET") {
+      const action = String(req.query?.action || "methods");
+      if (action === "status") {
+        const applicationId = req.query?.applicationId || req.query?.application_id || "";
+        if (!applicationId) return sendJson(res, 400, { error: "Application reference is required." });
+        const payment = await getPaymentRecordForUser({ user, applicationId });
+        if (!payment) return sendJson(res, 404, { error: "Payment record was not found." });
+        return sendJson(res, 200, { payment });
+      }
+      if (action === "admin-payments") {
+        const payments = await getAdminPaymentRecords({ user });
+        return sendJson(res, 200, { payments });
+      }
+
       const currency = req.query?.currency || "EUR";
       const countryCode = req.query?.countryCode || "";
       const enabledPaymentMethods = await getEnabledCheckoutPaymentMethodIds({ currency, countryCode });
