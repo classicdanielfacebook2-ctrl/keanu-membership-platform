@@ -76,6 +76,44 @@ const paymentMethodConfig = {
   open_banking: { label: "Open Banking", stripeTypes: ["pay_by_bank"], configKey: "pay_by_bank", currencies: ["gbp"], delayed: false }
 };
 
+const paymentLifecycle = {
+  awaitingBankTransfer: {
+    status: "awaiting_bank_transfer",
+    paymentStatus: "Awaiting Bank Transfer",
+    membershipStatus: "Pending"
+  },
+  processing: {
+    status: "processing",
+    paymentStatus: "Processing",
+    membershipStatus: "Pending"
+  },
+  partiallyPaid: {
+    status: "partially_paid",
+    paymentStatus: "Partially Paid",
+    membershipStatus: "Pending"
+  },
+  paid: {
+    status: "paid",
+    paymentStatus: "Paid",
+    membershipStatus: "Active"
+  },
+  failed: {
+    status: "payment_failed",
+    paymentStatus: "Failed",
+    membershipStatus: "Inactive"
+  },
+  expired: {
+    status: "expired",
+    paymentStatus: "Expired",
+    membershipStatus: "Inactive"
+  },
+  refunded: {
+    status: "refunded",
+    paymentStatus: "Refunded",
+    membershipStatus: "Inactive"
+  }
+};
+
 const normalizePaymentMethod = (value = "") => {
   const id = String(value || "").trim().toLowerCase();
   return paymentMethodConfig[id] ? id : "card";
@@ -257,6 +295,116 @@ const buildSessionMetadata = ({ applicationId, application, user, plan, paymentM
   delayedPayment: String(paymentConfig.delayed)
 });
 
+const escapeHtml = (value = "") =>
+  String(value).replace(/[&<>"']/g, (character) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    };
+    return entities[character];
+  });
+
+const sendMembershipPaymentConfirmationEmail = async (payment = {}) => {
+  const apiKey = process.env.RESEND_API_KEY || "";
+  const to = payment.customerEmail || payment.applicant_email || "";
+  if (!apiKey || !to) return;
+
+  const reference = payment.referenceId || payment.applicationId || "Membership application";
+  const html = `
+    <div style="margin:0;padding:32px;background:#050505;color:#f7f3ea;font-family:Inter,Arial,sans-serif;">
+      <div style="max-width:560px;margin:0 auto;border:1px solid rgba(244,216,139,.34);background:#0d0d0d;padding:32px;">
+        <p style="margin:0 0 12px;color:#f4d88b;font-size:12px;letter-spacing:.18em;text-transform:uppercase;">KR Global Membership</p>
+        <h1 style="margin:0 0 18px;font-family:Georgia,serif;font-size:30px;line-height:1.15;color:#fff9ed;">Payment confirmed</h1>
+        <p style="margin:0 0 18px;line-height:1.7;color:#cfc7ba;">Your payment has been confirmed by Stripe and your membership is now active.</p>
+        <div style="margin:22px 0;padding:16px;border:1px solid rgba(244,216,139,.28);background:#060606;">
+          <p style="margin:0 0 8px;color:#a9a197;">Reference</p>
+          <strong style="color:#f4d88b;">${escapeHtml(reference)}</strong>
+        </div>
+        <p style="margin:0;color:#a9a197;line-height:1.7;">For assistance, contact support@keanureeves.company.</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: "KR Global Membership <support@keanureeves.company>",
+        to,
+        subject: "Membership payment confirmed",
+        html
+      })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      console.error("[stripe/payment-confirmation-email]", {
+        message: data?.message || "Resend rejected the payment confirmation email.",
+        reference
+      });
+    } else {
+      console.log("[stripe/payment-confirmation-email]", { message: "Payment confirmation email sent", reference });
+    }
+  } catch (error) {
+    console.error("[stripe/payment-confirmation-email]", { message: error?.message, reference });
+  }
+};
+
+const sendMembershipPaymentFailureEmail = async (payment = {}) => {
+  const apiKey = process.env.RESEND_API_KEY || "";
+  const to = payment.customerEmail || payment.applicant_email || "";
+  if (!apiKey || !to) return;
+
+  const reference = payment.referenceId || payment.applicationId || "Membership application";
+  const html = `
+    <div style="margin:0;padding:32px;background:#050505;color:#f7f3ea;font-family:Inter,Arial,sans-serif;">
+      <div style="max-width:560px;margin:0 auto;border:1px solid rgba(244,216,139,.34);background:#0d0d0d;padding:32px;">
+        <p style="margin:0 0 12px;color:#f4d88b;font-size:12px;letter-spacing:.18em;text-transform:uppercase;">KR Global Membership</p>
+        <h1 style="margin:0 0 18px;font-family:Georgia,serif;font-size:30px;line-height:1.15;color:#fff9ed;">Payment could not be confirmed</h1>
+        <p style="margin:0 0 18px;line-height:1.7;color:#cfc7ba;">Stripe reported that your payment did not complete. You may retry checkout or contact Member Services for assistance.</p>
+        <div style="margin:22px 0;padding:16px;border:1px solid rgba(244,216,139,.28);background:#060606;">
+          <p style="margin:0 0 8px;color:#a9a197;">Reference</p>
+          <strong style="color:#f4d88b;">${escapeHtml(reference)}</strong>
+        </div>
+        <p style="margin:0;color:#a9a197;line-height:1.7;">Support: support@keanureeves.company</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: "KR Global Membership <support@keanureeves.company>",
+        to,
+        subject: "Membership payment requires attention",
+        html
+      })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      console.error("[stripe/payment-failure-email]", {
+        message: data?.message || "Resend rejected the payment failure email.",
+        reference
+      });
+    } else {
+      console.log("[stripe/payment-failure-email]", { message: "Payment failure email sent", reference });
+    }
+  } catch (error) {
+    console.error("[stripe/payment-failure-email]", { message: error?.message, reference });
+  }
+};
+
 const recordCheckoutSession = async ({
   payments,
   session,
@@ -267,28 +415,39 @@ const recordCheckoutSession = async ({
   selectedAmount,
   selectedCurrency,
   paymentMethodId,
-  paymentConfig
+  paymentConfig,
+  stripeCustomerId = ""
 }) => {
+  const initialLifecycle = paymentMethodId === "bank_transfer" ? paymentLifecycle.awaitingBankTransfer : paymentLifecycle.processing;
+  const stripePaymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || "";
   await payments.updateOne(
     { checkoutSessionId: session.id },
     {
       $set: {
+        status: initialLifecycle.status,
         checkoutSessionId: session.id,
-        paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : "",
+        stripe_checkout_session_id: session.id,
+        paymentIntentId: stripePaymentIntentId,
+        stripe_payment_intent_id: stripePaymentIntentId,
+        stripeCustomerId,
+        stripe_customer_id: stripeCustomerId,
         applicationId,
         referenceId: application.referenceId || "",
         userId: String(user._id),
         customerEmail: application.email || user.email || "",
+        applicant_email: application.email || user.email || "",
         fullName: application.fullName || user.fullName || "",
         selectedCard: plan.id,
+        selected_card: plan.id,
         cardName: plan.name,
         amount: selectedAmount,
         currency: selectedCurrency,
         paymentMethod: paymentMethodId,
+        payment_method: paymentMethodId,
         paymentMethodLabel: paymentConfig.label,
         delayedPayment: paymentConfig.delayed,
-        paymentStatus: "Pending",
-        membershipStatus: "Pending",
+        paymentStatus: initialLifecycle.paymentStatus,
+        membershipStatus: initialLifecycle.membershipStatus,
         stripeStatus: session.status,
         updatedAt: new Date()
       },
@@ -386,7 +545,8 @@ const createBankTransferCheckoutSession = async ({ stripe, siteUrl, plan, paymen
     selectedAmount,
     selectedCurrency,
     paymentMethodId,
-    paymentConfig
+    paymentConfig,
+    stripeCustomerId
   });
 
   return session;
@@ -484,11 +644,21 @@ export const markPaymentFromStripe = async ({ lookup = {}, updates = {} }) => {
   const query = Object.fromEntries(Object.entries(lookup).filter(([, value]) => value));
   if (!Object.keys(query).length) return null;
 
+  const existingPayment = await payments.findOne(query);
+  const normalizedUpdates = {
+    ...updates,
+    ...(updates.checkoutSessionId ? { stripe_checkout_session_id: updates.checkoutSessionId } : {}),
+    ...(updates.paymentIntentId ? { stripe_payment_intent_id: updates.paymentIntentId } : {}),
+    ...(updates.customerEmail ? { applicant_email: updates.customerEmail } : {}),
+    ...(updates.selectedCard ? { selected_card: updates.selectedCard } : {}),
+    ...(updates.paymentMethod ? { payment_method: updates.paymentMethod } : {})
+  };
+
   await payments.updateOne(
     query,
     {
       $set: {
-        ...updates,
+        ...normalizedUpdates,
         updatedAt: new Date()
       },
       $setOnInsert: {
@@ -514,12 +684,22 @@ export const markPaymentFromStripe = async ({ lookup = {}, updates = {} }) => {
     );
   }
 
+  if (updates.status === paymentLifecycle.paid.status && existingPayment?.status !== paymentLifecycle.paid.status) {
+    await sendMembershipPaymentConfirmationEmail(payment);
+  }
+  if (updates.status === paymentLifecycle.failed.status && existingPayment?.status !== paymentLifecycle.failed.status) {
+    await sendMembershipPaymentFailureEmail(payment);
+  }
+
   return payment;
 };
 
 export const mapCheckoutStatus = (session) => {
   if (session.payment_status === "paid") {
-    return { paymentStatus: "Paid", membershipStatus: "Active" };
+    return paymentLifecycle.paid;
   }
-  return { paymentStatus: "Pending", membershipStatus: "Pending" };
+  if (session.payment_status === "unpaid" && session.metadata?.paymentMethod === "bank_transfer") {
+    return paymentLifecycle.awaitingBankTransfer;
+  }
+  return paymentLifecycle.processing;
 };

@@ -68,7 +68,8 @@ const handleStripeEvent = async (event) => {
           paymentIntentId: getPaymentIntentId(object.payment_intent),
           stripeStatus: object.status,
           stripePaymentStatus: object.payment_status,
-          paymentStatus: "Failed",
+          status: "expired",
+          paymentStatus: "Expired",
           membershipStatus: "Inactive"
         }
       });
@@ -83,6 +84,7 @@ const handleStripeEvent = async (event) => {
           paymentIntentId: getPaymentIntentId(object.payment_intent),
           stripeStatus: object.status,
           stripePaymentStatus: object.payment_status,
+          status: "paid",
           paymentStatus: "Paid",
           membershipStatus: "Active"
         }
@@ -98,8 +100,23 @@ const handleStripeEvent = async (event) => {
           paymentIntentId: getPaymentIntentId(object.payment_intent),
           stripeStatus: object.status,
           stripePaymentStatus: object.payment_status,
+          status: "payment_failed",
           paymentStatus: "Failed",
           membershipStatus: "Inactive"
+        }
+      });
+      break;
+    }
+    case "payment_intent.processing": {
+      await markPaymentFromStripe({
+        lookup: intentLookup(object),
+        updates: {
+          ...baseMetadata(object),
+          paymentIntentId: object.id,
+          status: baseMetadata(object).paymentMethod === "bank_transfer" ? "awaiting_bank_transfer" : "processing",
+          paymentStatus: baseMetadata(object).paymentMethod === "bank_transfer" ? "Awaiting Bank Transfer" : "Processing",
+          membershipStatus: "Pending",
+          stripePaymentStatus: object.status
         }
       });
       break;
@@ -110,6 +127,7 @@ const handleStripeEvent = async (event) => {
         updates: {
           ...baseMetadata(object),
           paymentIntentId: object.id,
+          status: "paid",
           paymentStatus: "Paid",
           membershipStatus: "Active",
           stripePaymentStatus: object.status
@@ -123,6 +141,7 @@ const handleStripeEvent = async (event) => {
         updates: {
           ...baseMetadata(object),
           paymentIntentId: object.id,
+          status: "payment_failed",
           paymentStatus: "Failed",
           membershipStatus: "Inactive",
           stripePaymentStatus: object.status,
@@ -131,15 +150,31 @@ const handleStripeEvent = async (event) => {
       });
       break;
     }
+    case "payment_intent.partially_funded": {
+      await markPaymentFromStripe({
+        lookup: intentLookup(object),
+        updates: {
+          ...baseMetadata(object),
+          paymentIntentId: object.id,
+          status: "partially_paid",
+          paymentStatus: "Partially Paid",
+          membershipStatus: "Pending",
+          stripePaymentStatus: object.status
+        }
+      });
+      break;
+    }
     case "charge.refunded":
+    case "refund.updated":
     case "charge.refund.updated": {
       await markPaymentFromStripe({
         lookup: chargeLookup(object),
         updates: {
+          status: "refunded",
           paymentStatus: "Refunded",
           membershipStatus: "Inactive",
           refundStatus: object.status || "updated",
-          chargeId: object.id
+          chargeId: object.charge || object.id
         }
       });
       break;

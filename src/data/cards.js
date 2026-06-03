@@ -57,7 +57,17 @@ export const cardTypes = [
   }
 ];
 
-export const paymentStatuses = ["Pending", "Paid", "Failed", "Refunded", "Disputed"];
+export const paymentStatuses = [
+  "Pending",
+  "Awaiting Bank Transfer",
+  "Processing",
+  "Partially Paid",
+  "Paid",
+  "Failed",
+  "Expired",
+  "Refunded",
+  "Disputed"
+];
 export const reviewStatuses = ["Pending", "Approved", "Rejected"];
 export const shippingStatuses = ["Not Started", "Processing", "Shipped", "Delivered"];
 
