@@ -39,6 +39,7 @@ import AuthPage from "./pages/AuthPage.jsx";
 import LocationSelector from "./pages/LocationSelector.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import LiveChatWidget from "./components/LiveChatWidget.jsx";
+import DirectContactButtons from "./components/DirectContactButtons.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
 import { getApprovedHomeImages } from "./data/homeImages.js";
 
@@ -371,6 +372,7 @@ export default function App() {
         </div>
         {simpleAuthFooter ? null : (
           <div className="footer-stack">
+            <DirectContactButtons compact className="footer-direct-contact" />
             <div className="footer-links">
               <NavLink to="/terms">Terms</NavLink>
               <NavLink to="/privacy">Privacy</NavLink>

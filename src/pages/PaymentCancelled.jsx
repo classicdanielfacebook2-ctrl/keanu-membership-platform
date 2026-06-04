@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, XCircle } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
+import DirectContactButtons from "../components/DirectContactButtons.jsx";
 import { getApplications, updateApplication } from "../services/storage.js";
 import { useEffect, useMemo } from "react";
 
@@ -34,6 +35,7 @@ export default function PaymentCancelled() {
           Return to Payment
           <ArrowRight size={17} />
         </Link>
+        <DirectContactButtons className="payment-direct-contact" />
       </div>
     </section>
   );

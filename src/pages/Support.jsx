@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BadgeCheck, ChevronDown, Clock, CreditCard, Fingerprint, LockKeyhole, Mail, MessageCircle, RotateCcw, Send, ShieldAlert, Sparkles } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
+import DirectContactButtons from "../components/DirectContactButtons.jsx";
 import { saveSupportMessage } from "../services/storage.js";
 
 const emptyMessage = { name: "", email: "", subject: "", message: "" };
@@ -88,6 +89,8 @@ export default function Support() {
             <Mail size={15} />
             support@keanureeves.company
           </a>
+
+          <DirectContactButtons compact className="support-direct-contact" />
 
           <div className="review-time-card">
             <Clock size={16} />

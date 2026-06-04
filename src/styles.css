@@ -4151,6 +4151,86 @@ textarea {
   gap: 0.8rem;
 }
 
+.direct-contact-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(200, 169, 107, 0.18);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(200, 169, 107, 0.08), rgba(255, 255, 255, 0.025)),
+    #121212;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.24);
+  padding: 0.9rem;
+}
+
+.direct-contact-card.compact {
+  gap: 0.75rem;
+  border-radius: 16px;
+  padding: 0.7rem;
+}
+
+.direct-contact-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.direct-contact-copy strong {
+  color: #f8f1df;
+  font-size: 0.9rem;
+}
+
+.direct-contact-copy span {
+  color: #a9a196;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.direct-contact-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.direct-contact-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 2.35rem;
+  height: 2.35rem;
+  border: 1px solid rgba(200, 169, 107, 0.3);
+  border-radius: 999px;
+  background: rgba(200, 169, 107, 0.09);
+  color: #f2dfaa;
+  text-decoration: none;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.direct-contact-actions a:hover {
+  transform: translateY(-1px);
+  border-color: rgba(200, 169, 107, 0.58);
+  background: rgba(200, 169, 107, 0.16);
+}
+
+.direct-contact-actions a span {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.footer-direct-contact {
+  max-width: 26rem;
+}
+
+.support-direct-contact,
+.payment-direct-contact,
+.account-dashboard-contact {
+  width: 100%;
+}
+
 .footer-links a {
   color: var(--muted);
   transition: color 160ms ease;
@@ -6812,6 +6892,19 @@ body::after {
 }
 
 @media (max-width: 720px) {
+  .direct-contact-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .direct-contact-actions {
+    width: 100%;
+  }
+
+  .direct-contact-actions a {
+    flex: 1;
+  }
+
   .account-page-header {
     position: sticky;
     top: calc(var(--header-height, 72px) + 0.45rem);

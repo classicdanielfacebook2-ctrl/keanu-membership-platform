@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight, Clock3, CreditCard, Landmark, RefreshCcw, ShieldCheck } from "lucide-react";
 import AccountPageHeader from "../components/AccountPageHeader.jsx";
+import DirectContactButtons from "../components/DirectContactButtons.jsx";
 import { cardTypes } from "../data/cards.js";
 import { formatPaymentAmount } from "../data/paymentMethods.js";
 import { getPaymentStatus } from "../services/stripeCheckout.js";
@@ -167,6 +168,9 @@ export default function PaymentStatus() {
                 </Link>
               ) : null}
             </div>
+            {displayStatus !== "Paid" && displayStatus !== "Refunded" ? (
+              <DirectContactButtons className="payment-direct-contact" />
+            ) : null}
           </>
         )}
       </div>

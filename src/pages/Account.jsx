@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { City, Country, State } from "country-state-city";
 import AccountPageHeader from "../components/AccountPageHeader.jsx";
+import DirectContactButtons from "../components/DirectContactButtons.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import { formatPaymentAmount } from "../data/paymentMethods.js";
@@ -888,6 +889,7 @@ export default function Account({ view = "home" }) {
       {error ? <div className="notice warning">{error}</div> : null}
 
       {view === "home" ? <AccountMenu onLogout={logout} /> : null}
+      {view === "home" ? <DirectContactButtons className="account-dashboard-contact" /> : null}
       {view === "personal" ? <PersonalDetails auth={auth} /> : null}
       {view === "security" ? <SecurityPrivacy /> : null}
       {view === "change-password" ? <ChangePasswordPanel /> : null}
