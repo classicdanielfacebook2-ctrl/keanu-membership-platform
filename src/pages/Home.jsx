@@ -279,7 +279,6 @@ export default function Home() {
             Choose your membership level and continue through a secure guided application experience.
           </p>
           <div className="cinematic-trust-row" aria-label="Payment trust indicators">
-            <span>Stripe Checkout</span>
             <span>Encrypted session</span>
             <span>Private account access</span>
           </div>
