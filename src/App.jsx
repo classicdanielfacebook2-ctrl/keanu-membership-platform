@@ -182,7 +182,23 @@ export default function App() {
             path="/account/applications"
             element={
               <ProtectedRoute>
-                <Account view="applications" />
+                <Account view="memberships" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/personal"
+            element={
+              <ProtectedRoute>
+                <Account view="personal" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/security"
+            element={
+              <ProtectedRoute>
+                <Account view="security" />
               </ProtectedRoute>
             }
           />
@@ -191,6 +207,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Account view="payments" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/payment-history"
+            element={
+              <ProtectedRoute>
+                <Account view="history" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/memberships"
+            element={
+              <ProtectedRoute>
+                <Account view="memberships" />
               </ProtectedRoute>
             }
           />

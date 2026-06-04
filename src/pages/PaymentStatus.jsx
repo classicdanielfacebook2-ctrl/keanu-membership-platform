@@ -135,7 +135,7 @@ export default function PaymentStatus() {
             <div className="payment-actions compact-actions">
               {isBankTransfer(payment) ? (
                 <Link className="button primary" to={`/account/payment/${payment.applicationId}/bank-details`}>
-                  View Bank Details
+                  View Transfer Instructions
                   <ArrowRight size={17} />
                 </Link>
               ) : null}
@@ -146,6 +146,11 @@ export default function PaymentStatus() {
               <Link className="button secondary" to={`/support?reference=${encodeURIComponent(payment.referenceId || payment.applicationId || "")}`}>
                 Contact Support
               </Link>
+              {displayStatus !== "Paid" && displayStatus !== "Refunded" ? (
+                <Link className="button secondary" to={`/support?reference=${encodeURIComponent(payment.referenceId || payment.applicationId || "")}&request=cancel-payment`}>
+                  Cancel Payment
+                </Link>
+              ) : null}
             </div>
           </>
         )}

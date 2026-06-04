@@ -6450,6 +6450,116 @@ body::after {
   padding: clamp(1rem, 2.5vw, 1.35rem);
 }
 
+.account-menu-list,
+.account-control-list,
+.transaction-list {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.account-menu-item,
+.account-control-list button,
+.transaction-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 18px;
+  background: #161616;
+  color: #f5f1e8;
+  padding: 0.9rem;
+  text-align: left;
+  text-decoration: none;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.account-menu-item:hover,
+.account-control-list button:hover,
+.transaction-row:hover {
+  border-color: rgba(200, 169, 107, 0.34);
+  background: #1b1b1b;
+  transform: translateY(-1px);
+}
+
+.account-menu-icon,
+.transaction-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: rgba(200, 169, 107, 0.12);
+  color: #dcc384;
+}
+
+.account-menu-item strong,
+.account-menu-item small,
+.account-control-list strong,
+.account-control-list small,
+.transaction-row strong,
+.transaction-row small {
+  display: block;
+}
+
+.account-menu-item small,
+.account-control-list small,
+.transaction-row small {
+  margin-top: 0.18rem;
+  color: #9d9d9d;
+  font-size: 0.82rem;
+}
+
+.logout-menu-item {
+  width: 100%;
+}
+
+.account-form-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.account-form-panel label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.account-form-panel label span {
+  color: #9d9d9d;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.account-form-panel input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: #101010;
+  color: #f5f1e8;
+  font: inherit;
+  padding: 0.9rem 1rem;
+}
+
+.account-form-panel input:focus {
+  border-color: rgba(200, 169, 107, 0.54);
+  outline: none;
+}
+
+.security-control-list button {
+  width: 100%;
+}
+
+.transaction-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.transaction-row > strong {
+  color: #f5f1e8;
+  white-space: nowrap;
+}
+
 .banking-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
