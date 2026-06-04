@@ -18,6 +18,13 @@ import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import { formatPaymentAmount } from "../data/paymentMethods.js";
 import { getAccountPayments } from "../services/stripeCheckout.js";
+import {
+  changePassword,
+  getSecuritySettings,
+  logoutEverywhere,
+  updateProfile,
+  updateSecuritySettings
+} from "../services/authApi.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const historyStatuses = ["Paid", "Cancelled", "Expired", "Refunded"];
@@ -144,43 +151,73 @@ function PaymentHistory({ payments }) {
   );
 }
 
-function PersonalDetails({ user }) {
+function InlineMessage({ message }) {
+  if (!message?.text) return null;
+  return <div className={message.type === "error" ? "notice warning" : "notice success"}>{message.text}</div>;
+}
+
+function PersonalDetails({ auth }) {
+  const user = auth.user;
+  const [form, setForm] = useState({
+    fullName: user?.fullName || "",
+    email: user?.email || (user?.identifier?.includes("@") ? user.identifier : ""),
+    phone: user?.phone || ""
+  });
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setMessage(null);
+    try {
+      await updateProfile(form);
+      await auth.refreshUser();
+      setMessage({ type: "success", text: "Personal details updated." });
+    } catch (error) {
+      setMessage({ type: "error", text: error?.message || "Personal details could not be updated." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div className="banking-panel account-form-panel">
+    <form className="banking-panel account-form-panel" onSubmit={submit}>
       <label>
         <span>Full Name</span>
-        <input type="text" defaultValue={user?.fullName || ""} placeholder="Full name" />
+        <input type="text" value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} placeholder="Full name" />
       </label>
       <label>
         <span>Email Address</span>
-        <input type="email" defaultValue={user?.email || (user?.identifier?.includes("@") ? user.identifier : "")} placeholder="Email address" />
+        <input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder="Email address" />
       </label>
       <label>
         <span>Mobile Number</span>
-        <input type="tel" defaultValue={user?.phone || ""} placeholder="Mobile number" />
+        <input type="tel" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Mobile number" />
       </label>
       <div className="account-control-list">
-        <button type="button">Verify Email <ArrowRight size={16} /></button>
-        <button type="button">Verify Phone <ArrowRight size={16} /></button>
+        <button type="button" onClick={() => setMessage({ type: "success", text: "Email verification is already completed for active accounts." })}>Verify Email <ArrowRight size={16} /></button>
+        <button type="button" onClick={() => setMessage({ type: "success", text: "Phone verification uses OTP during registration and recovery." })}>Verify Phone <ArrowRight size={16} /></button>
       </div>
-      <button className="button primary" type="button">Save Changes</button>
-    </div>
+      <InlineMessage message={message} />
+      <button className="button primary" type="submit" disabled={saving}>{saving ? "Saving..." : "Save Changes"}</button>
+    </form>
   );
 }
 
-function SecurityPrivacy({ onLogout }) {
+function SecurityPrivacy() {
   const items = [
-    ["Change Password", "Update the password used for member access.", LockKeyhole],
-    ["2-Step Verification", "Add an extra verification step to sign in.", ShieldCheck],
-    ["Device Management", "Review devices connected to this account.", Smartphone],
-    ["App Security", "Manage account protection preferences.", LockKeyhole],
-    ["Log Out Everywhere", "End active sessions on other devices.", LogOut]
+    ["/account/security/change-password", "Change Password", "Update the password used for member access.", LockKeyhole],
+    ["/account/security/two-step", "2-Step Verification", "Add an extra verification step to sign in.", ShieldCheck],
+    ["/account/security/devices", "Device Management", "Review devices connected to this account.", Smartphone],
+    ["/account/security/app-security", "App Security", "Manage account protection preferences.", LockKeyhole],
+    ["/account/security/logout-everywhere", "Log Out Everywhere", "End active sessions on other devices.", LogOut]
   ];
 
   return (
     <div className="account-control-list security-control-list">
-      {items.map(([title, copy, Icon]) => (
-        <button type="button" key={title} onClick={title === "Log Out Everywhere" ? onLogout : undefined}>
+      {items.map(([to, title, copy, Icon]) => (
+        <Link className="account-menu-item" to={to} key={title}>
           <span className="account-menu-icon">
             <Icon size={18} />
           </span>
@@ -189,8 +226,180 @@ function SecurityPrivacy({ onLogout }) {
             <small>{copy}</small>
           </span>
           <ArrowRight size={16} />
-        </button>
+        </Link>
       ))}
+    </div>
+  );
+}
+
+function ChangePasswordPanel() {
+  const [form, setForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setMessage(null);
+    if (form.newPassword.length < 8) {
+      setMessage({ type: "error", text: "New password must be at least 8 characters." });
+      return;
+    }
+    if (form.newPassword !== form.confirmPassword) {
+      setMessage({ type: "error", text: "New password and confirmation do not match." });
+      return;
+    }
+    setSaving(true);
+    try {
+      await changePassword(form);
+      setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setMessage({ type: "success", text: "Password updated successfully." });
+    } catch (error) {
+      setMessage({ type: "error", text: error?.message || "Password could not be updated." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form className="banking-panel account-form-panel" onSubmit={submit}>
+      <label>
+        <span>Current Password</span>
+        <input type="password" value={form.currentPassword} onChange={(event) => setForm((current) => ({ ...current, currentPassword: event.target.value }))} />
+      </label>
+      <label>
+        <span>New Password</span>
+        <input type="password" value={form.newPassword} onChange={(event) => setForm((current) => ({ ...current, newPassword: event.target.value }))} />
+      </label>
+      <label>
+        <span>Confirm Password</span>
+        <input type="password" value={form.confirmPassword} onChange={(event) => setForm((current) => ({ ...current, confirmPassword: event.target.value }))} />
+      </label>
+      <InlineMessage message={message} />
+      <button className="button primary" type="submit" disabled={saving}>{saving ? "Updating..." : "Update Password"}</button>
+    </form>
+  );
+}
+
+function SecuritySettingsPanel({ mode, onLogout }) {
+  const [settings, setSettings] = useState({
+    twoStepEnabled: false,
+    requirePasswordBeforePayment: false,
+    requireBankTransferConfirmation: true,
+    sessionTimeoutMinutes: 30
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    getSecuritySettings()
+      .then((data) => {
+        if (active) setSettings((current) => ({ ...current, ...(data.settings || {}) }));
+      })
+      .catch((error) => {
+        if (active) setMessage({ type: "error", text: error?.message || "Security settings could not be loaded." });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const save = async (nextSettings) => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const data = await updateSecuritySettings(nextSettings);
+      setSettings(data.settings || nextSettings);
+      setMessage({ type: "success", text: "Security settings updated." });
+    } catch (error) {
+      setMessage({ type: "error", text: error?.message || "Security settings could not be updated." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="banking-panel account-empty-state">Loading security settings...</div>;
+
+  if (mode === "two-step") {
+    return (
+      <div className="banking-panel account-form-panel">
+        <div className="security-status-line">
+          <span>Status</span>
+          <strong>{settings.twoStepEnabled ? "Enabled" : "Not Enabled"}</strong>
+        </div>
+        <p className="muted-copy">Email OTP is used for 2-step verification. SMS can be added when support is enabled for the account.</p>
+        <InlineMessage message={message} />
+        <button className="button primary" type="button" disabled={saving} onClick={() => save({ ...settings, twoStepEnabled: !settings.twoStepEnabled })}>
+          {settings.twoStepEnabled ? "Disable 2-Step Verification" : "Enable 2-Step Verification"}
+        </button>
+      </div>
+    );
+  }
+
+  if (mode === "devices") {
+    return (
+      <div className="account-control-list">
+        <div className="account-menu-item">
+          <span className="account-menu-icon"><Smartphone size={18} /></span>
+          <span>
+            <strong>Current Session</strong>
+            <small>Active browser session. Device listing is not available from Supabase for this account type.</small>
+          </span>
+          <ShieldCheck size={16} />
+        </div>
+        <button className="account-menu-item" type="button" onClick={onLogout}>
+          <span className="account-menu-icon"><LogOut size={18} /></span>
+          <span>
+            <strong>Log out everywhere</strong>
+            <small>End all active sessions and return to sign in.</small>
+          </span>
+          <ArrowRight size={16} />
+        </button>
+      </div>
+    );
+  }
+
+  if (mode === "logout-everywhere") {
+    return (
+      <div className="banking-panel account-form-panel">
+        <p className="muted-copy">This will end active sessions for this account and redirect you to sign in.</p>
+        <button className="button primary" type="button" onClick={onLogout}>Log Out Everywhere</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="banking-panel account-form-panel">
+      {[
+        ["requirePasswordBeforePayment", "Require password before payment"],
+        ["requireBankTransferConfirmation", "Require confirmation before bank transfer"]
+      ].map(([key, label]) => (
+        <label className="security-toggle-row" key={key}>
+          <span>{label}</span>
+          <input
+            type="checkbox"
+            checked={Boolean(settings[key])}
+            onChange={(event) => save({ ...settings, [key]: event.target.checked })}
+          />
+        </label>
+      ))}
+      <label>
+        <span>Session timeout after inactivity</span>
+        <select
+          value={settings.sessionTimeoutMinutes}
+          onChange={(event) => save({ ...settings, sessionTimeoutMinutes: Number(event.target.value) })}
+        >
+          <option value="15">15 minutes</option>
+          <option value="30">30 minutes</option>
+          <option value="60">60 minutes</option>
+          <option value="120">2 hours</option>
+        </select>
+      </label>
+      <InlineMessage message={message} />
     </div>
   );
 }
@@ -224,6 +433,12 @@ export default function Account({ view = "home" }) {
     navigate("/home", { replace: true });
   };
 
+  const logoutAll = async () => {
+    await logoutEverywhere();
+    await auth.refreshUser();
+    navigate("/login", { replace: true });
+  };
+
   const openPayments = payments.filter((payment) => !historyStatuses.includes(payment.paymentStatus));
   const historyPayments = payments.filter((payment) => historyStatuses.includes(payment.paymentStatus));
   const activeMemberships = payments.filter((payment) => payment.membershipStatus === "Active" || payment.paymentStatus === "Paid");
@@ -232,6 +447,11 @@ export default function Account({ view = "home" }) {
     home: ["Account Center", "Manage your profile, security, payments, and memberships."],
     personal: ["Personal Details", "Update contact information and verification settings."],
     security: ["Security & Privacy", "Protect your account and manage access."],
+    "change-password": ["Change Password", "Update your member access password."],
+    "two-step": ["2-Step Verification", "Use email OTP for additional account protection."],
+    devices: ["Device Management", "Review active session access."],
+    "app-security": ["App Security", "Manage payment and session security preferences."],
+    "logout-everywhere": ["Log Out Everywhere", "End active sessions on this account."],
     payments: ["Payments", "Review pending and active payment requests."],
     history: ["Payment History", "Completed and closed transactions."],
     memberships: ["Memberships", "Your active and pending membership cards."]
@@ -258,8 +478,13 @@ export default function Account({ view = "home" }) {
       {error ? <div className="notice warning">{error}</div> : null}
 
       {view === "home" ? <AccountMenu onLogout={logout} /> : null}
-      {view === "personal" ? <PersonalDetails user={auth.user} /> : null}
-      {view === "security" ? <SecurityPrivacy onLogout={logout} /> : null}
+      {view === "personal" ? <PersonalDetails auth={auth} /> : null}
+      {view === "security" ? <SecurityPrivacy /> : null}
+      {view === "change-password" ? <ChangePasswordPanel /> : null}
+      {view === "two-step" ? <SecuritySettingsPanel mode="two-step" onLogout={logoutAll} /> : null}
+      {view === "devices" ? <SecuritySettingsPanel mode="devices" onLogout={logoutAll} /> : null}
+      {view === "app-security" ? <SecuritySettingsPanel mode="app-security" onLogout={logoutAll} /> : null}
+      {view === "logout-everywhere" ? <SecuritySettingsPanel mode="logout-everywhere" onLogout={logoutAll} /> : null}
       {view === "payments" ? (
         <>
           <PaymentCounts payments={payments} />

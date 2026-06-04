@@ -191,6 +191,11 @@ export const requireAuth = async (req) => {
       error.status = 401;
       throw error;
     }
+    if (user.sessionRevokedAt && payload.iat && payload.iat * 1000 < new Date(user.sessionRevokedAt).getTime()) {
+      const error = new Error("Session has been revoked");
+      error.status = 401;
+      throw error;
+    }
     return user;
   } catch (error) {
     if (!error.status) {

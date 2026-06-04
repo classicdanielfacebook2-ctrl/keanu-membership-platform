@@ -6542,13 +6542,66 @@ body::after {
   padding: 0.9rem 1rem;
 }
 
-.account-form-panel input:focus {
+.account-form-panel select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: #101010;
+  color: #f5f1e8;
+  font: inherit;
+  padding: 0.9rem 1rem;
+}
+
+.account-form-panel input:focus,
+.account-form-panel select:focus {
   border-color: rgba(200, 169, 107, 0.54);
   outline: none;
 }
 
 .security-control-list button {
   width: 100%;
+}
+
+.security-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: #101010;
+  padding: 1rem;
+}
+
+.security-status-line span,
+.muted-copy {
+  color: #9d9d9d;
+}
+
+.security-status-line strong {
+  color: #dcc384;
+}
+
+.muted-copy {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.security-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: #101010;
+  padding: 1rem;
+}
+
+.security-toggle-row input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: #c8a96b;
 }
 
 .transaction-row {

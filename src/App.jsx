@@ -203,6 +203,46 @@ export default function App() {
             }
           />
           <Route
+            path="/account/security/change-password"
+            element={
+              <ProtectedRoute>
+                <Account view="change-password" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/security/two-step"
+            element={
+              <ProtectedRoute>
+                <Account view="two-step" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/security/devices"
+            element={
+              <ProtectedRoute>
+                <Account view="devices" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/security/app-security"
+            element={
+              <ProtectedRoute>
+                <Account view="app-security" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/security/logout-everywhere"
+            element={
+              <ProtectedRoute>
+                <Account view="logout-everywhere" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/account/payments"
             element={
               <ProtectedRoute>

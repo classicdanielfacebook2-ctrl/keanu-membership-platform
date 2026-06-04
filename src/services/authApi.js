@@ -55,6 +55,27 @@ export const logout = () =>
     method: "POST",
     body: JSON.stringify({})
   });
+export const logoutEverywhere = () =>
+  authRequest("/api/auth/logout-everywhere", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+export const changePassword = (payload) =>
+  authRequest("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+export const getSecuritySettings = () => authRequest("/api/auth/security-settings");
+export const updateSecuritySettings = (payload) =>
+  authRequest("/api/auth/security-settings", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+export const updateProfile = (payload) =>
+  authRequest("/api/auth/update-profile", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 export const forgotPassword = (payload) =>
   authRequest("/api/auth/forgot-password", {
     method: "POST",

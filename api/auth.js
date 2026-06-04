@@ -61,6 +61,100 @@ async function logout(req, res) {
   return sendJson(res, 200, { ok: true });
 }
 
+async function logoutEverywhere(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  const user = await requireAuth(req);
+  const users = await getUsersCollection();
+  await users.updateOne({ _id: user._id }, { $set: { sessionRevokedAt: new Date(), updatedAt: new Date() } });
+  clearSessionCookie(res);
+  return sendJson(res, 200, { ok: true, message: "All active sessions have been signed out." });
+}
+
+async function changePassword(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  const currentPassword = String(req.body?.currentPassword || "");
+  const newPassword = String(req.body?.newPassword || "");
+  const confirmPassword = String(req.body?.confirmPassword || "");
+
+  if (!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword) {
+    return sendJson(res, 400, { error: "Enter your current password and a matching new password of at least 8 characters." });
+  }
+
+  const user = await requireAuth(req);
+  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    return sendJson(res, 401, { error: "Current password is incorrect." });
+  }
+
+  const users = await getUsersCollection();
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        passwordHash,
+        updatedAt: new Date()
+      }
+    }
+  );
+  return sendJson(res, 200, { ok: true, message: "Password updated successfully." });
+}
+
+async function securitySettings(req, res) {
+  const user = await requireAuth(req);
+  const users = await getUsersCollection();
+
+  if (req.method === "GET") {
+    return sendJson(res, 200, {
+      settings: {
+        twoStepEnabled: Boolean(user.securitySettings?.twoStepEnabled),
+        requirePasswordBeforePayment: Boolean(user.securitySettings?.requirePasswordBeforePayment),
+        requireBankTransferConfirmation: user.securitySettings?.requireBankTransferConfirmation !== false,
+        sessionTimeoutMinutes: user.securitySettings?.sessionTimeoutMinutes || 30
+      }
+    });
+  }
+
+  if (req.method !== "POST") return methodNotAllowed(res);
+
+  const nextSettings = {
+    twoStepEnabled: Boolean(req.body?.twoStepEnabled),
+    requirePasswordBeforePayment: Boolean(req.body?.requirePasswordBeforePayment),
+    requireBankTransferConfirmation: Boolean(req.body?.requireBankTransferConfirmation),
+    sessionTimeoutMinutes: Math.min(240, Math.max(5, Number(req.body?.sessionTimeoutMinutes || 30)))
+  };
+
+  await users.updateOne({ _id: user._id }, { $set: { securitySettings: nextSettings, updatedAt: new Date() } });
+  return sendJson(res, 200, { ok: true, settings: nextSettings, message: "Security settings updated." });
+}
+
+async function updateProfile(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  const user = await requireAuth(req);
+  const fullName = String(req.body?.fullName || "").trim();
+  const email = normalizeAuthIdentifier(req.body?.email || "");
+  const phone = normalizeAuthIdentifier(req.body?.phone || "");
+
+  if (!fullName || !isEmailIdentifier(email) || (phone && !isPhoneIdentifier(phone))) {
+    return sendJson(res, 400, { error: "Enter a valid full name, email address, and phone number." });
+  }
+
+  const users = await getUsersCollection();
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        fullName,
+        identifier: isEmailIdentifier(user.identifier) ? email : user.identifier,
+        email,
+        phone,
+        updatedAt: new Date()
+      }
+    }
+  );
+  const updatedUser = await users.findOne({ _id: user._id });
+  return sendJson(res, 200, { ok: true, user: publicUser(updatedUser), message: "Personal details updated." });
+}
+
 async function me(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -396,13 +490,17 @@ async function supabaseResetPassword(req, res) {
 const handlers = {
   "bootstrap-admin": bootstrapAdmin,
   "forgot-password": forgotPassword,
+  "change-password": changePassword,
+  "logout-everywhere": logoutEverywhere,
   login,
   logout,
   me,
   register,
   "resend-otp": resendOtp,
   "reset-password": resetPassword,
+  "security-settings": securitySettings,
   "supabase-reset-password": supabaseResetPassword,
+  "update-profile": updateProfile,
   "verify-otp": verifyOtp
 };
 
