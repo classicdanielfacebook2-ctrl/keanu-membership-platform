@@ -6442,6 +6442,94 @@ body::after {
   margin-bottom: 1.5rem;
 }
 
+.account-page-header {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(12, 12, 12, 0.84);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.22);
+  padding: 1rem;
+}
+
+.account-back-button {
+  display: inline-grid;
+  place-items: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  border: 1px solid rgba(200, 169, 107, 0.26);
+  border-radius: 999px;
+  background: rgba(200, 169, 107, 0.09);
+  color: #f2dfaa;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.account-back-button:hover {
+  transform: translateX(-2px);
+  border-color: rgba(200, 169, 107, 0.56);
+  background: rgba(200, 169, 107, 0.15);
+}
+
+.account-header-copy {
+  min-width: 0;
+}
+
+.account-header-copy h1 {
+  margin: 0.28rem 0 0;
+  color: #f8f1df;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  line-height: 1.03;
+}
+
+.account-header-copy p {
+  max-width: 58rem;
+  margin: 0.55rem 0 0;
+  color: #a9a196;
+  line-height: 1.65;
+}
+
+.account-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.36rem;
+  color: #9d9280;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.account-breadcrumbs span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  min-width: 0;
+}
+
+.account-breadcrumbs a {
+  color: #c8a96b;
+  text-decoration: none;
+}
+
+.account-breadcrumbs strong {
+  color: #e7dfcf;
+  font-weight: 900;
+}
+
+.account-breadcrumbs em {
+  color: rgba(255, 255, 255, 0.24);
+  font-style: normal;
+}
+
 .banking-panel {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 22px;
@@ -6724,6 +6812,41 @@ body::after {
 }
 
 @media (max-width: 720px) {
+  .account-page-header {
+    position: sticky;
+    top: calc(var(--header-height, 72px) + 0.45rem);
+    z-index: 25;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.72rem;
+    border-radius: 18px;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+      rgba(11, 11, 11, 0.94);
+    backdrop-filter: blur(16px);
+    padding: 0.78rem;
+  }
+
+  .account-back-button {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+
+  .account-header-copy h1 {
+    font-size: 1.45rem;
+  }
+
+  .account-header-copy p {
+    margin-top: 0.35rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .account-breadcrumbs {
+    gap: 0.25rem;
+    font-size: 0.62rem;
+    line-height: 1.45;
+  }
+
   .profile-form-grid,
   .recovery-code-grid {
     grid-template-columns: 1fr;

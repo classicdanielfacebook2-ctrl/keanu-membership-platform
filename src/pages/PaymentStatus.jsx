@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight, Clock3, CreditCard, Landmark, RefreshCcw, ShieldCheck } from "lucide-react";
-import SectionHeader from "../components/SectionHeader.jsx";
+import AccountPageHeader from "../components/AccountPageHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import { formatPaymentAmount } from "../data/paymentMethods.js";
 import { getPaymentStatus } from "../services/stripeCheckout.js";
@@ -45,10 +45,12 @@ const statusMeta = {
 export default function PaymentStatus() {
   const { applicationId = "" } = useParams();
   const [params] = useSearchParams();
+  const location = useLocation();
   const [payment, setPayment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const instructionsSaved = params.get("instructions") === "saved";
+  const isApplicationDetails = location.pathname.startsWith("/account/applications/");
 
   const loadPayment = async () => {
     setLoading(true);
@@ -77,10 +79,23 @@ export default function PaymentStatus() {
 
   return (
     <section className="page-section wide-page banking-dashboard">
-      <SectionHeader
-        eyebrow={instructionsSaved ? "Payment Instructions Saved" : "Payment Details"}
+      <AccountPageHeader
         title={instructionsSaved ? "Bank transfer instructions generated." : current.title}
         copy={instructionsSaved ? "Your bank transfer is awaiting confirmation." : current.copy}
+        fallbackTo={isApplicationDetails ? "/account/applications" : "/account/payments"}
+        breadcrumbs={
+          isApplicationDetails
+            ? [
+                { label: "My Account", to: "/account" },
+                { label: "Applications", to: "/account/applications" },
+                { label: "Application Details" }
+              ]
+            : [
+                { label: "My Account", to: "/account" },
+                { label: "Payments", to: "/account/payments" },
+                { label: instructionsSaved ? "Instructions Saved" : "Payment Details" }
+              ]
+        }
       />
 
       <div className="payment-detail-shell banking-panel">

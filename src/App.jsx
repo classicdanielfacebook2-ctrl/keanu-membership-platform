@@ -187,6 +187,14 @@ export default function App() {
             }
           />
           <Route
+            path="/account/applications/:applicationId"
+            element={
+              <ProtectedRoute>
+                <PaymentStatus />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/account/personal"
             element={
               <ProtectedRoute>

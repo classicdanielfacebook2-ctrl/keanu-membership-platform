@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowRight, Copy, Landmark, RefreshCcw } from "lucide-react";
-import SectionHeader from "../components/SectionHeader.jsx";
+import AccountPageHeader from "../components/AccountPageHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import { formatPaymentAmount } from "../data/paymentMethods.js";
 import { getPaymentStatus, renewBankTransferInstructions } from "../services/stripeCheckout.js";
@@ -73,10 +73,16 @@ export default function BankTransferDetails() {
 
   return (
     <section className="page-section wide-page banking-dashboard">
-      <SectionHeader
-        eyebrow="Bank Transfer"
+      <AccountPageHeader
         title="Transfer instructions."
         copy="Use the exact amount and reference shown below. Stripe confirms the transfer automatically after receipt."
+        fallbackTo={`/account/payment/${applicationId}`}
+        breadcrumbs={[
+          { label: "My Account", to: "/account" },
+          { label: "Payments", to: "/account/payments" },
+          { label: "Payment Details", to: `/account/payment/${applicationId}` },
+          { label: "Bank Transfer" }
+        ]}
       />
 
       <div className="payment-detail-shell banking-panel">

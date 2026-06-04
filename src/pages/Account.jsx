@@ -19,6 +19,7 @@ import {
   XCircle
 } from "lucide-react";
 import { City, Country, State } from "country-state-city";
+import AccountPageHeader from "../components/AccountPageHeader.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import { formatPaymentAmount } from "../data/paymentMethods.js";
@@ -105,7 +106,7 @@ function PaymentCounts({ payments }) {
   );
 }
 
-function CompactPayments({ payments, emptyText = "No payments found." }) {
+function CompactPayments({ payments, emptyText = "No payments found.", detailBase = "/account/payment" }) {
   if (!payments.length) return <div className="banking-panel account-empty-state">{emptyText}</div>;
 
   return (
@@ -132,7 +133,7 @@ function CompactPayments({ payments, emptyText = "No payments found." }) {
               <strong>{paymentDate(payment)}</strong>
             </div>
           </div>
-          <Link className="review-payment-button" to={`/account/payment/${payment.applicationId}`}>
+          <Link className="review-payment-button" to={`${detailBase}/${payment.applicationId}`}>
             Review
             <ArrowRight size={15} />
           </Link>
@@ -851,10 +852,63 @@ export default function Account({ view = "home" }) {
     memberships: ["Memberships", "Your active and pending membership cards."]
   };
   const [title, copy] = headers[view] || headers.home;
+  const breadcrumbsByView = {
+    personal: [{ label: "My Account", to: "/account" }, { label: "Personal Details" }],
+    security: [{ label: "My Account", to: "/account" }, { label: "Security & Privacy" }],
+    "change-password": [
+      { label: "My Account", to: "/account" },
+      { label: "Security & Privacy", to: "/account/security" },
+      { label: "Change Password" }
+    ],
+    "two-step": [
+      { label: "My Account", to: "/account" },
+      { label: "Security & Privacy", to: "/account/security" },
+      { label: "2-Step Verification" }
+    ],
+    devices: [
+      { label: "My Account", to: "/account" },
+      { label: "Security & Privacy", to: "/account/security" },
+      { label: "Device Management" }
+    ],
+    "app-security": [
+      { label: "My Account", to: "/account" },
+      { label: "Security & Privacy", to: "/account/security" },
+      { label: "App Security" }
+    ],
+    "logout-everywhere": [
+      { label: "My Account", to: "/account" },
+      { label: "Security & Privacy", to: "/account/security" },
+      { label: "Log Out Everywhere" }
+    ],
+    payments: [{ label: "My Account", to: "/account" }, { label: "Payments" }],
+    history: [{ label: "My Account", to: "/account" }, { label: "Payment History" }],
+    memberships: [{ label: "My Account", to: "/account" }, { label: "Applications" }]
+  };
+  const fallbackByView = {
+    "change-password": "/account/security",
+    "two-step": "/account/security",
+    devices: "/account/security",
+    "app-security": "/account/security",
+    "logout-everywhere": "/account/security",
+    payments: "/account",
+    history: "/account",
+    memberships: "/account",
+    personal: "/account",
+    security: "/account"
+  };
 
   return (
     <section className="page-section wide-page account-page banking-dashboard">
-      <SectionHeader eyebrow="My Account" title={title} copy={copy} />
+      {view === "home" ? (
+        <SectionHeader eyebrow="My Account" title={title} copy={copy} />
+      ) : (
+        <AccountPageHeader
+          title={title}
+          copy={copy}
+          breadcrumbs={breadcrumbsByView[view] || [{ label: "My Account", to: "/account" }, { label: title }]}
+          fallbackTo={fallbackByView[view] || "/account"}
+        />
+      )}
 
       <div className="account-welcome banking-panel">
         <div>
@@ -892,7 +946,7 @@ export default function Account({ view = "home" }) {
         loading ? (
           <div className="banking-panel account-empty-state">Loading memberships...</div>
         ) : (
-          <CompactPayments payments={activeMemberships} emptyText="No active memberships yet." />
+          <CompactPayments payments={activeMemberships} emptyText="No active memberships yet." detailBase="/account/applications" />
         )
       ) : null}
     </section>
