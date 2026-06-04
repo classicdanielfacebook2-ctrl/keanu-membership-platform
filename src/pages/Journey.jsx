@@ -114,8 +114,7 @@ const quoteCards = [
 const defaultJourneyImage = {
   title: "Keanu Reeves portrait",
   localImagePath: "/images/journey/portrait.jpg",
-  alt: "Keanu Reeves portrait",
-  credit: "Local journey image"
+  alt: "Keanu Reeves portrait"
 };
 
 function findApprovedImage(approvedImages, keys) {
@@ -128,6 +127,7 @@ function StoryImage({ image, label, poster = false }) {
     title: label || defaultJourneyImage.title,
     alt: label || defaultJourneyImage.alt
   };
+  const captionTitle = label || displayImage.title;
   const primarySource = displayImage.localImagePath || displayImage.imageUrl || defaultJourneyImage.localImagePath;
   const [fallbackUsed, setFallbackUsed] = useState(false);
 
@@ -152,8 +152,7 @@ function StoryImage({ image, label, poster = false }) {
     <figure className={poster ? "journey-media approved-media poster-placeholder" : "journey-media approved-media"}>
       <img src={imageSource} alt={displayImage.alt} onError={handleImageError} />
       <figcaption>
-        <strong>{displayImage.title}</strong>
-        <span>{displayImage.credit}</span>
+        <strong>{captionTitle}</strong>
       </figcaption>
     </figure>
   );
@@ -215,7 +214,7 @@ export default function Journey() {
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
-            <StoryImage image={section.image} label={section.fallback} />
+            <StoryImage image={section.image} label={section.label} />
           </article>
         ))}
       </div>
@@ -244,7 +243,7 @@ export default function Journey() {
               key={`${year}-${title}-poster`}
               poster
               image={findApprovedImage(approvedImages, keys)}
-              label={`${title} image`}
+              label={title}
             />
           ))}
         </div>
