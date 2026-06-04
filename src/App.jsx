@@ -20,6 +20,7 @@ import Welcome from "./pages/Welcome.jsx";
 import Home from "./pages/Home.jsx";
 import Apply from "./pages/Apply.jsx";
 import Account from "./pages/Account.jsx";
+import BankTransferDetails from "./pages/BankTransferDetails.jsx";
 import Payment from "./pages/Payment.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import PaymentCancelled from "./pages/PaymentCancelled.jsx";
@@ -198,6 +199,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <PaymentStatus />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/payment/:applicationId/bank-details"
+            element={
+              <ProtectedRoute>
+                <BankTransferDetails />
               </ProtectedRoute>
             }
           />
