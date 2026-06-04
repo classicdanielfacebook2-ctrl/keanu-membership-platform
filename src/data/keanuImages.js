@@ -5,7 +5,7 @@ export const KEANU_MEDIA_STORAGE_KEY = "keanu-media-review-decisions";
 
 const blobImageUrl = (id, fallback = "") => blobKeanuImages[id]?.url || fallback;
 const downloadedImageUrl = (url) => url?.includes("vercel-storage.com") || url?.startsWith("/media/");
-const localReviewImage = (filename) => `/media/review-images/${filename}`;
+const localReviewImage = (filename) => `/images/journey/${filename}`;
 
 export const keanuImageSuggestions = [
   {

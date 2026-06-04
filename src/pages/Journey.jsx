@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Clapperboard, Film, Quote, Star } from "lucide-react";
+import { ArrowRight, Clapperboard, Quote, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getLocalKeanuImages } from "../data/keanuImages.js";
 
@@ -111,41 +111,56 @@ const quoteCards = [
   "Some legends are built quietly, one generous act at a time."
 ];
 
+const defaultJourneyImage = {
+  title: "Keanu Reeves portrait",
+  localImagePath: "/images/journey/portrait.jpg",
+  alt: "Keanu Reeves portrait",
+  credit: "Local journey image"
+};
+
 function findApprovedImage(approvedImages, keys) {
   return keys.map((key) => approvedImages.find((image) => image.id === key)).find(Boolean);
 }
 
 function StoryImage({ image, label, poster = false }) {
-  const [failed, setFailed] = useState(false);
-  const imageSource = image?.localImagePath || image?.imageUrl;
+  const displayImage = image || {
+    ...defaultJourneyImage,
+    title: label || defaultJourneyImage.title,
+    alt: label || defaultJourneyImage.alt
+  };
+  const primarySource = displayImage.localImagePath || displayImage.imageUrl || defaultJourneyImage.localImagePath;
+  const [fallbackUsed, setFallbackUsed] = useState(false);
 
-  if (imageSource && !failed) {
-    return (
-      <figure className={poster ? "journey-media approved-media poster-placeholder" : "journey-media approved-media"}>
-        <img src={imageSource} alt={image.alt} onError={() => setFailed(true)} />
-        <figcaption>
-          <strong>{image.title}</strong>
-          <span>{image.credit}</span>
-        </figcaption>
-      </figure>
-    );
-  }
+  useEffect(() => {
+    setFallbackUsed(false);
+  }, [primarySource]);
+
+  const imageSource = fallbackUsed ? defaultJourneyImage.localImagePath : primarySource;
+
+  const handleImageError = () => {
+    console.warn("Journey image failed to load", {
+      title: displayImage.title,
+      imageUrl: imageSource
+    });
+
+    if (!fallbackUsed && imageSource !== defaultJourneyImage.localImagePath) {
+      setFallbackUsed(true);
+    }
+  };
 
   return (
-    <div className={poster ? "journey-media poster-placeholder" : "journey-media"}>
-      <div className="journey-media-glow" />
-      <Film size={poster ? 34 : 42} />
-      <span>{label}</span>
-    </div>
+    <figure className={poster ? "journey-media approved-media poster-placeholder" : "journey-media approved-media"}>
+      <img src={imageSource} alt={displayImage.alt} onError={handleImageError} />
+      <figcaption>
+        <strong>{displayImage.title}</strong>
+        <span>{displayImage.credit}</span>
+      </figcaption>
+    </figure>
   );
 }
 
 export default function Journey() {
-  const [approvedImages, setApprovedImages] = useState([]);
-
-  useEffect(() => {
-    setApprovedImages(getLocalKeanuImages());
-  }, []);
+  const approvedImages = useMemo(() => getLocalKeanuImages(), []);
 
   const storyWithImages = useMemo(
     () =>
