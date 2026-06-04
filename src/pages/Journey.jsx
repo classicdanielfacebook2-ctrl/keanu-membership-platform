@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Clapperboard, Film, Quote, Star } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getApprovedKeanuImages } from "../data/keanuImages.js";
+import { getLocalKeanuImages } from "../data/keanuImages.js";
 
 const storySections = [
   {
@@ -13,7 +13,7 @@ const storySections = [
       "School was not always easy. He moved through several schools and faced the daily difficulty of dyslexia, yet those challenges did not close his world. They sharpened his patience, his independence, and his ability to find meaning outside the ordinary path.",
       "As a young person, he found energy in hockey and expression in acting. The ice gave him discipline and motion; performance gave him a place to transform feeling into presence."
     ],
-    fallback: "Approved image not available yet"
+    fallback: "Early life image"
   },
   {
     label: "Beginning of Acting Career",
@@ -23,7 +23,7 @@ const storySections = [
       "Reeves began with early stage work, commercials, television appearances, and smaller screen roles. The path was gradual, built from auditions, uncertainty, and the kind of persistence that rarely looks glamorous from the outside.",
       "His early film appearances helped him move from local promise into a wider industry. He did not arrive all at once; he kept showing up until Hollywood began to understand the calm intensity he carried."
     ],
-    fallback: "Approved image not available yet"
+    fallback: "Early acting career image"
   },
   {
     label: "Bill & Ted Era",
@@ -33,7 +33,7 @@ const storySections = [
       "Bill & Ted's Excellent Adventure introduced a generation to his warmth and unusual comic rhythm. The role became a cultural marker: light, funny, generous, and unforgettable.",
       "It showed that Reeves could hold a screen with sincerity, timing, and a kind of innocence that audiences remembered long after the credits."
     ],
-    fallback: "Approved image not available yet"
+    fallback: "Bill and Ted era image"
   },
   {
     label: "Speed Era",
@@ -43,7 +43,7 @@ const storySections = [
       "Speed turned Reeves into a major action lead. The performance balanced urgency with restraint, showing a screen presence that could carry intensity without losing humanity.",
       "It helped move him from rising actor to international star, setting the stage for an even larger cinematic transformation."
     ],
-    fallback: "Approved image not available yet"
+    fallback: "Speed era image"
   },
   {
     label: "The Matrix Era",
@@ -53,7 +53,7 @@ const storySections = [
       "The Matrix gave cinema one of its defining modern heroes. As Neo, Reeves embodied uncertainty, awakening, discipline, and quiet power.",
       "The role became more than a performance. It became a cultural image of transformation, one that still shapes how audiences remember science fiction and action cinema."
     ],
-    fallback: "Approved image not available yet"
+    fallback: "Matrix era image"
   },
   {
     label: "John Wick Era",
@@ -63,7 +63,7 @@ const storySections = [
       "Years later, John Wick revealed a different kind of legend: disciplined, precise, physical, and restrained. Reeves' commitment to the role helped reshape modern action filmmaking.",
       "Fans responded not only to the performance, but to the professionalism and quiet respect he brought to the work."
     ],
-    fallback: "Approved image not available yet"
+    fallback: "John Wick era image"
   },
   {
     label: "Personal Struggles",
@@ -73,7 +73,7 @@ const storySections = [
       "Reeves has lived through painful personal chapters and losses that became part of the public understanding of his journey. This page treats those moments with care, because they belong first to a human life, not to spectacle.",
       "What has inspired many fans is the way he continued forward without turning hardship into performance. His public image became associated with humility, reserve, and a quiet strength that never needed to announce itself."
     ],
-    fallback: "Approved image not available yet"
+    fallback: "Personal journey image"
   },
   {
     label: "Relationships",
@@ -83,7 +83,7 @@ const storySections = [
       "Over the years, Reeves has kept his personal relationships largely private. That discretion has become part of how many people understand him: respectful, careful, and unwilling to turn intimacy into publicity.",
       "Fans have often admired the way he carries himself around others, with gentleness and courtesy rather than spectacle. His private life remains private, and this page honors that boundary."
     ],
-    fallback: "Approved image not available yet"
+    fallback: "Private life image"
   },
   {
     label: "Legacy and Inspiration",
@@ -93,7 +93,7 @@ const storySections = [
       "Keanu Reeves' legacy is built across decades of film, but also through a reputation for generosity, kindness, and humility. In an industry that often rewards noise, he became beloved for stillness.",
       "His journey from a complicated childhood to worldwide respect is not a simple success story. It is a story of endurance, craft, privacy, and grace. For many, that is why his work continues to feel personal: it reminds people that strength can be quiet and success can remain human."
     ],
-    fallback: "Approved image not available yet"
+    fallback: "Legacy image"
   }
 ];
 
@@ -117,11 +117,12 @@ function findApprovedImage(approvedImages, keys) {
 
 function StoryImage({ image, label, poster = false }) {
   const [failed, setFailed] = useState(false);
+  const imageSource = image?.localImagePath || image?.imageUrl;
 
-  if (image && !failed) {
+  if (imageSource && !failed) {
     return (
       <figure className={poster ? "journey-media approved-media poster-placeholder" : "journey-media approved-media"}>
-        <img src={image.imageUrl} alt={image.alt} onError={() => setFailed(true)} />
+        <img src={imageSource} alt={image.alt} onError={() => setFailed(true)} />
         <figcaption>
           <strong>{image.title}</strong>
           <span>{image.credit}</span>
@@ -143,7 +144,7 @@ export default function Journey() {
   const [approvedImages, setApprovedImages] = useState([]);
 
   useEffect(() => {
-    setApprovedImages(getApprovedKeanuImages());
+    setApprovedImages(getLocalKeanuImages());
   }, []);
 
   const storyWithImages = useMemo(
@@ -228,7 +229,7 @@ export default function Journey() {
               key={`${year}-${title}-poster`}
               poster
               image={findApprovedImage(approvedImages, keys)}
-              label="Approved image not available yet"
+              label={`${title} image`}
             />
           ))}
         </div>
