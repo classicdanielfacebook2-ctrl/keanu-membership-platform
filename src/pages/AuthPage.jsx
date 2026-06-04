@@ -47,6 +47,9 @@ export default function AuthPage({ mode }) {
   const [verificationPending, setVerificationPending] = useState(false);
   const [verificationIdentifier, setVerificationIdentifier] = useState("");
   const [verificationChannel, setVerificationChannel] = useState("email");
+  const [twoFactorPending, setTwoFactorPending] = useState(false);
+  const [twoFactorChallenge, setTwoFactorChallenge] = useState("");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -162,7 +165,13 @@ export default function AuthPage({ mode }) {
         setVerificationChannel(data.channel || method);
         setMessage("");
       } else {
-        await auth.login({ identifier: selectedIdentifier, password: form.password });
+        const data = await auth.login({ identifier: selectedIdentifier, password: form.password });
+        if (data.twoFactorRequired) {
+          setTwoFactorPending(true);
+          setTwoFactorChallenge(data.challengeToken || "");
+          setMessage(data.message || "");
+          return;
+        }
         completeAuth();
       }
     } catch (requestError) {
@@ -171,6 +180,22 @@ export default function AuthPage({ mode }) {
         setVerificationIdentifier(requestError.identifier || selectedIdentifier);
         setVerificationChannel(requestError.channel || method);
       }
+      setError(requestError.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerifyTwoFactor = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await auth.verifyLoginTwoStep({ challengeToken: twoFactorChallenge, code: twoFactorCode });
+      completeAuth();
+    } catch (requestError) {
       setError(requestError.message);
     } finally {
       setSubmitting(false);
@@ -208,7 +233,7 @@ export default function AuthPage({ mode }) {
     }
   };
 
-  const pageCopy = getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending });
+  const pageCopy = getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending, twoFactorPending });
 
   return (
     <section className={isUpdatePassword ? "auth-page reset-password-page" : "auth-page"}>
@@ -223,7 +248,7 @@ export default function AuthPage({ mode }) {
           <p>{pageCopy.subtitle}</p>
         </div>
 
-        <form className="auth-form" onSubmit={verificationPending ? handleVerifyOtp : handleSubmit}>
+        <form className="auth-form" onSubmit={twoFactorPending ? handleVerifyTwoFactor : verificationPending ? handleVerifyOtp : handleSubmit}>
           {isUpdatePassword ? (
             <div className="recovery-verified-badge">
               <Check size={15} />
@@ -231,7 +256,22 @@ export default function AuthPage({ mode }) {
             </div>
           ) : null}
 
-          {!verificationPending && isRegister ? (
+          {twoFactorPending ? (
+            <label htmlFor="twoFactorCode">
+              Authenticator Code
+              <input
+                id="twoFactorCode"
+                required
+                inputMode="numeric"
+                maxLength="11"
+                placeholder="Enter 6-digit code"
+                value={twoFactorCode}
+                onChange={(event) => setTwoFactorCode(event.target.value.replace(/[^\dA-Za-z-]/g, "").slice(0, 14))}
+              />
+            </label>
+          ) : null}
+
+          {!twoFactorPending && !verificationPending && isRegister ? (
             <>
               <label htmlFor="fullName">
                 Full Name
@@ -259,15 +299,15 @@ export default function AuthPage({ mode }) {
             </>
           ) : null}
 
-          {!verificationPending && !isRegister && !isReset && !isForgot && !isUpdatePassword ? (
+          {!twoFactorPending && !verificationPending && !isRegister && !isReset && !isForgot && !isUpdatePassword ? (
             <MethodTabs label="Continue with" method={method} setMethod={setMethod} emailLabel="Email" smsLabel="Phone" />
           ) : null}
 
-          {!verificationPending && isReset ? (
+          {!twoFactorPending && !verificationPending && isReset ? (
             <MethodTabs label="Continue with" method={method} setMethod={setMethod} emailLabel="Email" smsLabel="Phone" />
           ) : null}
 
-          {!verificationPending && isForgot ? (
+          {!twoFactorPending && !verificationPending && isForgot ? (
             <label htmlFor="recoveryIdentifier">
               Email Address
               <input
@@ -281,7 +321,7 @@ export default function AuthPage({ mode }) {
             </label>
           ) : null}
 
-          {!verificationPending && !isRegister && !isForgot && !isUpdatePassword && method === "email" ? (
+          {!twoFactorPending && !verificationPending && !isRegister && !isForgot && !isUpdatePassword && method === "email" ? (
             <label htmlFor="email">
               Email Address
               <input
@@ -295,11 +335,11 @@ export default function AuthPage({ mode }) {
             </label>
           ) : null}
 
-          {!verificationPending && !isRegister && !isForgot && !isUpdatePassword && method === "sms" ? (
+          {!twoFactorPending && !verificationPending && !isRegister && !isForgot && !isUpdatePassword && method === "sms" ? (
             <PhoneField form={form} updateField={updateField} placeholder="Enter your phone number" />
           ) : null}
 
-          {!verificationPending && isUpdatePassword ? (
+          {!twoFactorPending && !verificationPending && isUpdatePassword ? (
             <>
               <label htmlFor="password">
                 New Password
@@ -360,7 +400,7 @@ export default function AuthPage({ mode }) {
             </>
           ) : null}
 
-          {!verificationPending && !isForgot && !isUpdatePassword ? (
+          {!twoFactorPending && !verificationPending && !isForgot && !isUpdatePassword ? (
             <label htmlFor="password">
               {isReset ? "New Password" : "Password"}
               <input
@@ -375,7 +415,7 @@ export default function AuthPage({ mode }) {
             </label>
           ) : null}
 
-          {verificationPending || isReset ? (
+          {!twoFactorPending && (verificationPending || isReset) ? (
             <label htmlFor="otp">
               {isReset ? "Reset Code" : "Verification Code"}
               <input
@@ -405,6 +445,8 @@ export default function AuthPage({ mode }) {
               ? "Please wait..."
               : passwordUpdated
                 ? "Redirecting..."
+              : twoFactorPending
+                ? "Verify Sign In"
               : verificationPending
                 ? "Verify Account"
                 : isForgot
@@ -425,7 +467,7 @@ export default function AuthPage({ mode }) {
             </div>
           ) : null}
 
-          {!verificationPending && !isUpdatePassword ? (
+          {!twoFactorPending && !verificationPending && !isUpdatePassword ? (
             <div className="auth-links">
               {isRegister ? <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`}>Already have an account?</Link> : null}
               {!isRegister && !isForgot && !isReset && !isUpdatePassword ? (
@@ -560,7 +602,15 @@ function PhoneField({ form, updateField, placeholder = "Phone number" }) {
   );
 }
 
-function getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending }) {
+function getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending, twoFactorPending }) {
+  if (twoFactorPending) {
+    return {
+      label: "ACCOUNT VERIFICATION",
+      heading: "Verify sign in",
+      subtitle: "Enter the code from your authenticator app to continue."
+    };
+  }
+
   if (verificationPending) {
     return {
       label: "ACCOUNT VERIFICATION",

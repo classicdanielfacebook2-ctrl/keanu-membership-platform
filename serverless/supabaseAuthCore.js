@@ -142,6 +142,26 @@ const ensureSupabaseAuthUser = async ({ email, user }) => {
   }
 };
 
+export const upsertSupabaseUserProfile = async ({ user, profile }) => {
+  if (!user?.email) return null;
+  const admin = getSupabaseAdminClient();
+  await ensureSupabaseAuthUser({ email: user.email, user });
+  const { data: listed, error: listError } = await admin.auth.admin.listUsers();
+  if (listError) throw listError;
+  const supabaseUser = listed?.users?.find((item) => item.email?.toLowerCase() === user.email.toLowerCase());
+  if (!supabaseUser?.id) return null;
+
+  const { data, error } = await admin.auth.admin.updateUserById(supabaseUser.id, {
+    user_metadata: {
+      ...(supabaseUser.user_metadata || {}),
+      profile,
+      mongo_user_id: String(user._id || user.id || "")
+    }
+  });
+  if (error) throw error;
+  return data?.user || null;
+};
+
 const updateMongoPassword = async ({ email, password }) => {
   const users = await getUsersCollection();
   const user = await users.findOne({ $or: [{ identifier: email }, { email }] });

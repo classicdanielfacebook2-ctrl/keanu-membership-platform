@@ -6519,9 +6519,16 @@ body::after {
   gap: 0.9rem;
 }
 
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
 .account-form-panel label {
   display: grid;
   gap: 0.4rem;
+  min-width: 0;
 }
 
 .account-form-panel label span {
@@ -6558,6 +6565,27 @@ body::after {
   outline: none;
 }
 
+.verification-chip {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid rgba(200, 169, 107, 0.22);
+  border-radius: 999px;
+  color: #c7ad72;
+  background: rgba(200, 169, 107, 0.08);
+  padding: 0.28rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  overflow-wrap: anywhere;
+}
+
+.verification-chip.verified {
+  color: #9ed7a6;
+  border-color: rgba(158, 215, 166, 0.32);
+  background: rgba(158, 215, 166, 0.08);
+}
+
 .security-control-list button {
   width: 100%;
 }
@@ -6580,6 +6608,142 @@ body::after {
 
 .security-status-line strong {
   color: #dcc384;
+}
+
+.two-step-panel .button {
+  justify-content: center;
+}
+
+.contact-verification-panel {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(16, 16, 16, 0.82);
+  padding: 1rem;
+}
+
+.contact-verification-panel strong,
+.contact-verification-panel small {
+  display: block;
+}
+
+.contact-verification-panel strong {
+  color: #f5f1e8;
+}
+
+.contact-verification-panel small {
+  margin-top: 0.22rem;
+  color: #9d9d9d;
+  line-height: 1.5;
+}
+
+.verification-actions,
+.inline-verification-form {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.inline-verification-form input {
+  flex: 1 1 12rem;
+}
+
+.totp-setup-grid,
+.two-factor-action-card,
+.recovery-code-panel {
+  display: grid;
+  gap: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(16, 16, 16, 0.86);
+  padding: 1rem;
+}
+
+.totp-qr-card {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(200, 169, 107, 0.22);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(244, 216, 139, 0.12), rgba(255, 255, 255, 0.03));
+  padding: 1rem;
+}
+
+.totp-qr-card img {
+  width: min(220px, 100%);
+  border-radius: 14px;
+}
+
+.totp-copy-block,
+.recovery-code-panel > div:first-child,
+.two-factor-action-card > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.totp-copy-block span {
+  color: #9d9d9d;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.totp-copy-block strong,
+.recovery-code-panel strong,
+.two-factor-action-card strong {
+  color: #f5f1e8;
+  overflow-wrap: anywhere;
+}
+
+.totp-copy-block small,
+.recovery-code-panel small,
+.two-factor-action-card small {
+  color: #9d9d9d;
+  line-height: 1.5;
+}
+
+.recovery-code-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.recovery-code-grid code {
+  border: 1px solid rgba(200, 169, 107, 0.18);
+  border-radius: 12px;
+  background: #0b0b0b;
+  color: #dcc384;
+  padding: 0.7rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.two-factor-action-card.danger {
+  border-color: rgba(255, 112, 112, 0.2);
+}
+
+@media (max-width: 720px) {
+  .profile-form-grid,
+  .recovery-code-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .totp-setup-grid,
+  .two-factor-action-card,
+  .recovery-code-panel {
+    border-radius: 16px;
+    padding: 0.85rem;
+  }
+
+  .verification-chip {
+    width: 100%;
+  }
+
+  .verification-actions .button,
+  .inline-verification-form .button {
+    width: 100%;
+  }
 }
 
 .muted-copy {

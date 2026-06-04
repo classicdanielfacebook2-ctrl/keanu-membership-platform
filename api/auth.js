@@ -1,4 +1,8 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import QRCode from "qrcode";
+import { ObjectId } from "mongodb";
 import { isAllowedPhoneCountry, isAllowedPhoneNumber } from "../src/data/phoneCountries.js";
 import {
   checkTwilioSmsOtp,
@@ -23,9 +27,248 @@ import {
   setSessionCookie,
   signToken
 } from "../serverless/authCore.js";
-import { sendSupabaseRecoveryResponse, syncSupabaseRecoveredPassword } from "../serverless/supabaseAuthCore.js";
+import {
+  sendSupabaseRecoveryResponse,
+  syncSupabaseRecoveredPassword,
+  upsertSupabaseUserProfile
+} from "../serverless/supabaseAuthCore.js";
 
 const getAction = (req) => (Array.isArray(req.query?.action) ? req.query.action[0] : req.query?.action || "");
+const TOTP_ISSUER = "Keanu Reeves Company";
+const TOTP_STEP_SECONDS = 30;
+const TWO_FACTOR_LOCK_MINUTES = 10;
+
+const base32Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+const base32Encode = (buffer) => {
+  let bits = "";
+  for (const byte of buffer) bits += byte.toString(2).padStart(8, "0");
+  return bits.match(/.{1,5}/g)?.map((chunk) => base32Alphabet[parseInt(chunk.padEnd(5, "0"), 2)]).join("") || "";
+};
+
+const base32Decode = (value = "") => {
+  const clean = value.replace(/=+$/g, "").replace(/\s+/g, "").toUpperCase();
+  let bits = "";
+  for (const char of clean) {
+    const index = base32Alphabet.indexOf(char);
+    if (index < 0) continue;
+    bits += index.toString(2).padStart(5, "0");
+  }
+  const bytes = bits.match(/.{8}/g)?.map((byte) => parseInt(byte, 2)) || [];
+  return Buffer.from(bytes);
+};
+
+const encryptionKey = () => crypto.createHash("sha256").update(process.env.AUTH_JWT_SECRET || "local-development-secret").digest();
+const encryptSecret = (secret) => {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", encryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(secret, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString("base64")}.${tag.toString("base64")}.${encrypted.toString("base64")}`;
+};
+const decryptSecret = (payload = "") => {
+  const [ivRaw, tagRaw, encryptedRaw] = payload.split(".");
+  const decipher = crypto.createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(ivRaw, "base64"));
+  decipher.setAuthTag(Buffer.from(tagRaw, "base64"));
+  return Buffer.concat([decipher.update(Buffer.from(encryptedRaw, "base64")), decipher.final()]).toString("utf8");
+};
+
+const totpCode = (secret, offset = 0) => {
+  const counter = Math.floor(Date.now() / 1000 / TOTP_STEP_SECONDS) + offset;
+  const counterBuffer = Buffer.alloc(8);
+  counterBuffer.writeBigUInt64BE(BigInt(counter));
+  const hmac = crypto.createHmac("sha1", base32Decode(secret)).update(counterBuffer).digest();
+  const start = hmac[hmac.length - 1] & 0x0f;
+  const binary = ((hmac[start] & 0x7f) << 24) | ((hmac[start + 1] & 0xff) << 16) | ((hmac[start + 2] & 0xff) << 8) | (hmac[start + 3] & 0xff);
+  return String(binary % 1000000).padStart(6, "0");
+};
+
+const verifyTotp = (secret, code) => /^\d{6}$/.test(code) && [-1, 0, 1].some((offset) => totpCode(secret, offset) === code);
+const createRecoveryCodes = () => Array.from({ length: 10 }, () => crypto.randomBytes(5).toString("hex").toUpperCase().match(/.{1,5}/g).join("-"));
+const hashRecoveryCodes = async (codes) => Promise.all(codes.map(async (code) => bcrypt.hash(code, 12)));
+const isTwoFactorLocked = (user) => user.twoFactorLockUntil && new Date(user.twoFactorLockUntil).getTime() > Date.now();
+const cleanOtp = (value = "") => String(value || "").replace(/\D/g, "").slice(0, 6);
+const countriesWithoutPostalCodes = new Set([
+  "Afghanistan",
+  "Angola",
+  "Bahamas",
+  "Belize",
+  "Benin",
+  "Botswana",
+  "Burundi",
+  "Cameroon",
+  "Central African Republic",
+  "Chad",
+  "Comoros",
+  "Congo",
+  "Democratic Republic of the Congo",
+  "Djibouti",
+  "Equatorial Guinea",
+  "Eritrea",
+  "Fiji",
+  "Gambia",
+  "Ghana",
+  "Grenada",
+  "Guyana",
+  "Hong Kong",
+  "Ireland",
+  "Jamaica",
+  "Kenya",
+  "Kiribati",
+  "Libya",
+  "Macau",
+  "Malawi",
+  "Mali",
+  "Mauritania",
+  "Mauritius",
+  "Nauru",
+  "Nigeria",
+  "Qatar",
+  "Rwanda",
+  "Saint Kitts and Nevis",
+  "Saint Lucia",
+  "Sao Tome and Principe",
+  "Seychelles",
+  "Sierra Leone",
+  "Solomon Islands",
+  "Somalia",
+  "South Sudan",
+  "Suriname",
+  "Syria",
+  "Tanzania",
+  "Timor-Leste",
+  "Tonga",
+  "Trinidad and Tobago",
+  "Tuvalu",
+  "Uganda",
+  "United Arab Emirates",
+  "Vanuatu",
+  "Yemen",
+  "Zimbabwe"
+]);
+
+const normalizeProfile = (body = {}) => ({
+  fullName: String(body.fullName || "").trim(),
+  email: normalizeAuthIdentifier(body.email || ""),
+  phone: normalizeAuthIdentifier(body.phone || ""),
+  country: String(body.country || "").trim(),
+  countryCode: String(body.countryCode || "").trim(),
+  stateRegion: String(body.stateRegion || body.state || "").trim(),
+  stateCode: String(body.stateCode || "").trim(),
+  city: String(body.city || "").trim(),
+  streetAddress: String(body.streetAddress || "").trim(),
+  apartmentUnit: String(body.apartmentUnit || "").trim(),
+  postalCode: String(body.postalCode || "").trim(),
+  dateOfBirth: String(body.dateOfBirth || "").trim(),
+  preferredCurrency: String(body.preferredCurrency || "EUR").toUpperCase(),
+  preferredLanguage: String(body.preferredLanguage || "English").trim()
+});
+
+const validateProfile = (profile) => {
+  if (!profile.fullName) return "Full name is required.";
+  if (!isEmailIdentifier(profile.email)) return "Enter a valid email address.";
+  if (profile.phone && !isPhoneIdentifier(profile.phone)) return "Enter a valid mobile number with country code.";
+  if (!profile.country) return "Country is required.";
+  if (!profile.stateRegion) return "State / Region is required.";
+  if (!profile.city) return "City is required.";
+  if (!countriesWithoutPostalCodes.has(profile.country) && !profile.postalCode) {
+    return "Postal code is required for the selected country.";
+  }
+  return "";
+};
+
+const signTwoFactorChallenge = (user) =>
+  jwt.sign({ sub: String(user._id), purpose: "two_factor" }, process.env.AUTH_JWT_SECRET || "", { expiresIn: "5m" });
+
+const getTwoFactorUserFromChallenge = async (challengeToken) => {
+  const payload = jwt.verify(String(challengeToken || ""), process.env.AUTH_JWT_SECRET || "");
+  if (payload?.purpose !== "two_factor" || !payload?.sub) {
+    const error = new Error("Invalid verification challenge.");
+    error.status = 401;
+    throw error;
+  }
+  const users = await getUsersCollection();
+  const user = await users.findOne({ _id: new ObjectId(payload.sub) });
+  if (!user) {
+    const error = new Error("Verification challenge account was not found.");
+    error.status = 401;
+    throw error;
+  }
+  return { users, user };
+};
+
+const buildOtpauthUri = ({ user, secret }) => {
+  const accountName = encodeURIComponent(`${TOTP_ISSUER}:${user.email || user.identifier}`);
+  return `otpauth://totp/${accountName}?secret=${secret}&issuer=${encodeURIComponent(TOTP_ISSUER)}&algorithm=SHA1&digits=6&period=${TOTP_STEP_SECONDS}`;
+};
+
+const verifyRecoveryCode = async (user, code) => {
+  const input = String(code || "").trim().toUpperCase();
+  if (!input || !Array.isArray(user.twoStep?.recoveryCodeHashes)) return { valid: false };
+  for (let index = 0; index < user.twoStep.recoveryCodeHashes.length; index += 1) {
+    if (await bcrypt.compare(input, user.twoStep.recoveryCodeHashes[index])) {
+      return { valid: true, index };
+    }
+  }
+  return { valid: false };
+};
+
+const verifyUserTwoFactorCode = async ({ users, user, code, allowRecovery = true }) => {
+  if (isTwoFactorLocked(user)) {
+    return { ok: false, status: 429, error: "Too many verification attempts. Please wait before trying again." };
+  }
+
+  const entered = String(code || "").trim();
+  let ok = false;
+  let usedRecoveryIndex = -1;
+  try {
+    const secret = decryptSecret(user.twoStep?.secretEncrypted || "");
+    ok = verifyTotp(secret, cleanOtp(entered));
+  } catch {
+    ok = false;
+  }
+
+  if (!ok && allowRecovery) {
+    const recovery = await verifyRecoveryCode(user, entered);
+    ok = recovery.valid;
+    usedRecoveryIndex = recovery.valid ? recovery.index : -1;
+  }
+
+  if (!ok) {
+    const attempts = Number(user.twoStep?.failedAttempts || 0) + 1;
+    const lockUntil = attempts >= 5 ? new Date(Date.now() + TWO_FACTOR_LOCK_MINUTES * 60 * 1000) : null;
+    await users.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          "twoStep.failedAttempts": attempts,
+          ...(lockUntil ? { "twoStep.lockedUntil": lockUntil, twoFactorLockUntil: lockUntil } : {}),
+          updatedAt: new Date()
+        }
+      }
+    );
+    return { ok: false, status: lockUntil ? 429 : 401, error: lockUntil ? "Too many verification attempts. Please wait before trying again." : "Invalid authenticator code." };
+  }
+
+  const update = {
+    $set: {
+      "twoStep.failedAttempts": 0,
+      updatedAt: new Date()
+    },
+    $unset: {
+      "twoStep.lockedUntil": "",
+      twoFactorLockUntil: ""
+    }
+  };
+
+  if (usedRecoveryIndex >= 0) {
+    const nextHashes = [...(user.twoStep.recoveryCodeHashes || [])];
+    nextHashes.splice(usedRecoveryIndex, 1);
+    update.$set["twoStep.recoveryCodeHashes"] = nextHashes;
+  }
+
+  await users.updateOne({ _id: user._id }, update);
+  return { ok: true };
+};
 
 async function login(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
@@ -48,6 +291,17 @@ async function login(req, res) {
       error: "Please verify your email before logging in.",
       verificationRequired: true,
       identifier: user.identifier
+    });
+  }
+
+  if (user.twoStep?.enabled) {
+    if (isTwoFactorLocked(user)) {
+      return sendJson(res, 429, { error: "Two-step verification is temporarily locked. Please try again later." });
+    }
+    return sendJson(res, 200, {
+      twoFactorRequired: true,
+      challengeToken: signTwoFactorChallenge(user),
+      message: "Enter the 6-digit code from your authenticator app."
     });
   }
 
@@ -130,29 +384,189 @@ async function securitySettings(req, res) {
 async function updateProfile(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
   const user = await requireAuth(req);
-  const fullName = String(req.body?.fullName || "").trim();
-  const email = normalizeAuthIdentifier(req.body?.email || "");
-  const phone = normalizeAuthIdentifier(req.body?.phone || "");
+  const profile = normalizeProfile(req.body || {});
+  const validationError = validateProfile(profile);
 
-  if (!fullName || !isEmailIdentifier(email) || (phone && !isPhoneIdentifier(phone))) {
-    return sendJson(res, 400, { error: "Enter a valid full name, email address, and phone number." });
+  if (validationError) {
+    return sendJson(res, 400, { error: validationError });
   }
 
   const users = await getUsersCollection();
+  const emailChanged = profile.email && profile.email !== normalizeAuthIdentifier(user.email || "");
+  const phoneChanged = profile.phone && profile.phone !== normalizeAuthIdentifier(user.phone || "");
+  if (emailChanged) {
+    const existingEmailUser = await users.findOne({
+      _id: { $ne: user._id },
+      $or: [{ email: profile.email }, { identifier: profile.email }]
+    });
+    if (existingEmailUser) return sendJson(res, 409, { error: "That email address is already registered." });
+  }
+
+  if (phoneChanged) {
+    const existingPhoneUser = await users.findOne({
+      _id: { $ne: user._id },
+      $or: [{ phone: profile.phone }, { identifier: profile.phone }]
+    });
+    if (existingPhoneUser) return sendJson(res, 409, { error: "That mobile number is already registered." });
+  }
+
+  const nextProfile = {
+    ...(user.profile || {}),
+    ...profile,
+    email: emailChanged ? user.email || "" : profile.email,
+    pendingEmail: emailChanged ? profile.email : user.pendingEmail || "",
+    phone: profile.phone
+  };
+
+  const setFields = {
+    fullName: profile.fullName,
+    phone: profile.phone,
+    profile: nextProfile,
+    phoneVerified: phoneChanged ? false : Boolean(user.phoneVerified),
+    updatedAt: new Date()
+  };
+
+  if (emailChanged) {
+    setFields.pendingEmail = profile.email;
+    setFields.emailVerified = false;
+  } else {
+    setFields.email = profile.email;
+    setFields.emailVerified = user.emailVerified !== false;
+    if (isEmailIdentifier(user.identifier)) setFields.identifier = profile.email;
+  }
+
   await users.updateOne(
     { _id: user._id },
     {
-      $set: {
-        fullName,
-        identifier: isEmailIdentifier(user.identifier) ? email : user.identifier,
-        email,
-        phone,
-        updatedAt: new Date()
-      }
+      $set: setFields,
+      ...(emailChanged ? {} : { $unset: { pendingEmail: "" } })
     }
   );
   const updatedUser = await users.findOne({ _id: user._id });
-  return sendJson(res, 200, { ok: true, user: publicUser(updatedUser), message: "Personal details updated." });
+  let supabaseSynced = false;
+  try {
+    await upsertSupabaseUserProfile({ user: updatedUser, profile: nextProfile });
+    supabaseSynced = true;
+  } catch (error) {
+    console.error("[auth/update-profile]", {
+      message: "Supabase profile sync failed",
+      error: error?.message
+    });
+  }
+  return sendJson(res, 200, {
+    ok: true,
+    user: publicUser(updatedUser),
+    supabaseSynced,
+    message: emailChanged
+      ? "Profile saved. Verify the new email address before it replaces your current email."
+      : "Personal details updated."
+  });
+}
+
+async function sendProfileVerification(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  const user = await requireAuth(req);
+  const channel = req.body?.channel === "phone" ? "phone" : "email";
+  const users = await getUsersCollection();
+
+  if (channel === "email") {
+    const targetEmail = normalizeAuthIdentifier(user.pendingEmail || user.email || "");
+    if (!isEmailIdentifier(targetEmail)) return sendJson(res, 400, { error: "No valid email address is available for verification." });
+    const otpFields = await createOtpFields();
+    await users.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          "profileVerification.emailOtpHash": otpFields.otpHash,
+          "profileVerification.emailOtpExpiresAt": otpFields.otpExpiresAt,
+          "profileVerification.emailOtpAttempts": 0,
+          updatedAt: new Date()
+        }
+      }
+    );
+    await sendOtpEmail({ to: targetEmail, fullName: user.fullName || "Member", otp: otpFields.otp });
+    return sendJson(res, 200, { ok: true, channel: "email", message: "A verification code has been sent to your email address." });
+  }
+
+  const targetPhone = normalizeAuthIdentifier(user.phone || "");
+  if (!isPhoneIdentifier(targetPhone) || !isAllowedPhoneNumber(targetPhone)) {
+    return sendJson(res, 400, { error: "No valid mobile number is available for verification." });
+  }
+  await sendTwilioSmsOtp({ to: targetPhone });
+  return sendJson(res, 200, { ok: true, channel: "phone", message: "A verification code has been sent to your mobile number." });
+}
+
+async function verifyProfileContact(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  const user = await requireAuth(req);
+  const channel = req.body?.channel === "phone" ? "phone" : "email";
+  const otp = cleanOtp(req.body?.otp);
+  if (!/^\d{6}$/.test(otp)) return sendJson(res, 400, { error: "Enter the 6-digit verification code." });
+
+  const users = await getUsersCollection();
+  if (channel === "email") {
+    if (!user.profileVerification?.emailOtpHash || !user.profileVerification?.emailOtpExpiresAt) {
+      return sendJson(res, 400, { error: "Request a new email verification code." });
+    }
+    if (Date.now() > new Date(user.profileVerification.emailOtpExpiresAt).getTime()) {
+      await users.updateOne(
+        { _id: user._id },
+        {
+          $unset: {
+            "profileVerification.emailOtpHash": "",
+            "profileVerification.emailOtpExpiresAt": ""
+          },
+          $set: { "profileVerification.emailOtpAttempts": 0 }
+        }
+      );
+      return sendJson(res, 400, { error: "Verification code expired. Request a new code." });
+    }
+    if ((user.profileVerification.emailOtpAttempts || 0) >= 5) {
+      return sendJson(res, 429, { error: "Too many verification attempts. Request a new code." });
+    }
+    const valid = await bcrypt.compare(otp, user.profileVerification.emailOtpHash);
+    if (!valid) {
+      await users.updateOne({ _id: user._id }, { $inc: { "profileVerification.emailOtpAttempts": 1 } });
+      return sendJson(res, 401, { error: "Invalid verification code." });
+    }
+
+    const nextEmail = normalizeAuthIdentifier(user.pendingEmail || user.email || "");
+    const nextProfile = {
+      ...(user.profile || {}),
+      email: nextEmail,
+      pendingEmail: ""
+    };
+    const setFields = {
+      email: nextEmail,
+      emailVerified: true,
+      profile: nextProfile,
+      updatedAt: new Date()
+    };
+    if (isEmailIdentifier(user.identifier)) setFields.identifier = nextEmail;
+    await users.updateOne(
+      { _id: user._id },
+      {
+        $set: setFields,
+        $unset: {
+          pendingEmail: "",
+          "profileVerification.emailOtpHash": "",
+          "profileVerification.emailOtpExpiresAt": "",
+          "profileVerification.emailOtpAttempts": ""
+        }
+      }
+    );
+    const updatedUser = await users.findOne({ _id: user._id });
+    await upsertSupabaseUserProfile({ user: updatedUser, profile: nextProfile }).catch((error) => {
+      console.error("[auth/profile-verify]", { message: "Supabase email profile sync failed", error: error?.message });
+    });
+    return sendJson(res, 200, { ok: true, user: publicUser(updatedUser), message: "Email address verified." });
+  }
+
+  const verification = await checkTwilioSmsOtp({ to: user.phone, code: otp });
+  if (verification.status !== "approved") return sendJson(res, 401, { error: "Invalid verification code." });
+  await users.updateOne({ _id: user._id }, { $set: { phoneVerified: true, updatedAt: new Date() } });
+  const updatedUser = await users.findOne({ _id: user._id });
+  return sendJson(res, 200, { ok: true, user: publicUser(updatedUser), message: "Mobile number verified." });
 }
 
 async function me(req, res) {
@@ -416,6 +830,183 @@ async function resendOtp(req, res) {
   });
 }
 
+async function twoStepStatus(req, res) {
+  if (req.method !== "GET") return methodNotAllowed(res);
+  const user = await requireAuth(req);
+  return sendJson(res, 200, {
+    enabled: Boolean(user.twoStep?.enabled),
+    recoveryCodeCount: Array.isArray(user.twoStep?.recoveryCodeHashes) ? user.twoStep.recoveryCodeHashes.length : 0,
+    lockedUntil: user.twoStep?.lockedUntil || user.twoFactorLockUntil || null
+  });
+}
+
+async function twoStepSetup(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  const user = await requireAuth(req);
+  const users = await getUsersCollection();
+  const secret = base32Encode(crypto.randomBytes(20));
+  const otpauthUri = buildOtpauthUri({ user, secret });
+  const qrCodeDataUrl = await QRCode.toDataURL(otpauthUri, {
+    errorCorrectionLevel: "M",
+    margin: 1,
+    scale: 6,
+    color: {
+      dark: "#0b0b0b",
+      light: "#f8f1df"
+    }
+  });
+
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        "twoStep.pendingSecretEncrypted": encryptSecret(secret),
+        "twoStep.pendingCreatedAt": new Date(),
+        updatedAt: new Date()
+      }
+    }
+  );
+
+  return sendJson(res, 200, {
+    manualKey: secret,
+    qrCodeDataUrl,
+    issuer: TOTP_ISSUER,
+    message: "Scan the QR code, then enter the 6-digit authenticator code."
+  });
+}
+
+async function twoStepVerifySetup(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  const user = await requireAuth(req);
+  const code = cleanOtp(req.body?.code);
+
+  if (!/^\d{6}$/.test(code)) return sendJson(res, 400, { error: "Enter the 6-digit authenticator code." });
+  if (!user.twoStep?.pendingSecretEncrypted) {
+    return sendJson(res, 400, { error: "Start two-step verification setup before verifying a code." });
+  }
+
+  const secret = decryptSecret(user.twoStep.pendingSecretEncrypted);
+  if (!verifyTotp(secret, code)) return sendJson(res, 401, { error: "Invalid authenticator code." });
+
+  const recoveryCodes = createRecoveryCodes();
+  const recoveryCodeHashes = await hashRecoveryCodes(recoveryCodes);
+  const users = await getUsersCollection();
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        "twoStep.enabled": true,
+        "twoStep.secretEncrypted": encryptSecret(secret),
+        "twoStep.recoveryCodeHashes": recoveryCodeHashes,
+        "twoStep.failedAttempts": 0,
+        "securitySettings.twoStepEnabled": true,
+        updatedAt: new Date()
+      },
+      $unset: {
+        "twoStep.pendingSecretEncrypted": "",
+        "twoStep.pendingCreatedAt": "",
+        "twoStep.lockedUntil": "",
+        twoFactorLockUntil: ""
+      }
+    }
+  );
+
+  return sendJson(res, 200, {
+    ok: true,
+    enabled: true,
+    recoveryCodes,
+    message: "2-step verification is now enabled."
+  });
+}
+
+async function twoStepDisable(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  const user = await requireAuth(req);
+  const currentPassword = String(req.body?.currentPassword || "");
+  const code = cleanOtp(req.body?.code);
+
+  if (!user.twoStep?.enabled) return sendJson(res, 400, { error: "2-step verification is not enabled." });
+  if (!currentPassword || !/^\d{6}$/.test(code)) {
+    return sendJson(res, 400, { error: "Enter your current password and authenticator code." });
+  }
+  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    return sendJson(res, 401, { error: "Current password is incorrect." });
+  }
+
+  const users = await getUsersCollection();
+  const verification = await verifyUserTwoFactorCode({ users, user, code, allowRecovery: false });
+  if (!verification.ok) return sendJson(res, verification.status, { error: verification.error });
+
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        "twoStep.enabled": false,
+        "securitySettings.twoStepEnabled": false,
+        updatedAt: new Date()
+      },
+      $unset: {
+        "twoStep.secretEncrypted": "",
+        "twoStep.recoveryCodeHashes": "",
+        "twoStep.pendingSecretEncrypted": "",
+        "twoStep.lockedUntil": "",
+        twoFactorLockUntil: ""
+      }
+    }
+  );
+  return sendJson(res, 200, { ok: true, enabled: false, message: "2-step verification has been disabled." });
+}
+
+async function twoStepRegenerateRecovery(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  const user = await requireAuth(req);
+  const currentPassword = String(req.body?.currentPassword || "");
+  const code = cleanOtp(req.body?.code);
+
+  if (!user.twoStep?.enabled) return sendJson(res, 400, { error: "Enable 2-step verification first." });
+  if (!currentPassword || !/^\d{6}$/.test(code)) {
+    return sendJson(res, 400, { error: "Enter your current password and authenticator code." });
+  }
+  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    return sendJson(res, 401, { error: "Current password is incorrect." });
+  }
+
+  const users = await getUsersCollection();
+  const verification = await verifyUserTwoFactorCode({ users, user, code, allowRecovery: false });
+  if (!verification.ok) return sendJson(res, verification.status, { error: verification.error });
+
+  const recoveryCodes = createRecoveryCodes();
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        "twoStep.recoveryCodeHashes": await hashRecoveryCodes(recoveryCodes),
+        updatedAt: new Date()
+      }
+    }
+  );
+  return sendJson(res, 200, { ok: true, recoveryCodes, message: "New recovery codes generated." });
+}
+
+async function verifyLoginTwoStep(req, res) {
+  if (req.method !== "POST") return methodNotAllowed(res);
+  const { users, user } = await getTwoFactorUserFromChallenge(req.body?.challengeToken);
+  if (!user.twoStep?.enabled) return sendJson(res, 400, { error: "2-step verification is not enabled for this account." });
+
+  const verification = await verifyUserTwoFactorCode({
+    users,
+    user,
+    code: req.body?.code,
+    allowRecovery: true
+  });
+
+  if (!verification.ok) return sendJson(res, verification.status, { error: verification.error });
+
+  const refreshedUser = await users.findOne({ _id: user._id });
+  setSessionCookie(res, signToken(refreshedUser));
+  return sendJson(res, 200, { user: publicUser(refreshedUser), message: "Sign in verified." });
+}
+
 async function forgotPassword(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
   return sendSupabaseRecoveryResponse(res, req.body?.identifier);
@@ -499,9 +1090,17 @@ const handlers = {
   "resend-otp": resendOtp,
   "reset-password": resetPassword,
   "security-settings": securitySettings,
+  "send-profile-verification": sendProfileVerification,
   "supabase-reset-password": supabaseResetPassword,
+  "two-step-disable": twoStepDisable,
+  "two-step-regenerate-recovery": twoStepRegenerateRecovery,
+  "two-step-setup": twoStepSetup,
+  "two-step-status": twoStepStatus,
+  "two-step-verify-setup": twoStepVerifySetup,
   "update-profile": updateProfile,
-  "verify-otp": verifyOtp
+  "verify-login-2fa": verifyLoginTwoStep,
+  "verify-otp": verifyOtp,
+  "verify-profile-contact": verifyProfileContact
 };
 
 export default async function handler(req, res) {

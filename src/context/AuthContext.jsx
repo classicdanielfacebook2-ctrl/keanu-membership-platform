@@ -30,8 +30,13 @@ export function AuthProvider({ children }) {
       isAdmin: user?.role === "admin",
       async login(payload) {
         const data = await authApi.login(payload);
+        if (data.user) setUser(data.user);
+        return data;
+      },
+      async verifyLoginTwoStep(payload) {
+        const data = await authApi.verifyLoginTwoStep(payload);
         setUser(data.user);
-        return data.user;
+        return data;
       },
       async register(payload) {
         const data = await authApi.register(payload);

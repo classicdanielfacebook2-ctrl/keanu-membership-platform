@@ -137,11 +137,16 @@ export const publicUser = (user) =>
         fullName: user.fullName,
         identifier: user.identifier,
         email: user.email,
+        pendingEmail: user.pendingEmail || "",
+        emailVerified: user.emailVerified !== false,
         phone: user.phone,
         phoneCountry: user.phoneCountry,
+        phoneVerified: Boolean(user.phoneVerified),
+        profile: user.profile || {},
         role: user.role,
         verified: isUserVerified(user),
-        isVerified: isUserVerified(user)
+        isVerified: isUserVerified(user),
+        twoStepEnabled: Boolean(user.twoStep?.enabled || user.securitySettings?.twoStepEnabled)
       }
     : null;
 

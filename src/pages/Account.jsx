@@ -2,11 +2,15 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
+  CheckCircle2,
   Clock3,
+  Copy,
   CreditCard,
   History,
+  KeyRound,
   LockKeyhole,
   LogOut,
+  QrCode,
   RefreshCcw,
   ShieldCheck,
   Smartphone,
@@ -14,16 +18,24 @@ import {
   WalletCards,
   XCircle
 } from "lucide-react";
+import { City, Country, State } from "country-state-city";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { cardTypes } from "../data/cards.js";
 import { formatPaymentAmount } from "../data/paymentMethods.js";
 import { getAccountPayments } from "../services/stripeCheckout.js";
 import {
   changePassword,
+  disableTwoStep,
   getSecuritySettings,
+  getTwoStepStatus,
   logoutEverywhere,
+  regenerateRecoveryCodes,
+  sendProfileVerification,
+  startTwoStepSetup,
   updateProfile,
-  updateSecuritySettings
+  updateSecuritySettings,
+  verifyProfileContact,
+  verifyTwoStepSetup
 } from "../services/authApi.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -158,22 +170,62 @@ function InlineMessage({ message }) {
 
 function PersonalDetails({ auth }) {
   const user = auth.user;
+  const countries = Country.getAllCountries();
+  const profile = user?.profile || {};
   const [form, setForm] = useState({
-    fullName: user?.fullName || "",
-    email: user?.email || (user?.identifier?.includes("@") ? user.identifier : ""),
-    phone: user?.phone || ""
+    fullName: profile.fullName || user?.fullName || "",
+    email: user?.pendingEmail || profile.email || user?.email || (user?.identifier?.includes("@") ? user.identifier : ""),
+    phone: profile.phone || user?.phone || "",
+    country: profile.country || "",
+    countryCode: profile.countryCode || "",
+    stateRegion: profile.stateRegion || "",
+    stateCode: profile.stateCode || "",
+    city: profile.city || "",
+    streetAddress: profile.streetAddress || "",
+    apartmentUnit: profile.apartmentUnit || "",
+    postalCode: profile.postalCode || "",
+    dateOfBirth: profile.dateOfBirth || "",
+    preferredCurrency: profile.preferredCurrency || "EUR",
+    preferredLanguage: profile.preferredLanguage || "English"
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [verification, setVerification] = useState({ channel: "", otp: "", sending: false, verifying: false });
+  const selectedCountry = countries.find((country) => country.isoCode === form.countryCode) || countries.find((country) => country.name === form.country);
+  const states = selectedCountry ? State.getStatesOfCountry(selectedCountry.isoCode) : [];
+  const selectedState = states.find((state) => state.isoCode === form.stateCode) || states.find((state) => state.name === form.stateRegion);
+  const cities = selectedCountry && selectedState ? City.getCitiesOfState(selectedCountry.isoCode, selectedState.isoCode) : [];
+  const countriesWithoutPostalCodes = new Set(["United Arab Emirates", "Hong Kong", "Qatar", "Ireland", "Jamaica", "Nigeria", "Ghana"]);
+
+  const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const emailPending = Boolean(user?.pendingEmail && user.pendingEmail === form.email);
+  const emailVerified = user?.emailVerified !== false && !emailPending;
+  const phoneVerified = Boolean(user?.phoneVerified) && form.phone === user?.phone;
+
+  const validate = () => {
+    if (!form.fullName.trim()) return "Full name is required.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return "Enter a valid email address.";
+    if (form.phone && !/^\+[1-9]\d{7,14}$/.test(form.phone.replace(/[\s().-]/g, ""))) return "Enter a mobile number with country code.";
+    if (!form.country) return "Country is required.";
+    if (!form.stateRegion) return "State / Region is required.";
+    if (!form.city) return "City is required.";
+    if (!countriesWithoutPostalCodes.has(form.country) && !form.postalCode.trim()) return "Postal code is required for the selected country.";
+    return "";
+  };
 
   const submit = async (event) => {
     event.preventDefault();
+    const validationError = validate();
+    if (validationError) {
+      setMessage({ type: "error", text: validationError });
+      return;
+    }
     setSaving(true);
     setMessage(null);
     try {
       await updateProfile(form);
       await auth.refreshUser();
-      setMessage({ type: "success", text: "Personal details updated." });
+      setMessage({ type: "success", text: "Personal details saved." });
     } catch (error) {
       setMessage({ type: "error", text: error?.message || "Personal details could not be updated." });
     } finally {
@@ -181,23 +233,171 @@ function PersonalDetails({ auth }) {
     }
   };
 
+  const requestVerification = async (channel) => {
+    setVerification((current) => ({ ...current, channel, otp: "", sending: true }));
+    setMessage(null);
+    try {
+      const data = await sendProfileVerification({ channel });
+      setMessage({ type: "success", text: data.message || "Verification code sent." });
+    } catch (error) {
+      setMessage({ type: "error", text: error?.message || "Verification code could not be sent." });
+    } finally {
+      setVerification((current) => ({ ...current, sending: false }));
+    }
+  };
+
+  const confirmVerification = async (event) => {
+    event.preventDefault();
+    setVerification((current) => ({ ...current, verifying: true }));
+    setMessage(null);
+    try {
+      const data = await verifyProfileContact({ channel: verification.channel, otp: verification.otp });
+      await auth.refreshUser();
+      setVerification({ channel: "", otp: "", sending: false, verifying: false });
+      setMessage({ type: "success", text: data.message || "Contact method verified." });
+    } catch (error) {
+      setMessage({ type: "error", text: error?.message || "Verification could not be completed." });
+      setVerification((current) => ({ ...current, verifying: false }));
+    }
+  };
+
   return (
     <form className="banking-panel account-form-panel" onSubmit={submit}>
-      <label>
-        <span>Full Name</span>
-        <input type="text" value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} placeholder="Full name" />
-      </label>
-      <label>
-        <span>Email Address</span>
-        <input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder="Email address" />
-      </label>
-      <label>
-        <span>Mobile Number</span>
-        <input type="tel" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Mobile number" />
-      </label>
-      <div className="account-control-list">
-        <button type="button" onClick={() => setMessage({ type: "success", text: "Email verification is already completed for active accounts." })}>Verify Email <ArrowRight size={16} /></button>
-        <button type="button" onClick={() => setMessage({ type: "success", text: "Phone verification uses OTP during registration and recovery." })}>Verify Phone <ArrowRight size={16} /></button>
+      <div className="profile-form-grid">
+        <label>
+          <span>Full Name</span>
+          <input type="text" value={form.fullName} onChange={(event) => setField("fullName", event.target.value)} placeholder="Full name" />
+        </label>
+        <label>
+          <span>Email Address</span>
+          <input type="email" value={form.email} onChange={(event) => setField("email", event.target.value)} placeholder="Email address" />
+          <small className={emailVerified ? "verification-chip verified" : "verification-chip"}>
+            {emailVerified ? "Verified" : emailPending ? "Verification required before replacement" : "Verification required after change"}
+          </small>
+        </label>
+        <label>
+          <span>Mobile Number</span>
+          <input type="tel" value={form.phone} onChange={(event) => setField("phone", event.target.value)} placeholder="+1 555 000 0000" />
+          <small className={phoneVerified ? "verification-chip verified" : "verification-chip"}>{phoneVerified ? "Verified" : "Unverified"}</small>
+        </label>
+        <label>
+          <span>Country</span>
+          <select
+            value={form.countryCode}
+            onChange={(event) => {
+              const country = countries.find((item) => item.isoCode === event.target.value);
+              setForm((current) => ({
+                ...current,
+                country: country?.name || "",
+                countryCode: country?.isoCode || "",
+                stateRegion: "",
+                stateCode: "",
+                city: ""
+              }));
+            }}
+          >
+            <option value="">Select country</option>
+            {countries.map((country) => (
+              <option value={country.isoCode} key={country.isoCode}>{country.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>State / Region</span>
+          <select
+            value={form.stateCode}
+            disabled={!selectedCountry}
+            onChange={(event) => {
+              const state = states.find((item) => item.isoCode === event.target.value);
+              setForm((current) => ({
+                ...current,
+                stateRegion: state?.name || "",
+                stateCode: state?.isoCode || "",
+                city: ""
+              }));
+            }}
+          >
+            <option value="">Select state / region</option>
+            {states.map((state) => (
+              <option value={state.isoCode} key={state.isoCode}>{state.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>City</span>
+          <input
+            list="profile-cities"
+            value={form.city}
+            onChange={(event) => setField("city", event.target.value)}
+            placeholder="City"
+            disabled={!selectedState && states.length > 0}
+          />
+          <datalist id="profile-cities">
+            {cities.map((city) => (
+              <option value={city.name} key={`${city.name}-${city.latitude}-${city.longitude}`} />
+            ))}
+          </datalist>
+        </label>
+        <label>
+          <span>Street Address</span>
+          <input type="text" value={form.streetAddress} onChange={(event) => setField("streetAddress", event.target.value)} placeholder="Street address" />
+        </label>
+        <label>
+          <span>Apartment / Unit</span>
+          <input type="text" value={form.apartmentUnit} onChange={(event) => setField("apartmentUnit", event.target.value)} placeholder="Apartment, suite, unit" />
+        </label>
+        <label>
+          <span>Postal Code</span>
+          <input type="text" value={form.postalCode} onChange={(event) => setField("postalCode", event.target.value)} placeholder="Postal code" />
+        </label>
+        <label>
+          <span>Date of Birth</span>
+          <input type="date" value={form.dateOfBirth} onChange={(event) => setField("dateOfBirth", event.target.value)} />
+        </label>
+        <label>
+          <span>Preferred Currency</span>
+          <select value={form.preferredCurrency} onChange={(event) => setField("preferredCurrency", event.target.value)}>
+            {["EUR", "USD", "GBP", "AUD", "CAD", "BRL", "CHF", "CLP"].map((currency) => (
+              <option value={currency} key={currency}>{currency}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Preferred Language</span>
+          <select value={form.preferredLanguage} onChange={(event) => setField("preferredLanguage", event.target.value)}>
+            {["English", "French", "Spanish", "German", "Italian", "Portuguese", "Arabic"].map((language) => (
+              <option value={language} key={language}>{language}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="contact-verification-panel">
+        <div>
+          <strong>Contact verification</strong>
+          <small>Verify changed email or mobile details before they are fully trusted on the account.</small>
+        </div>
+        <div className="verification-actions">
+          <button className="button secondary" type="button" disabled={verification.sending} onClick={() => requestVerification("email")}>
+            {verification.sending && verification.channel === "email" ? "Sending..." : "Verify Email"}
+          </button>
+          <button className="button secondary" type="button" disabled={verification.sending || !form.phone} onClick={() => requestVerification("phone")}>
+            {verification.sending && verification.channel === "phone" ? "Sending..." : "Verify Phone"}
+          </button>
+        </div>
+        {verification.channel ? (
+          <form className="inline-verification-form" onSubmit={confirmVerification}>
+            <input
+              inputMode="numeric"
+              maxLength="6"
+              placeholder="Enter 6-digit code"
+              value={verification.otp}
+              onChange={(event) => setVerification((current) => ({ ...current, otp: event.target.value.replace(/\D/g, "").slice(0, 6) }))}
+            />
+            <button className="button primary" type="submit" disabled={verification.verifying || verification.otp.length !== 6}>
+              {verification.verifying ? "Verifying..." : "Confirm Code"}
+            </button>
+          </form>
+        ) : null}
       </div>
       <InlineMessage message={message} />
       <button className="button primary" type="submit" disabled={saving}>{saving ? "Saving..." : "Save Changes"}</button>
@@ -287,6 +487,12 @@ function SecuritySettingsPanel({ mode, onLogout }) {
     requireBankTransferConfirmation: true,
     sessionTimeoutMinutes: 30
   });
+  const [twoStep, setTwoStep] = useState({ enabled: false, recoveryCodeCount: 0, lockedUntil: null });
+  const [setup, setSetup] = useState(null);
+  const [setupCode, setSetupCode] = useState("");
+  const [recoveryCodes, setRecoveryCodes] = useState([]);
+  const [disableForm, setDisableForm] = useState({ currentPassword: "", code: "" });
+  const [regenerateForm, setRegenerateForm] = useState({ currentPassword: "", code: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -308,6 +514,25 @@ function SecuritySettingsPanel({ mode, onLogout }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (mode !== "two-step") return;
+    let active = true;
+    setLoading(true);
+    getTwoStepStatus()
+      .then((data) => {
+        if (active) setTwoStep(data);
+      })
+      .catch((error) => {
+        if (active) setMessage({ type: "error", text: error?.message || "2-step verification status could not be loaded." });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [mode]);
+
   const save = async (nextSettings) => {
     setSaving(true);
     setMessage(null);
@@ -325,17 +550,186 @@ function SecuritySettingsPanel({ mode, onLogout }) {
   if (loading) return <div className="banking-panel account-empty-state">Loading security settings...</div>;
 
   if (mode === "two-step") {
+    const beginSetup = async () => {
+      setSaving(true);
+      setMessage(null);
+      setRecoveryCodes([]);
+      try {
+        const data = await startTwoStepSetup();
+        setSetup(data);
+        setMessage({ type: "success", text: data.message || "Scan the QR code and enter your authenticator code." });
+      } catch (error) {
+        setMessage({ type: "error", text: error?.message || "2-step setup could not be started." });
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    const confirmSetup = async (event) => {
+      event.preventDefault();
+      setSaving(true);
+      setMessage(null);
+      try {
+        const data = await verifyTwoStepSetup({ code: setupCode });
+        setTwoStep({ enabled: true, recoveryCodeCount: data.recoveryCodes?.length || 0, lockedUntil: null });
+        setSettings((current) => ({ ...current, twoStepEnabled: true }));
+        setRecoveryCodes(data.recoveryCodes || []);
+        setSetup(null);
+        setSetupCode("");
+        setMessage({ type: "success", text: "2-step verification is enabled. Save your recovery codes now." });
+      } catch (error) {
+        setMessage({ type: "error", text: error?.message || "Authenticator code could not be verified." });
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    const disable = async (event) => {
+      event.preventDefault();
+      setSaving(true);
+      setMessage(null);
+      try {
+        const data = await disableTwoStep(disableForm);
+        setTwoStep({ enabled: false, recoveryCodeCount: 0, lockedUntil: null });
+        setSettings((current) => ({ ...current, twoStepEnabled: false }));
+        setDisableForm({ currentPassword: "", code: "" });
+        setMessage({ type: "success", text: data.message || "2-step verification disabled." });
+      } catch (error) {
+        setMessage({ type: "error", text: error?.message || "2-step verification could not be disabled." });
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    const regenerate = async (event) => {
+      event.preventDefault();
+      setSaving(true);
+      setMessage(null);
+      try {
+        const data = await regenerateRecoveryCodes(regenerateForm);
+        setRecoveryCodes(data.recoveryCodes || []);
+        setTwoStep((current) => ({ ...current, recoveryCodeCount: data.recoveryCodes?.length || current.recoveryCodeCount }));
+        setRegenerateForm({ currentPassword: "", code: "" });
+        setMessage({ type: "success", text: "New recovery codes generated. Save them now." });
+      } catch (error) {
+        setMessage({ type: "error", text: error?.message || "Recovery codes could not be regenerated." });
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    const copyRecoveryCodes = async () => {
+      await navigator.clipboard?.writeText(recoveryCodes.join("\n"));
+      setMessage({ type: "success", text: "Recovery codes copied." });
+    };
+
     return (
-      <div className="banking-panel account-form-panel">
+      <div className="banking-panel account-form-panel two-step-panel">
         <div className="security-status-line">
           <span>Status</span>
-          <strong>{settings.twoStepEnabled ? "Enabled" : "Not Enabled"}</strong>
+          <strong>{twoStep.enabled ? "Enabled" : "Not Enabled"}</strong>
         </div>
-        <p className="muted-copy">Email OTP is used for 2-step verification. SMS can be added when support is enabled for the account.</p>
+        <p className="muted-copy">Use Google Authenticator, Microsoft Authenticator, Authy, or another compatible app to protect account access.</p>
+        {!twoStep.enabled && !setup ? (
+          <button className="button primary" type="button" disabled={saving} onClick={beginSetup}>
+            <QrCode size={17} />
+            {saving ? "Preparing..." : "Enable 2-Step Verification"}
+          </button>
+        ) : null}
+        {setup ? (
+          <form className="totp-setup-grid" onSubmit={confirmSetup}>
+            <div className="totp-qr-card">
+              <img src={setup.qrCodeDataUrl} alt="Authenticator QR code" />
+            </div>
+            <div className="totp-copy-block">
+              <span>Manual Setup Key</span>
+              <strong>{setup.manualKey}</strong>
+              <small>Scan the QR code or enter this key manually in your authenticator app.</small>
+            </div>
+            <label>
+              <span>Authenticator Code</span>
+              <input
+                inputMode="numeric"
+                maxLength="6"
+                placeholder="Enter 6-digit code"
+                value={setupCode}
+                onChange={(event) => setSetupCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+            </label>
+            <button className="button primary" type="submit" disabled={saving}>
+              {saving ? "Verifying..." : "Verify and Enable"}
+            </button>
+          </form>
+        ) : null}
+        {recoveryCodes.length ? (
+          <div className="recovery-code-panel">
+            <div>
+              <strong>Recovery codes</strong>
+              <small>These codes are shown once. Store them somewhere private.</small>
+            </div>
+            <div className="recovery-code-grid">
+              {recoveryCodes.map((code) => <code key={code}>{code}</code>)}
+            </div>
+            <button className="button secondary" type="button" onClick={copyRecoveryCodes}>
+              <Copy size={16} />
+              Copy Codes
+            </button>
+          </div>
+        ) : null}
+        {twoStep.enabled ? (
+          <>
+            <div className="security-status-line">
+              <span>Recovery Codes Remaining</span>
+              <strong>{twoStep.recoveryCodeCount}</strong>
+            </div>
+            <form className="two-factor-action-card" onSubmit={regenerate}>
+              <div>
+                <strong>Regenerate recovery codes</strong>
+                <small>Old recovery codes stop working after regeneration.</small>
+              </div>
+              <input
+                type="password"
+                placeholder="Current password"
+                value={regenerateForm.currentPassword}
+                onChange={(event) => setRegenerateForm((current) => ({ ...current, currentPassword: event.target.value }))}
+              />
+              <input
+                inputMode="numeric"
+                maxLength="6"
+                placeholder="Authenticator code"
+                value={regenerateForm.code}
+                onChange={(event) => setRegenerateForm((current) => ({ ...current, code: event.target.value.replace(/\D/g, "").slice(0, 6) }))}
+              />
+              <button className="button secondary" type="submit" disabled={saving}>
+                <KeyRound size={16} />
+                Regenerate Codes
+              </button>
+            </form>
+            <form className="two-factor-action-card danger" onSubmit={disable}>
+              <div>
+                <strong>Disable 2-step verification</strong>
+                <small>Requires your current password and authenticator code.</small>
+              </div>
+              <input
+                type="password"
+                placeholder="Current password"
+                value={disableForm.currentPassword}
+                onChange={(event) => setDisableForm((current) => ({ ...current, currentPassword: event.target.value }))}
+              />
+              <input
+                inputMode="numeric"
+                maxLength="6"
+                placeholder="Authenticator code"
+                value={disableForm.code}
+                onChange={(event) => setDisableForm((current) => ({ ...current, code: event.target.value.replace(/\D/g, "").slice(0, 6) }))}
+              />
+              <button className="button secondary" type="submit" disabled={saving}>
+                Disable 2-Step Verification
+              </button>
+            </form>
+          </>
+        ) : null}
         <InlineMessage message={message} />
-        <button className="button primary" type="button" disabled={saving} onClick={() => save({ ...settings, twoStepEnabled: !settings.twoStepEnabled })}>
-          {settings.twoStepEnabled ? "Disable 2-Step Verification" : "Enable 2-Step Verification"}
-        </button>
       </div>
     );
   }
@@ -448,7 +842,7 @@ export default function Account({ view = "home" }) {
     personal: ["Personal Details", "Update contact information and verification settings."],
     security: ["Security & Privacy", "Protect your account and manage access."],
     "change-password": ["Change Password", "Update your member access password."],
-    "two-step": ["2-Step Verification", "Use email OTP for additional account protection."],
+    "two-step": ["2-Step Verification", "Use an authenticator app for stronger account access."],
     devices: ["Device Management", "Review active session access."],
     "app-security": ["App Security", "Manage payment and session security preferences."],
     "logout-everywhere": ["Log Out Everywhere", "End active sessions on this account."],
