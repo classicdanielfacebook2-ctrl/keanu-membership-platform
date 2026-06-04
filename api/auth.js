@@ -3,7 +3,6 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import QRCode from "qrcode";
 import { ObjectId } from "mongodb";
-import { isAllowedPhoneCountry, isAllowedPhoneNumber } from "../src/data/phoneCountries.js";
 import {
   checkTwilioSmsOtp,
   cleanupExpiredOtpUsers,
@@ -12,10 +11,8 @@ import {
   createOtpFields,
   getRegistrationIntentsCollection,
   getUsersCollection,
-  getVerificationChannel,
   handleApiError,
   isEmailIdentifier,
-  isPhoneIdentifier,
   isUserVerified,
   methodNotAllowed,
   normalizeAuthIdentifier,
@@ -166,7 +163,6 @@ const normalizeProfile = (body = {}) => ({
 const validateProfile = (profile) => {
   if (!profile.fullName) return "Full name is required.";
   if (!isEmailIdentifier(profile.email)) return "Enter a valid email address.";
-  if (profile.phone && !isPhoneIdentifier(profile.phone)) return "Enter a valid mobile number with country code.";
   if (!profile.country) return "Country is required.";
   if (!profile.stateRegion) return "State / Region is required.";
   if (!profile.city) return "City is required.";
@@ -275,15 +271,15 @@ async function login(req, res) {
 
   const identifier = normalizeAuthIdentifier(req.body?.identifier);
   const password = String(req.body?.password || "");
-  if (!isEmailIdentifier(identifier) && (!isPhoneIdentifier(identifier) || !isAllowedPhoneNumber(identifier))) {
-    return sendJson(res, 400, { error: "Enter an allowed email address or phone number." });
+  if (!isEmailIdentifier(identifier)) {
+    return sendJson(res, 400, { error: "Enter a valid email address." });
   }
 
   const users = await getUsersCollection();
-  const user = await users.findOne({ $or: [{ identifier }, { email: identifier }, { phone: identifier }] });
+  const user = await users.findOne({ $or: [{ identifier }, { email: identifier }] });
 
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-    return sendJson(res, 401, { error: "Invalid email/phone or password." });
+    return sendJson(res, 401, { error: "Invalid email or password." });
   }
 
   if (!isUserVerified(user)) {
@@ -393,21 +389,12 @@ async function updateProfile(req, res) {
 
   const users = await getUsersCollection();
   const emailChanged = profile.email && profile.email !== normalizeAuthIdentifier(user.email || "");
-  const phoneChanged = profile.phone && profile.phone !== normalizeAuthIdentifier(user.phone || "");
   if (emailChanged) {
     const existingEmailUser = await users.findOne({
       _id: { $ne: user._id },
       $or: [{ email: profile.email }, { identifier: profile.email }]
     });
     if (existingEmailUser) return sendJson(res, 409, { error: "That email address is already registered." });
-  }
-
-  if (phoneChanged) {
-    const existingPhoneUser = await users.findOne({
-      _id: { $ne: user._id },
-      $or: [{ phone: profile.phone }, { identifier: profile.phone }]
-    });
-    if (existingPhoneUser) return sendJson(res, 409, { error: "That mobile number is already registered." });
   }
 
   const nextProfile = {
@@ -422,7 +409,6 @@ async function updateProfile(req, res) {
     fullName: profile.fullName,
     phone: profile.phone,
     profile: nextProfile,
-    phoneVerified: phoneChanged ? false : Boolean(user.phoneVerified),
     updatedAt: new Date()
   };
 
@@ -466,107 +452,88 @@ async function updateProfile(req, res) {
 async function sendProfileVerification(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
   const user = await requireAuth(req);
-  const channel = req.body?.channel === "phone" ? "phone" : "email";
   const users = await getUsersCollection();
 
-  if (channel === "email") {
-    const targetEmail = normalizeAuthIdentifier(user.pendingEmail || user.email || "");
-    if (!isEmailIdentifier(targetEmail)) return sendJson(res, 400, { error: "No valid email address is available for verification." });
-    const otpFields = await createOtpFields();
-    await users.updateOne(
-      { _id: user._id },
-      {
-        $set: {
-          "profileVerification.emailOtpHash": otpFields.otpHash,
-          "profileVerification.emailOtpExpiresAt": otpFields.otpExpiresAt,
-          "profileVerification.emailOtpAttempts": 0,
-          updatedAt: new Date()
-        }
+  const targetEmail = normalizeAuthIdentifier(user.pendingEmail || user.email || "");
+  if (!isEmailIdentifier(targetEmail)) return sendJson(res, 400, { error: "No valid email address is available for verification." });
+  const otpFields = await createOtpFields();
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        "profileVerification.emailOtpHash": otpFields.otpHash,
+        "profileVerification.emailOtpExpiresAt": otpFields.otpExpiresAt,
+        "profileVerification.emailOtpAttempts": 0,
+        updatedAt: new Date()
       }
-    );
-    await sendOtpEmail({ to: targetEmail, fullName: user.fullName || "Member", otp: otpFields.otp });
-    return sendJson(res, 200, { ok: true, channel: "email", message: "A verification code has been sent to your email address." });
-  }
-
-  const targetPhone = normalizeAuthIdentifier(user.phone || "");
-  if (!isPhoneIdentifier(targetPhone) || !isAllowedPhoneNumber(targetPhone)) {
-    return sendJson(res, 400, { error: "No valid mobile number is available for verification." });
-  }
-  await sendTwilioSmsOtp({ to: targetPhone });
-  return sendJson(res, 200, { ok: true, channel: "phone", message: "A verification code has been sent to your mobile number." });
+    }
+  );
+  await sendOtpEmail({ to: targetEmail, fullName: user.fullName || "Member", otp: otpFields.otp });
+  return sendJson(res, 200, { ok: true, channel: "email", message: "A verification code has been sent to your email address." });
 }
 
 async function verifyProfileContact(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
   const user = await requireAuth(req);
-  const channel = req.body?.channel === "phone" ? "phone" : "email";
   const otp = cleanOtp(req.body?.otp);
   if (!/^\d{6}$/.test(otp)) return sendJson(res, 400, { error: "Enter the 6-digit verification code." });
 
   const users = await getUsersCollection();
-  if (channel === "email") {
-    if (!user.profileVerification?.emailOtpHash || !user.profileVerification?.emailOtpExpiresAt) {
-      return sendJson(res, 400, { error: "Request a new email verification code." });
-    }
-    if (Date.now() > new Date(user.profileVerification.emailOtpExpiresAt).getTime()) {
-      await users.updateOne(
-        { _id: user._id },
-        {
-          $unset: {
-            "profileVerification.emailOtpHash": "",
-            "profileVerification.emailOtpExpiresAt": ""
-          },
-          $set: { "profileVerification.emailOtpAttempts": 0 }
-        }
-      );
-      return sendJson(res, 400, { error: "Verification code expired. Request a new code." });
-    }
-    if ((user.profileVerification.emailOtpAttempts || 0) >= 5) {
-      return sendJson(res, 429, { error: "Too many verification attempts. Request a new code." });
-    }
-    const valid = await bcrypt.compare(otp, user.profileVerification.emailOtpHash);
-    if (!valid) {
-      await users.updateOne({ _id: user._id }, { $inc: { "profileVerification.emailOtpAttempts": 1 } });
-      return sendJson(res, 401, { error: "Invalid verification code." });
-    }
-
-    const nextEmail = normalizeAuthIdentifier(user.pendingEmail || user.email || "");
-    const nextProfile = {
-      ...(user.profile || {}),
-      email: nextEmail,
-      pendingEmail: ""
-    };
-    const setFields = {
-      email: nextEmail,
-      emailVerified: true,
-      profile: nextProfile,
-      updatedAt: new Date()
-    };
-    if (isEmailIdentifier(user.identifier)) setFields.identifier = nextEmail;
+  if (!user.profileVerification?.emailOtpHash || !user.profileVerification?.emailOtpExpiresAt) {
+    return sendJson(res, 400, { error: "Request a new email verification code." });
+  }
+  if (Date.now() > new Date(user.profileVerification.emailOtpExpiresAt).getTime()) {
     await users.updateOne(
       { _id: user._id },
       {
-        $set: setFields,
         $unset: {
-          pendingEmail: "",
           "profileVerification.emailOtpHash": "",
-          "profileVerification.emailOtpExpiresAt": "",
-          "profileVerification.emailOtpAttempts": ""
-        }
+          "profileVerification.emailOtpExpiresAt": ""
+        },
+        $set: { "profileVerification.emailOtpAttempts": 0 }
       }
     );
-    const updatedUser = await users.findOne({ _id: user._id });
-    await upsertSupabaseUserProfile({ user: updatedUser, profile: nextProfile }).catch((error) => {
-      console.error("[auth/profile-verify]", { message: "Supabase email profile sync failed", error: error?.message });
-    });
-    return sendJson(res, 200, { ok: true, user: publicUser(updatedUser), message: "Email address verified." });
+    return sendJson(res, 400, { error: "Verification code expired. Request a new code." });
+  }
+  if ((user.profileVerification.emailOtpAttempts || 0) >= 5) {
+    return sendJson(res, 429, { error: "Too many verification attempts. Request a new code." });
+  }
+  const valid = await bcrypt.compare(otp, user.profileVerification.emailOtpHash);
+  if (!valid) {
+    await users.updateOne({ _id: user._id }, { $inc: { "profileVerification.emailOtpAttempts": 1 } });
+    return sendJson(res, 401, { error: "Invalid verification code." });
   }
 
-  const verification = await checkTwilioSmsOtp({ to: user.phone, code: otp });
-  if (verification.status !== "approved") return sendJson(res, 401, { error: "Invalid verification code." });
-  await users.updateOne({ _id: user._id }, { $set: { phoneVerified: true, updatedAt: new Date() } });
+  const nextEmail = normalizeAuthIdentifier(user.pendingEmail || user.email || "");
+  const nextProfile = {
+    ...(user.profile || {}),
+    email: nextEmail,
+    pendingEmail: ""
+  };
+  const setFields = {
+    email: nextEmail,
+    emailVerified: true,
+    profile: nextProfile,
+    updatedAt: new Date()
+  };
+  if (isEmailIdentifier(user.identifier)) setFields.identifier = nextEmail;
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: setFields,
+      $unset: {
+        pendingEmail: "",
+        "profileVerification.emailOtpHash": "",
+        "profileVerification.emailOtpExpiresAt": "",
+        "profileVerification.emailOtpAttempts": ""
+      }
+    }
+  );
   const updatedUser = await users.findOne({ _id: user._id });
-  return sendJson(res, 200, { ok: true, user: publicUser(updatedUser), message: "Mobile number verified." });
+  await upsertSupabaseUserProfile({ user: updatedUser, profile: nextProfile }).catch((error) => {
+    console.error("[auth/profile-verify]", { message: "Supabase email profile sync failed", error: error?.message });
+  });
+  return sendJson(res, 200, { ok: true, user: publicUser(updatedUser), message: "Email address verified." });
 }
 
 async function me(req, res) {
@@ -590,20 +557,17 @@ async function register(req, res) {
 
   const fullName = String(req.body?.fullName || "").trim();
   const email = normalizeAuthIdentifier(req.body?.email || req.body?.identifier);
-  const phone = normalizeAuthIdentifier(req.body?.phone);
-  const phoneCountry = String(req.body?.phoneCountry || "").toUpperCase();
-  const verificationMethod = req.body?.verificationMethod === "sms" ? "sms" : "email";
-  const identifier = verificationMethod === "sms" ? phone : email;
+  const identifier = email;
   const password = String(req.body?.password || "");
 
-  if (!fullName || !email || !phone || password.length < 8) {
+  if (!fullName || !email || password.length < 8) {
     return sendJson(res, 400, {
-      error: "Full name, email address, phone number, and a password of at least 8 characters are required."
+      error: "Full name, email address, and a password of at least 8 characters are required."
     });
   }
 
-  if (!isEmailIdentifier(email) || !isPhoneIdentifier(phone) || !isAllowedPhoneCountry(phoneCountry) || !isAllowedPhoneNumber(phone)) {
-    return sendJson(res, 400, { error: "Enter a valid email address and select an allowed phone country." });
+  if (!isEmailIdentifier(email)) {
+    return sendJson(res, 400, { error: "Enter a valid email address." });
   }
 
   const users = await getUsersCollection();
@@ -611,21 +575,21 @@ async function register(req, res) {
   await cleanupExpiredOtpUsers(users);
   await cleanupExpiredRegistrationIntents(intents);
 
-  const existing = await users.findOne({ $or: [{ identifier }, { email }, { phone }] });
+  const existing = await users.findOne({ $or: [{ identifier }, { email }] });
   if (isUserVerified(existing)) {
-    return sendJson(res, 409, { error: "An account already exists for that email or phone number." });
+    return sendJson(res, 409, { error: "An account already exists for that email address." });
   }
   if (existing) await users.deleteOne({ _id: existing._id });
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const channel = verificationMethod === "sms" ? "sms" : getVerificationChannel(identifier);
+  const channel = "email";
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
   const pendingRegistration = {
     fullName,
     identifier,
     email,
-    phone,
-    phoneCountry,
+    phone: "",
+    phoneCountry: "",
     passwordHash,
     role: "user",
     channel,
@@ -634,26 +598,16 @@ async function register(req, res) {
     createdAt: new Date()
   };
 
-  if (channel === "email") {
-    const otpFields = await createOtpFields();
-    pendingRegistration.otpHash = otpFields.otpHash;
-    pendingRegistration.expiresAt = otpFields.otpExpiresAt;
+  const otpFields = await createOtpFields();
+  pendingRegistration.otpHash = otpFields.otpHash;
+  pendingRegistration.expiresAt = otpFields.otpExpiresAt;
 
-    await intents.replaceOne({ identifier }, pendingRegistration, { upsert: true });
-    try {
-      await sendOtpEmail({ to: identifier, fullName, otp: otpFields.otp });
-    } catch (error) {
-      await intents.deleteOne({ identifier });
-      throw error;
-    }
-  } else {
-    await intents.replaceOne({ identifier }, pendingRegistration, { upsert: true });
-    try {
-      await sendTwilioSmsOtp({ to: identifier });
-    } catch (error) {
-      await intents.deleteOne({ identifier });
-      throw error;
-    }
+  await intents.replaceOne({ identifier }, pendingRegistration, { upsert: true });
+  try {
+    await sendOtpEmail({ to: identifier, fullName, otp: otpFields.otp });
+  } catch (error) {
+    await intents.deleteOne({ identifier });
+    throw error;
   }
 
   return sendJson(res, 201, {
@@ -661,10 +615,7 @@ async function register(req, res) {
     identifier,
     channel,
     expiresAt: pendingRegistration.expiresAt.toISOString(),
-    message:
-      channel === "sms"
-        ? "A verification code has been sent to your phone number."
-        : "A verification code has been sent to your email."
+    message: "A verification code has been sent to your email."
   });
 }
 
@@ -1023,38 +974,32 @@ async function resetPassword(req, res) {
     return sendJson(res, 400, { error: "Email, 6-digit reset code, and a new password are required." });
   }
 
-  if (!isEmailIdentifier(identifier) && (!isPhoneIdentifier(identifier) || !isAllowedPhoneNumber(identifier))) {
-    return sendJson(res, 400, { error: "Enter an allowed email address or phone number." });
+  if (!isEmailIdentifier(identifier)) {
+    return sendJson(res, 400, { error: "Enter a valid email address." });
   }
 
   const users = await getUsersCollection();
-  const user = await users.findOne({ $or: [{ identifier }, { email: identifier }, { phone: identifier }] });
-  const channel = getVerificationChannel(identifier);
+  const user = await users.findOne({ $or: [{ identifier }, { email: identifier }] });
 
   if (!user) return sendJson(res, 400, { error: "Invalid or expired reset code." });
 
-  if (channel === "email") {
-    if (!user.resetCodeHash || !user.resetExpiresAt) {
-      return sendJson(res, 400, { error: "Invalid or expired reset code." });
-    }
+  if (!user.resetCodeHash || !user.resetExpiresAt) {
+    return sendJson(res, 400, { error: "Invalid or expired reset code." });
+  }
 
-    if (Date.now() > new Date(user.resetExpiresAt).getTime()) {
-      await users.updateOne({ _id: user._id }, { $unset: { resetCodeHash: "", resetExpiresAt: "" }, $set: { resetAttempts: 0 } });
-      return sendJson(res, 400, { error: "Reset code expired. Request a new code." });
-    }
+  if (Date.now() > new Date(user.resetExpiresAt).getTime()) {
+    await users.updateOne({ _id: user._id }, { $unset: { resetCodeHash: "", resetExpiresAt: "" }, $set: { resetAttempts: 0 } });
+    return sendJson(res, 400, { error: "Reset code expired. Request a new code." });
+  }
 
-    if ((user.resetAttempts || 0) >= 5) {
-      return sendJson(res, 429, { error: "Too many reset attempts. Request a new code." });
-    }
+  if ((user.resetAttempts || 0) >= 5) {
+    return sendJson(res, 429, { error: "Too many reset attempts. Request a new code." });
+  }
 
-    const validCode = await bcrypt.compare(resetCode, user.resetCodeHash);
-    if (!validCode) {
-      await users.updateOne({ _id: user._id }, { $inc: { resetAttempts: 1 } });
-      return sendJson(res, 401, { error: "Invalid reset code." });
-    }
-  } else {
-    const verification = await checkTwilioSmsOtp({ to: identifier, code: resetCode });
-    if (verification.status !== "approved") return sendJson(res, 401, { error: "Invalid reset code." });
+  const validCode = await bcrypt.compare(resetCode, user.resetCodeHash);
+  if (!validCode) {
+    await users.updateOne({ _id: user._id }, { $inc: { resetAttempts: 1 } });
+    return sendJson(res, 401, { error: "Invalid reset code." });
   }
 
   const passwordHash = await bcrypt.hash(password, 12);

@@ -1,4 +1,4 @@
-import { NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import {
   BadgeCheck,
   CreditCard,
@@ -230,7 +230,7 @@ export default function App() {
             path="/account/security/devices"
             element={
               <ProtectedRoute>
-                <Account view="devices" />
+                <Navigate to="/account/security" replace />
               </ProtectedRoute>
             }
           />

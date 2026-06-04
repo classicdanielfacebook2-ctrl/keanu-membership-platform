@@ -1,13 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Eye, EyeOff, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { forgotPassword, resetPassword } from "../services/authApi.js";
 import { preparePasswordRecoverySession, updateRecoveredPassword } from "../services/supabasePasswordReset.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { allowedPhoneCountries, getAllowedPhoneCountry, getCountryFlag } from "../data/phoneCountries.js";
 import { getApprovedHomeImages } from "../data/homeImages.js";
-
-const cleanPhone = (value = "") => value.replace(/[^\d]/g, "");
 
 const getPasswordRules = (password = "") => [
   ["Minimum 8 characters", password.length >= 8],
@@ -36,17 +33,13 @@ export default function AuthPage({ mode }) {
   const [form, setForm] = useState({
     fullName: "",
     email: "",
-    phone: "",
-    countryIso: "US",
     recoveryIdentifier: "",
     password: "",
     confirmPassword: ""
   });
-  const [method, setMethod] = useState("email");
   const [otp, setOtp] = useState("");
   const [verificationPending, setVerificationPending] = useState(false);
   const [verificationIdentifier, setVerificationIdentifier] = useState("");
-  const [verificationChannel, setVerificationChannel] = useState("email");
   const [twoFactorPending, setTwoFactorPending] = useState(false);
   const [twoFactorChallenge, setTwoFactorChallenge] = useState("");
   const [twoFactorCode, setTwoFactorCode] = useState("");
@@ -63,9 +56,7 @@ export default function AuthPage({ mode }) {
     () => getApprovedHomeImages().find((image) => image.id === "official-portrait")?.imageUrl || "/logo.svg",
     []
   );
-  const selectedCountry = getAllowedPhoneCountry(form.countryIso);
-  const phoneIdentifier = `${selectedCountry.callingCode}${cleanPhone(form.phone)}`;
-  const selectedIdentifier = isForgot ? form.recoveryIdentifier.trim() : method === "sms" ? phoneIdentifier : form.email.trim();
+  const selectedIdentifier = isForgot ? form.recoveryIdentifier.trim() : form.email.trim();
   const passwordRules = getPasswordRules(form.password);
   const passwordStrength = getPasswordStrength(form.password);
   const showPasswordGuidance = isUpdatePassword && form.password.length > 0;
@@ -155,14 +146,10 @@ export default function AuthPage({ mode }) {
         const data = await auth.register({
           fullName: form.fullName,
           email: form.email,
-          phone: phoneIdentifier,
-          phoneCountry: selectedCountry.iso,
-          password: form.password,
-          verificationMethod: method
+          password: form.password
         });
         setVerificationPending(Boolean(data.verificationRequired));
         setVerificationIdentifier(data.identifier || selectedIdentifier);
-        setVerificationChannel(data.channel || method);
         setMessage("");
       } else {
         const data = await auth.login({ identifier: selectedIdentifier, password: form.password });
@@ -178,7 +165,6 @@ export default function AuthPage({ mode }) {
       if (requestError.verificationRequired) {
         setVerificationPending(true);
         setVerificationIdentifier(requestError.identifier || selectedIdentifier);
-        setVerificationChannel(requestError.channel || method);
       }
       setError(requestError.message);
     } finally {
@@ -294,17 +280,7 @@ export default function AuthPage({ mode }) {
                   onChange={(event) => updateField("email", event.target.value)}
                 />
               </label>
-              <PhoneField form={form} updateField={updateField} placeholder="Enter your phone number" />
-              <MethodTabs label="Verification method" method={method} setMethod={setMethod} emailLabel="Email OTP" smsLabel="SMS OTP" />
             </>
-          ) : null}
-
-          {!twoFactorPending && !verificationPending && !isRegister && !isReset && !isForgot && !isUpdatePassword ? (
-            <MethodTabs label="Continue with" method={method} setMethod={setMethod} emailLabel="Email" smsLabel="Phone" />
-          ) : null}
-
-          {!twoFactorPending && !verificationPending && isReset ? (
-            <MethodTabs label="Continue with" method={method} setMethod={setMethod} emailLabel="Email" smsLabel="Phone" />
           ) : null}
 
           {!twoFactorPending && !verificationPending && isForgot ? (
@@ -321,7 +297,7 @@ export default function AuthPage({ mode }) {
             </label>
           ) : null}
 
-          {!twoFactorPending && !verificationPending && !isRegister && !isForgot && !isUpdatePassword && method === "email" ? (
+          {!twoFactorPending && !verificationPending && !isRegister && !isForgot && !isUpdatePassword ? (
             <label htmlFor="email">
               Email Address
               <input
@@ -333,10 +309,6 @@ export default function AuthPage({ mode }) {
                 onChange={(event) => updateField("email", event.target.value)}
               />
             </label>
-          ) : null}
-
-          {!twoFactorPending && !verificationPending && !isRegister && !isForgot && !isUpdatePassword && method === "sms" ? (
-            <PhoneField form={form} updateField={updateField} placeholder="Enter your phone number" />
           ) : null}
 
           {!twoFactorPending && !verificationPending && isUpdatePassword ? (
@@ -493,115 +465,6 @@ export default function AuthPage({ mode }) {
   );
 }
 
-function MethodTabs({ label, method, setMethod, emailLabel, smsLabel }) {
-  return (
-    <div className="auth-method-group">
-      <span>{label}</span>
-      <div className="auth-tabs" role="tablist" aria-label={label}>
-        <button
-          className={method === "email" ? "active" : ""}
-          type="button"
-          onClick={() => setMethod("email")}
-          aria-pressed={method === "email"}
-        >
-          {emailLabel}
-        </button>
-        <button
-          className={method === "sms" ? "active" : ""}
-          type="button"
-          onClick={() => setMethod("sms")}
-          aria-pressed={method === "sms"}
-        >
-          {smsLabel}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PhoneField({ form, updateField, placeholder = "Phone number" }) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const wrapperRef = useRef(null);
-  const selectedCountry = getAllowedPhoneCountry(form.countryIso);
-  const countries = allowedPhoneCountries.filter((country) => {
-    const searchText = `${country.name} ${country.callingCode} ${country.iso}`.toLowerCase();
-    return searchText.includes(query.trim().toLowerCase());
-  });
-
-  const chooseCountry = (country) => {
-    updateField("countryIso", country.iso);
-    setQuery("");
-    setOpen(false);
-  };
-
-  const handleBlur = (event) => {
-    if (!wrapperRef.current?.contains(event.relatedTarget)) {
-      setOpen(false);
-    }
-  };
-
-  return (
-    <label htmlFor="phone">
-      Phone Number
-      <div className="phone-input-row" ref={wrapperRef} onBlur={handleBlur}>
-        <div className="country-select">
-          <button
-            className="country-select-trigger"
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            aria-label="Select country code"
-            aria-expanded={open}
-          >
-            <span>{getCountryFlag(selectedCountry.iso)}</span>
-            <strong>{selectedCountry.callingCode}</strong>
-            <small aria-hidden="true">⌄</small>
-          </button>
-          {open ? (
-            <div className="country-menu-backdrop" aria-hidden="true" onMouseDown={() => setOpen(false)} />
-          ) : null}
-          {open ? (
-            <div className="country-menu" role="dialog" aria-label="Select country code">
-              <div className="country-menu-handle" aria-hidden="true" />
-              <input
-                aria-label="Search country"
-                placeholder="Search country or code"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                autoFocus
-              />
-              <div className="country-options" role="listbox">
-                {countries.map((country) => (
-                  <button
-                    key={country.iso}
-                    type="button"
-                    className={country.iso === selectedCountry.iso ? "selected" : ""}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => chooseCountry(country)}
-                  >
-                    <span>{getCountryFlag(country.iso)}</span>
-                    <span>{country.name}</span>
-                    <strong>{country.callingCode}</strong>
-                  </button>
-                ))}
-                {countries.length === 0 ? <p>No matching country available.</p> : null}
-              </div>
-            </div>
-          ) : null}
-        </div>
-        <input
-          id="phone"
-          required
-          inputMode="tel"
-          placeholder={placeholder}
-          value={form.phone}
-          onChange={(event) => updateField("phone", event.target.value)}
-        />
-      </div>
-    </label>
-  );
-}
-
 function getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending, twoFactorPending }) {
   if (twoFactorPending) {
     return {
@@ -615,7 +478,7 @@ function getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verifica
     return {
       label: "ACCOUNT VERIFICATION",
       heading: "Verify your identity",
-      subtitle: "Enter the verification code sent to your contact method."
+      subtitle: "Enter the verification code sent to your email address."
     };
   }
 
@@ -657,3 +520,4 @@ function getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verifica
     subtitle: "Sign in to continue to your account."
   };
 }
+

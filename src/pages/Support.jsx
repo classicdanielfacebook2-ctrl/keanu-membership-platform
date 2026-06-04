@@ -7,7 +7,7 @@ const emptyMessage = { name: "", email: "", subject: "", message: "" };
 
 const supportItems = [
   ["OTP & Verification", "Receive calm guidance for verification codes and account confirmation."],
-  ["Account Recovery", "Reset access with a registered email address or phone number."],
+  ["Account Recovery", "Reset access with your registered email address."],
   ["Membership Assistance", "Get help choosing a card tier or continuing an application."],
   ["Payment Support", "Check payment status and next steps through secure payment channels."]
 ];

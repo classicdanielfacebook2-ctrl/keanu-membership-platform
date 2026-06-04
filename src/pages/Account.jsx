@@ -13,7 +13,6 @@ import {
   QrCode,
   RefreshCcw,
   ShieldCheck,
-  Smartphone,
   UserCircle,
   WalletCards,
   XCircle
@@ -50,7 +49,7 @@ const paymentDate = (payment) => (payment.createdAt ? new Date(payment.createdAt
 function AccountMenu({ onLogout }) {
   const items = [
     { to: "/account/personal", label: "Personal Details", copy: "Name, email, and mobile number", icon: UserCircle },
-    { to: "/account/security", label: "Security & Privacy", copy: "Password, devices, and verification", icon: LockKeyhole },
+    { to: "/account/security", label: "Security & Privacy", copy: "Password, app security, and verification", icon: LockKeyhole },
     { to: "/account/payments", label: "Payments", copy: "Open and pending payments", icon: CreditCard },
     { to: "/account/payment-history", label: "Payment History", copy: "Completed and closed transactions", icon: History },
     { to: "/account/memberships", label: "Memberships", copy: "Membership cards and activation status", icon: WalletCards }
@@ -201,12 +200,10 @@ function PersonalDetails({ auth }) {
   const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
   const emailPending = Boolean(user?.pendingEmail && user.pendingEmail === form.email);
   const emailVerified = user?.emailVerified !== false && !emailPending;
-  const phoneVerified = Boolean(user?.phoneVerified) && form.phone === user?.phone;
 
   const validate = () => {
     if (!form.fullName.trim()) return "Full name is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return "Enter a valid email address.";
-    if (form.phone && !/^\+[1-9]\d{7,14}$/.test(form.phone.replace(/[\s().-]/g, ""))) return "Enter a mobile number with country code.";
     if (!form.country) return "Country is required.";
     if (!form.stateRegion) return "State / Region is required.";
     if (!form.city) return "City is required.";
@@ -255,7 +252,7 @@ function PersonalDetails({ auth }) {
       const data = await verifyProfileContact({ channel: verification.channel, otp: verification.otp });
       await auth.refreshUser();
       setVerification({ channel: "", otp: "", sending: false, verifying: false });
-      setMessage({ type: "success", text: data.message || "Contact method verified." });
+      setMessage({ type: "success", text: data.message || "Email address verified." });
     } catch (error) {
       setMessage({ type: "error", text: error?.message || "Verification could not be completed." });
       setVerification((current) => ({ ...current, verifying: false }));
@@ -279,7 +276,6 @@ function PersonalDetails({ auth }) {
         <label>
           <span>Mobile Number</span>
           <input type="tel" value={form.phone} onChange={(event) => setField("phone", event.target.value)} placeholder="+1 555 000 0000" />
-          <small className={phoneVerified ? "verification-chip verified" : "verification-chip"}>{phoneVerified ? "Verified" : "Unverified"}</small>
         </label>
         <label>
           <span>Country</span>
@@ -375,14 +371,11 @@ function PersonalDetails({ auth }) {
       <div className="contact-verification-panel">
         <div>
           <strong>Contact verification</strong>
-          <small>Verify changed email or mobile details before they are fully trusted on the account.</small>
+          <small>Verify a changed email address before it replaces your current sign-in email.</small>
         </div>
         <div className="verification-actions">
           <button className="button secondary" type="button" disabled={verification.sending} onClick={() => requestVerification("email")}>
             {verification.sending && verification.channel === "email" ? "Sending..." : "Verify Email"}
-          </button>
-          <button className="button secondary" type="button" disabled={verification.sending || !form.phone} onClick={() => requestVerification("phone")}>
-            {verification.sending && verification.channel === "phone" ? "Sending..." : "Verify Phone"}
           </button>
         </div>
         {verification.channel ? (
@@ -410,7 +403,6 @@ function SecurityPrivacy() {
   const items = [
     ["/account/security/change-password", "Change Password", "Update the password used for member access.", LockKeyhole],
     ["/account/security/two-step", "2-Step Verification", "Add an extra verification step to sign in.", ShieldCheck],
-    ["/account/security/devices", "Device Management", "Review devices connected to this account.", Smartphone],
     ["/account/security/app-security", "App Security", "Manage account protection preferences.", LockKeyhole],
     ["/account/security/logout-everywhere", "Log Out Everywhere", "End active sessions on other devices.", LogOut]
   ];
@@ -735,29 +727,6 @@ function SecuritySettingsPanel({ mode, onLogout }) {
     );
   }
 
-  if (mode === "devices") {
-    return (
-      <div className="account-control-list">
-        <div className="account-menu-item">
-          <span className="account-menu-icon"><Smartphone size={18} /></span>
-          <span>
-            <strong>Current Session</strong>
-            <small>Active browser session. Device listing is not available from Supabase for this account type.</small>
-          </span>
-          <ShieldCheck size={16} />
-        </div>
-        <button className="account-menu-item" type="button" onClick={onLogout}>
-          <span className="account-menu-icon"><LogOut size={18} /></span>
-          <span>
-            <strong>Log out everywhere</strong>
-            <small>End all active sessions and return to sign in.</small>
-          </span>
-          <ArrowRight size={16} />
-        </button>
-      </div>
-    );
-  }
-
   if (mode === "logout-everywhere") {
     return (
       <div className="banking-panel account-form-panel">
@@ -844,7 +813,6 @@ export default function Account({ view = "home" }) {
     security: ["Security & Privacy", "Protect your account and manage access."],
     "change-password": ["Change Password", "Update your member access password."],
     "two-step": ["2-Step Verification", "Use an authenticator app for stronger account access."],
-    devices: ["Device Management", "Review active session access."],
     "app-security": ["App Security", "Manage payment and session security preferences."],
     "logout-everywhere": ["Log Out Everywhere", "End active sessions on this account."],
     payments: ["Payments", "Review pending and active payment requests."],
@@ -865,11 +833,6 @@ export default function Account({ view = "home" }) {
       { label: "Security & Privacy", to: "/account/security" },
       { label: "2-Step Verification" }
     ],
-    devices: [
-      { label: "My Account", to: "/account" },
-      { label: "Security & Privacy", to: "/account/security" },
-      { label: "Device Management" }
-    ],
     "app-security": [
       { label: "My Account", to: "/account" },
       { label: "Security & Privacy", to: "/account/security" },
@@ -887,7 +850,6 @@ export default function Account({ view = "home" }) {
   const fallbackByView = {
     "change-password": "/account/security",
     "two-step": "/account/security",
-    devices: "/account/security",
     "app-security": "/account/security",
     "logout-everywhere": "/account/security",
     payments: "/account",
@@ -930,7 +892,6 @@ export default function Account({ view = "home" }) {
       {view === "security" ? <SecurityPrivacy /> : null}
       {view === "change-password" ? <ChangePasswordPanel /> : null}
       {view === "two-step" ? <SecuritySettingsPanel mode="two-step" onLogout={logoutAll} /> : null}
-      {view === "devices" ? <SecuritySettingsPanel mode="devices" onLogout={logoutAll} /> : null}
       {view === "app-security" ? <SecuritySettingsPanel mode="app-security" onLogout={logoutAll} /> : null}
       {view === "logout-everywhere" ? <SecuritySettingsPanel mode="logout-everywhere" onLogout={logoutAll} /> : null}
       {view === "payments" ? (
