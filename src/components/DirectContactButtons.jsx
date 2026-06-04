@@ -5,7 +5,12 @@ const welcomeMessage = "Hello support, I need help with my membership applicatio
 const cleanWhatsappNumber = (value = "") => value.replace(/[^\d]/g, "");
 const cleanTelegramUsername = (value = "") => value.replace(/^@/, "").trim();
 
-export default function DirectContactButtons({ compact = false, className = "" }) {
+export default function DirectContactButtons({
+  compact = false,
+  className = "",
+  title = "Contact us directly",
+  subtext = "Message support on WhatsApp or Telegram"
+}) {
   const whatsappNumber = cleanWhatsappNumber(import.meta.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "");
   const telegramUsername = cleanTelegramUsername(import.meta.env.NEXT_PUBLIC_TELEGRAM_USERNAME || "");
 
@@ -19,8 +24,8 @@ export default function DirectContactButtons({ compact = false, className = "" }
   return (
     <div className={`direct-contact-card ${compact ? "compact" : ""} ${className}`.trim()}>
       <div className="direct-contact-copy">
-        <strong>Contact us directly</strong>
-        <span>Message support on WhatsApp or Telegram</span>
+        <strong>{title}</strong>
+        <span>{subtext}</span>
       </div>
       <div className="direct-contact-actions" aria-label="Direct support channels">
         {whatsappUrl ? (

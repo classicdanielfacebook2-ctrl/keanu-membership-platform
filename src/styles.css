@@ -4231,6 +4231,11 @@ textarea {
   width: 100%;
 }
 
+.home-hero-contact {
+  width: min(100%, 34rem);
+  margin-top: 1rem;
+}
+
 .footer-links a {
   color: var(--muted);
   transition: color 160ms ease;

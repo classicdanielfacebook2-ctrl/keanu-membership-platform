@@ -2,6 +2,7 @@ import { useRef, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PhotoPlaceholder, VideoPlaceholder } from "../components/MediaPlaceholder.jsx";
+import DirectContactButtons from "../components/DirectContactButtons.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
 import { getApprovedHomeImages } from "../data/homeImages.js";
 import { getApprovedHomeVideos } from "../data/homeVideos.js";
@@ -261,6 +262,12 @@ export default function Home() {
               <ArrowRight size={16} />
             </a>
           </div>
+          <DirectContactButtons
+            compact
+            className="home-hero-contact"
+            title="Contact Us"
+            subtext="Message support directly on WhatsApp or Telegram"
+          />
         </div>
       </section>
 
