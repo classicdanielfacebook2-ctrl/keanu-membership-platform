@@ -18,6 +18,7 @@ import {
   Users
 } from "lucide-react";
 import SectionHeader from "../components/SectionHeader.jsx";
+import { useLanguage } from "../context/LanguageContext.jsx";
 import { getBankTransferRegion } from "../data/bankTransferRegions.js";
 import { cardTypes } from "../data/cards.js";
 import {
@@ -56,7 +57,6 @@ const emptyForm = {
   paymentCurrency: "EUR"
 };
 
-const steps = ["Membership", "Application", "Review", "Payment Method"];
 const paymentMethodIcons = {
   card: CreditCard,
   sepa: BadgeCheck,
@@ -64,40 +64,7 @@ const paymentMethodIcons = {
   ideal: Globe2
 };
 
-const membershipExperienceFeatures = [
-  {
-    number: "01",
-    title: "Official Recognition",
-    copy: "Your membership card gives you a unique member identity and confirms your place within the official membership platform."
-  },
-  {
-    number: "02",
-    title: "Premium Digital Access",
-    copy: "Receive access to a refined digital membership experience created for serious supporters worldwide."
-  },
-  {
-    number: "03",
-    title: "Priority Support",
-    copy: "Members receive guided assistance, account support, and faster responses through the official support channel."
-  },
-  {
-    number: "04",
-    title: "Exclusive Updates",
-    copy: "Stay connected with selected membership updates, announcements, and platform information before the general public."
-  },
-  {
-    number: "05",
-    title: "Member Identity",
-    copy: "Each membership includes a unique reference/member ID, helping identify your selected access level clearly and professionally."
-  },
-  {
-    number: "06",
-    title: "Limited Membership Access",
-    copy: "Membership availability may be limited by tier, review status, and platform approval. Choose your card while access is available."
-  }
-];
-
-function ReviewSummaryCard({ title, items }) {
+function ReviewSummaryCard({ title, items, notProvided }) {
   return (
     <article className="review-summary-card">
       <h4>{title}</h4>
@@ -109,7 +76,7 @@ function ReviewSummaryCard({ title, items }) {
             </span>
             <span className="review-row-copy">
               <small>{label}</small>
-              <strong>{value || "Not provided"}</strong>
+              <strong>{value || notProvided}</strong>
             </span>
           </div>
         ))}
@@ -119,6 +86,26 @@ function ReviewSummaryCard({ title, items }) {
 }
 
 export default function Apply() {
+  const { t } = useLanguage();
+  const copy = t.apply;
+  const steps = copy.steps;
+  const membershipExperienceFeatures = copy.features.map(([number, title, featureCopy]) => ({ number, title, copy: featureCopy }));
+  const getLocalizedCard = (card) => {
+    const localized = copy.cards[card?.id];
+    return {
+      ...card,
+      displayName: localized?.[0] || card?.name,
+      displayBenefits: localized?.[1] || card?.benefits || []
+    };
+  };
+  const getLocalizedPaymentMethod = (method) => {
+    const localized = copy.paymentMethods[method?.id];
+    return {
+      ...method,
+      displayTitle: localized?.[0] || method?.title,
+      displayDescription: localized?.[1] || method?.description
+    };
+  };
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const auth = useAuth();
@@ -140,13 +127,16 @@ export default function Apply() {
   const [checkoutError, setCheckoutError] = useState(null);
 
   const selectedCard = cardTypes.find((card) => card.id === form.selectedCard) || null;
-  const selectedPaymentMethod = form.paymentMethod ? getPaymentMethod(form.paymentMethod) : null;
+  const displaySelectedCard = selectedCard ? getLocalizedCard(selectedCard) : null;
+  const selectedPaymentMethod = form.paymentMethod ? getLocalizedPaymentMethod(getPaymentMethod(form.paymentMethod)) : null;
   const bankTransferRegion = getBankTransferRegion(form.countryCode);
   const finalStateRegion = form.stateCode === "__manual_state__" ? form.manualStateRegion.trim() : form.stateRegion;
   const finalCity = form.city === "__manual__" ? form.manualCity.trim() : form.city;
   const selectedAmount = selectedCard ? convertEurCents(selectedCard.priceAmountCents, form.paymentCurrency) : 0;
   const formattedAmount = selectedCard ? formatPaymentAmount(selectedAmount, form.paymentCurrency) : "";
-  const visibleCheckoutPaymentOptions = checkoutPaymentOptions.filter((method) => availablePaymentMethods.includes(method.id));
+  const visibleCheckoutPaymentOptions = checkoutPaymentOptions
+    .filter((method) => availablePaymentMethods.includes(method.id))
+    .map(getLocalizedPaymentMethod);
   const progress = ((step + 1) / steps.length) * 100;
   const applicationComplete =
     form.firstName &&
@@ -300,7 +290,7 @@ export default function Apply() {
 
   const goToStep = (targetStep) => {
     if (!canEnterStep(targetStep)) {
-      setStepError("Complete the previous step before continuing.");
+      setStepError(copy.completePrevious);
       return;
     }
     setStepError("");
@@ -309,11 +299,11 @@ export default function Apply() {
 
   const nextStep = () => {
     if (step === 0 && !form.selectedCard) {
-      setStepError("Select a membership card to begin.");
+      setStepError(copy.selectCardError);
       return;
     }
     if (step === 0 && auth.loading) {
-      setStepError("Preparing your membership session. Please try again in a moment.");
+      setStepError(copy.preparingSession);
       return;
     }
     if (step === 0 && !auth.isAuthenticated) {
@@ -323,7 +313,7 @@ export default function Apply() {
       return;
     }
     if (step === 1 && !applicationComplete) {
-      setStepError("Complete the required applicant details before continuing.");
+      setStepError(copy.completeDetails);
       return;
     }
     setStepError("");
@@ -357,14 +347,14 @@ export default function Apply() {
         applicationComplete: Boolean(applicationComplete),
         hasPaymentMethod: Boolean(selectedPaymentMethod)
       });
-      setStepError("Select a payment method before continuing to secure checkout.");
+      setStepError(copy.selectPayment);
       return;
     }
     if (!availablePaymentMethods.includes(form.paymentMethod)) {
       setStepError("");
       setCheckoutError({
-        title: "Payment method unavailable",
-        body: "This payment method is currently unavailable. Please choose another payment method."
+        title: copy.unavailableTitle,
+        body: copy.unavailableBody
       });
       return;
     }
@@ -387,7 +377,7 @@ export default function Apply() {
         message: form.message.trim(),
         selectedCard: selectedCard.id,
         paymentMethod: form.paymentMethod,
-        paymentMethodLabel: selectedPaymentMethod.title,
+        paymentMethodLabel: selectedPaymentMethod.displayTitle,
         paymentCurrency: form.paymentMethod === "bank_transfer" && bankTransferRegion ? bankTransferRegion.currency.toUpperCase() : form.paymentCurrency,
         paymentAmount: formattedAmount
       });
@@ -414,8 +404,8 @@ export default function Apply() {
         setForm((current) => ({ ...current, paymentMethod: "card" }));
       }
       setCheckoutError({
-        title: "Checkout unavailable",
-        body: "This payment method is currently unavailable. Please choose another payment method."
+        title: copy.checkoutUnavailableTitle,
+        body: copy.checkoutUnavailableBody
       });
     }
   };
@@ -423,15 +413,15 @@ export default function Apply() {
   return (
     <section className="page-section application-page">
       <SectionHeader
-        eyebrow="KR Global Membership"
-        title="Select your private membership access."
-        copy="Choose a membership level, complete your details, review your request, then continue to secure checkout."
+        eyebrow={copy.pageEyebrow}
+        title={copy.pageTitle}
+        copy={copy.pageCopy}
       />
 
       <div className="conversion-flow">
         <div className="progress-header conversion-progress">
           <div>
-            <span className="eyebrow">Step {step + 1} of {steps.length}</span>
+            <span className="eyebrow">{copy.step} {step + 1} {copy.of} {steps.length}</span>
             <h2>{steps[step]}</h2>
           </div>
           <div className="progress-track" aria-label="Application progress">
@@ -465,15 +455,15 @@ export default function Apply() {
                     type="button"
                     onClick={() => updateField("selectedCard", card.id)}
                   >
-                    {card.id === "vip" ? <span className="vip-badge"><Crown size={14} /> Most Popular</span> : null}
-                    <span className="vip-card-kicker">KR Global Membership</span>
-                    <span className="vip-card-title">{card.name}</span>
+                    {card.id === "vip" ? <span className="vip-badge"><Crown size={14} /> {copy.popular}</span> : null}
+                    <span className="vip-card-kicker">{copy.membershipKicker}</span>
+                    <span className="vip-card-title">{getLocalizedCard(card).displayName}</span>
                     <span className="vip-card-price">
                       {card.price}
-                      <small>/person</small>
+                      <small>{copy.perPerson}</small>
                     </span>
                     <span className="vip-benefit-list">
-                      {card.benefits.map((benefit) => (
+                      {getLocalizedCard(card).displayBenefits.map((benefit) => (
                         <span key={benefit}>
                           <Check size={15} />
                           {benefit}
@@ -489,34 +479,34 @@ export default function Apply() {
           {step === 1 ? (
             <div className="membership-application-form application-step-anchor" ref={applicationRef}>
               <div className="application-form-heading">
-                <span className="eyebrow">Membership details</span>
-                <h3>Complete Your Membership Application</h3>
-                <p>Provide your details so we can review and prepare your selected membership.</p>
+                <span className="eyebrow">{copy.formEyebrow}</span>
+                <h3>{copy.formTitle}</h3>
+                <p>{copy.formCopy}</p>
               </div>
 
               <div className="form-grid luxury-application-grid">
               <label htmlFor="firstName">
-                First name
+                {copy.firstName}
                 <input
                   id="firstName"
                   required
-                  placeholder="Enter first name"
+                  placeholder={copy.firstNamePlaceholder}
                   value={form.firstName}
                   onChange={(e) => updateField("firstName", e.target.value)}
                 />
               </label>
               <label htmlFor="lastName">
-                Last name
+                {copy.lastName}
                 <input
                   id="lastName"
                   required
-                  placeholder="Enter last name"
+                  placeholder={copy.lastNamePlaceholder}
                   value={form.lastName}
                   onChange={(e) => updateField("lastName", e.target.value)}
                 />
               </label>
               <label htmlFor="email">
-                Email
+                {copy.email}
                 <input
                   id="email"
                   required
@@ -528,7 +518,7 @@ export default function Apply() {
                 />
               </label>
               <label htmlFor="phone">
-                Phone number
+                {copy.phone}
                 <input
                   id="phone"
                   required
@@ -539,7 +529,7 @@ export default function Apply() {
                 />
               </label>
               <label className="wide">
-                Selected membership card
+                {copy.selectedCard}
                 <div className="inline-choice-grid">
                   {cardTypes.map((card) => (
                     <button
@@ -548,25 +538,25 @@ export default function Apply() {
                       type="button"
                       onClick={() => updateField("selectedCard", card.id)}
                     >
-                      <span>{card.name}</span>
+                      <span>{getLocalizedCard(card).displayName}</span>
                       <small>{card.price}</small>
                     </button>
                   ))}
                 </div>
               </label>
               <label id="countryField" htmlFor="countrySelector">
-                Country
+                {copy.country}
                 <button
                   id="countrySelector"
                   className="selector-page-trigger"
                   type="button"
                   onClick={() => openSelector("/apply/select-country", "countryField")}
                 >
-                  <span>{form.country || "Select country"}</span>
+                  <span>{form.country || copy.selectCountry}</span>
                 </button>
               </label>
               <label id="stateField" htmlFor="stateSelector">
-                State / Region
+                {copy.state}
                 <button
                   id="stateSelector"
                   className="selector-page-trigger"
@@ -574,23 +564,23 @@ export default function Apply() {
                   disabled={!form.countryCode}
                   onClick={() => openSelector("/apply/select-state", "stateField")}
                 >
-                  <span>{finalStateRegion || (form.countryCode ? "Select state or region" : "Select country first")}</span>
+                  <span>{finalStateRegion || (form.countryCode ? copy.selectState : copy.selectCountryFirst)}</span>
                 </button>
               </label>
               {form.stateCode === "__manual_state__" ? (
                 <label htmlFor="manualStateRegion">
-                  Type state / region manually
+                  {copy.manualState}
                   <input
                     id="manualStateRegion"
                     required
-                    placeholder="Enter your state or region"
+                    placeholder={copy.manualStatePlaceholder}
                     value={form.manualStateRegion}
                     onChange={(e) => updateField("manualStateRegion", e.target.value)}
                   />
                 </label>
               ) : null}
               <label id="cityField" htmlFor="citySelector">
-                City
+                {copy.city}
                 <button
                   id="citySelector"
                   className="selector-page-trigger"
@@ -598,23 +588,23 @@ export default function Apply() {
                   disabled={!form.stateCode}
                   onClick={() => openSelector("/apply/select-city", "cityField")}
                 >
-                  <span>{finalCity || (form.stateCode ? "Select city" : "Select state or region first")}</span>
+                  <span>{finalCity || (form.stateCode ? copy.selectCity : copy.selectStateFirst)}</span>
                 </button>
               </label>
               {form.city === "__manual__" ? (
                 <label htmlFor="manualCity">
-                  Type city manually
+                  {copy.manualCity}
                   <input
                     id="manualCity"
                     required
-                    placeholder="Enter your city"
+                    placeholder={copy.manualCityPlaceholder}
                     value={form.manualCity}
                     onChange={(e) => updateField("manualCity", e.target.value)}
                   />
                 </label>
               ) : null}
               <label>
-                Number of applicants
+                {copy.applicants}
                 <div className="applicant-choice-row">
                   {["1", "2", "3", "4", "5", "6+"].map((count) => (
                     <button
@@ -629,11 +619,11 @@ export default function Apply() {
                 </div>
               </label>
               <label className="wide" htmlFor="message">
-                Message or special request
+                {copy.message}
                 <textarea
                   id="message"
                   rows="5"
-                  placeholder="Share any request or detail you would like us to consider."
+                  placeholder={copy.messagePlaceholder}
                   value={form.message}
                   onChange={(e) => updateField("message", e.target.value)}
                 />
@@ -645,56 +635,59 @@ export default function Apply() {
           {step === 2 ? (
             <div className="review-premium-panel conversion-review application-step-anchor" ref={reviewRef}>
               <div className="review-premium-heading">
-                <span className="eyebrow">Application Review</span>
-                <h3>Review Your Application</h3>
-                <p>Please confirm your details before secure payment.</p>
+                <span className="eyebrow">{copy.reviewEyebrow}</span>
+                <h3>{copy.reviewTitle}</h3>
+                <p>{copy.reviewCopy}</p>
               </div>
 
               <div className="review-membership-hero">
                 <div className="review-membership-title">
-                  <span>Selected membership</span>
+                  <span>{copy.selectedMembership}</span>
                   <strong>{selectedCard?.name}</strong>
-                  <small>{selectedCard?.benefits?.[0]}</small>
+                  <small>{displaySelectedCard?.displayBenefits?.[0]}</small>
                 </div>
                 <div className="review-price-block">
                   <strong>{formattedAmount}</strong>
                   <span>
                     <BadgeCheck size={14} />
-                    Ready for payment
+                    {copy.readyForPayment}
                   </span>
                 </div>
               </div>
 
               <div className="review-summary-grid">
                 <ReviewSummaryCard
-                  title="Applicant details"
+                  title={copy.applicantDetails}
+                  notProvided={copy.notProvided}
                   items={[
-                    { label: "Full name", value: `${form.firstName} ${form.lastName}`.trim(), Icon: User },
-                    { label: "Email", value: form.email, Icon: Mail },
-                    { label: "Phone", value: form.phone, Icon: Phone }
+                    { label: copy.fullName, value: `${form.firstName} ${form.lastName}`.trim(), Icon: User },
+                    { label: copy.email, value: form.email, Icon: Mail },
+                    { label: copy.phone, value: form.phone, Icon: Phone }
                   ]}
                 />
                 <ReviewSummaryCard
-                  title="Location"
+                  title={copy.location}
+                  notProvided={copy.notProvided}
                   items={[
-                    { label: "Country", value: form.country, Icon: Globe2 },
-                    { label: "State / Region", value: finalStateRegion, Icon: MapPinned },
-                    { label: "City", value: finalCity, Icon: MapPin }
+                    { label: copy.country, value: form.country, Icon: Globe2 },
+                    { label: copy.state, value: finalStateRegion, Icon: MapPinned },
+                    { label: copy.city, value: finalCity, Icon: MapPin }
                   ]}
                 />
                 <ReviewSummaryCard
-                  title="Membership"
+                  title={copy.membership}
+                  notProvided={copy.notProvided}
                   items={[
-                    { label: "Selected card", value: selectedCard?.name, Icon: CreditCard },
-                    { label: "Number of applicants", value: form.numberApplicants, Icon: Users },
-                    { label: "Total amount", value: formattedAmount, Icon: Building2 }
+                    { label: copy.selectedCard, value: displaySelectedCard?.displayName, Icon: CreditCard },
+                    { label: copy.numberApplicants, value: form.numberApplicants, Icon: Users },
+                    { label: copy.totalAmount, value: formattedAmount, Icon: Building2 }
                   ]}
                 />
               </div>
 
               {form.message ? (
                 <article className="review-message-card">
-                  <span>Message or special request</span>
+                  <span>{copy.message}</span>
                   <p>{form.message}</p>
                 </article>
               ) : null}
@@ -705,12 +698,12 @@ export default function Apply() {
             <div className="payment-step website-checkout application-step-anchor" ref={paymentRef}>
               <div className="checkout-membership-summary">
                 <div>
-                  <span className="eyebrow">Selected membership</span>
-                  <h3>{selectedCard?.name}</h3>
+                  <span className="eyebrow">{copy.selectedMembership}</span>
+                  <h3>{displaySelectedCard?.displayName}</h3>
                   <strong>{formattedAmount}</strong>
                 </div>
                 <ul>
-                  {selectedCard?.benefits.slice(0, 3).map((benefit) => (
+                  {displaySelectedCard?.displayBenefits.slice(0, 3).map((benefit) => (
                     <li key={benefit}>{benefit}</li>
                   ))}
                 </ul>
@@ -718,13 +711,13 @@ export default function Apply() {
 
               <div className="checkout-method-section">
                 <div className="checkout-section-head">
-                  <span className="eyebrow">Payment Method</span>
-                  <h3>Choose Payment Method</h3>
-                  <p>Select how you would like to continue. Stripe Checkout securely collects all payment details on the next screen.</p>
+                  <span className="eyebrow">{copy.paymentEyebrow}</span>
+                  <h3>{copy.paymentTitle}</h3>
+                  <p>{copy.paymentCopy}</p>
                 </div>
 
                 {paymentAvailabilityLoading ? (
-                  <div className="payment-method-loading">Checking available payment methods...</div>
+                  <div className="payment-method-loading">{copy.checkingPayments}</div>
                 ) : null}
 
                 <div className="payment-method-grid website-method-grid" aria-label="Payment method options">
@@ -741,8 +734,8 @@ export default function Apply() {
                           <Icon size={18} />
                         </span>
                         <span>
-                          <strong>{method.title}</strong>
-                          <small>{method.description}</small>
+                          <strong>{method.displayTitle}</strong>
+                          <small>{method.displayDescription}</small>
                         </span>
                       </button>
                     );
@@ -759,12 +752,12 @@ export default function Apply() {
 
               <div className="checkout-total-bar">
                 <div>
-                  <span>Total amount</span>
+                  <span>{copy.totalAmount}</span>
                   <strong>{formattedAmount}</strong>
                 </div>
                 <p>
                   <ShieldCheck size={17} />
-                  Secure encrypted checkout. Payment details are collected only by Stripe after you continue.
+                  {copy.secureCheckout}
                 </p>
               </div>
             </div>
@@ -775,33 +768,29 @@ export default function Apply() {
           <div className="step-actions">
             <button className="button ghost" type="button" onClick={previousStep} disabled={step === 0 || checkoutLoading}>
               <ArrowLeft size={17} />
-              Back
+              {copy.back}
             </button>
             {step < 3 ? (
               <button className={step === 2 ? "button primary review-continue-button" : "button primary"} type="button" onClick={nextStep}>
-                {step === 0 ? "Continue" : step === 1 ? "Submit Application" : "Choose Payment Method"}
+                {step === 0 ? copy.continue : step === 1 ? copy.submit : copy.choosePayment}
                 <ArrowRight size={17} />
               </button>
             ) : form.paymentMethod ? (
               <button className="button primary checkout-continue-button" type="button" onClick={handleContinueToPayment} disabled={checkoutLoading}>
-                {checkoutLoading ? "Opening checkout..." : "Continue to Secure Checkout"}
+                {checkoutLoading ? copy.openingCheckout : copy.secureCheckoutButton}
                 <ArrowRight size={17} />
               </button>
             ) : (
-              <span className="payment-method-required">Select a payment method to continue.</span>
+              <span className="payment-method-required">{copy.paymentRequired}</span>
             )}
           </div>
 
           {step === 0 ? (
             <section className="why-join-section" aria-labelledby="membership-experience-title">
               <div className="why-join-heading">
-                <span className="eyebrow">The Membership Experience</span>
-                <h3 id="membership-experience-title">More Than a Card. A Private Membership Experience.</h3>
-                <p>
-                  This membership is designed for dedicated supporters who want a more personal, premium, and recognized connection
-                  to the official platform. Each card represents access, identity, priority support, and a place within an exclusive
-                  digital membership community.
-                </p>
+                <span className="eyebrow">{copy.whyEyebrow}</span>
+                <h3 id="membership-experience-title">{copy.whyTitle}</h3>
+                <p>{copy.whyCopy}</p>
               </div>
               <div className="why-join-grid">
                 {membershipExperienceFeatures.map((feature) => (

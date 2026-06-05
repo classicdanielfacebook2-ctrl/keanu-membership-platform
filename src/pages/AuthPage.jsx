@@ -4,9 +4,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { forgotPassword, resetPassword } from "../services/authApi.js";
 import { preparePasswordRecoverySession, updateRecoveredPassword } from "../services/supabasePasswordReset.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useLanguage } from "../context/LanguageContext.jsx";
 import { getApprovedHomeImages } from "../data/homeImages.js";
-
-const AUTH_LANGUAGE_KEY = "kr-auth-language";
 
 const authTranslations = {
   en: {
@@ -215,14 +214,6 @@ const authTranslations = {
   }
 };
 
-const getStoredAuthLanguage = () => {
-  try {
-    return localStorage.getItem(AUTH_LANGUAGE_KEY) || "en";
-  } catch {
-    return "en";
-  }
-};
-
 const getPasswordRules = (password = "", language = "en") => {
   const rules = authTranslations[language]?.password.rules || authTranslations.en.password.rules;
   return [
@@ -271,7 +262,7 @@ export default function AuthPage({ mode }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
-  const [language, setLanguage] = useState(() => getStoredAuthLanguage());
+  const { language, setLanguage } = useLanguage();
 
   const returnTo = useMemo(() => params.get("returnTo") || "/home", [params]);
   const authLogo = useMemo(
@@ -283,19 +274,6 @@ export default function AuthPage({ mode }) {
   const passwordRules = getPasswordRules(form.password, language);
   const passwordStrength = getPasswordStrength(form.password, language);
   const showPasswordGuidance = isUpdatePassword && form.password.length > 0;
-
-  const updateLanguage = (nextLanguage) => {
-    setLanguage(nextLanguage);
-    try {
-      localStorage.setItem(AUTH_LANGUAGE_KEY, nextLanguage);
-    } catch {
-      // Language preference is non-critical if storage is unavailable.
-    }
-  };
-
-  useEffect(() => {
-    document.documentElement.lang = language === "de" ? "de" : "en";
-  }, [language]);
 
   useEffect(() => {
     if (!isUpdatePassword) return;
@@ -467,7 +445,7 @@ export default function AuthPage({ mode }) {
           </div>
           <label className="auth-language-switcher" htmlFor="authLanguage">
             <span>{copy.languageLabel}</span>
-            <select id="authLanguage" value={language} onChange={(event) => updateLanguage(event.target.value)}>
+            <select id="authLanguage" value={language} onChange={(event) => setLanguage(event.target.value)}>
               <option value="en">{copy.english}</option>
               <option value="de">{copy.german}</option>
             </select>

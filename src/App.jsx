@@ -41,22 +41,23 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import LiveChatWidget from "./components/LiveChatWidget.jsx";
 import DirectContactButtons from "./components/DirectContactButtons.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
+import { useLanguage } from "./context/LanguageContext.jsx";
 import { getApprovedHomeImages } from "./data/homeImages.js";
 
 const navItems = [
-  { to: "/home", label: "Home", icon: BadgeCheck },
-  { to: "/journey", label: "Journey", icon: Sparkles },
-  { to: "/apply", label: "Apply", icon: FileText },
-  { to: "/support", label: "Support", icon: Headset },
-  { to: "/protection", label: "Protection", icon: ShieldAlert }
+  { to: "/home", labelKey: "home", icon: BadgeCheck },
+  { to: "/journey", labelKey: "journey", icon: Sparkles },
+  { to: "/apply", labelKey: "apply", icon: FileText },
+  { to: "/support", labelKey: "support", icon: Headset },
+  { to: "/protection", labelKey: "protection", icon: ShieldAlert }
 ];
 
 const adminNavItems = [
-  { to: "/admin", label: "Admin", icon: LayoutDashboard },
-  { to: "/admin/payments", label: "Payments", icon: CreditCard },
-  { to: "/admin/support", label: "Support Desk", icon: MessagesSquare },
-  { to: "/admin/protection", label: "Protection", icon: ShieldAlert },
-  { to: "/media-review", label: "Media", icon: Image }
+  { to: "/admin", labelKey: "admin", icon: LayoutDashboard },
+  { to: "/admin/payments", labelKey: "payments", icon: CreditCard },
+  { to: "/admin/support", labelKey: "supportDesk", icon: MessagesSquare },
+  { to: "/admin/protection", labelKey: "protection", icon: ShieldAlert },
+  { to: "/media-review", labelKey: "media", icon: Image }
 ];
 
 export default function App() {
@@ -66,6 +67,7 @@ export default function App() {
   const [brandImageFailed, setBrandImageFailed] = useState(false);
   const location = useLocation();
   const auth = useAuth();
+  const { language, setLanguage, t } = useLanguage();
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -94,7 +96,7 @@ export default function App() {
   return (
     <div className="app-shell">
       {loading ? (
-        <div className="page-loader" aria-label="Loading page">
+        <div className="page-loader" aria-label={t.nav.loading}>
           <span />
           <span />
           <span />
@@ -115,27 +117,34 @@ export default function App() {
             <span className="brand-company">Company</span>
           </span>
         </NavLink>
-        {menuOpen ? <button className="menu-overlay" type="button" aria-label="Close navigation" onClick={closeMenu} /> : null}
+        {menuOpen ? <button className="menu-overlay" type="button" aria-label={t.nav.closeNavigation} onClick={closeMenu} /> : null}
         <button
           className={menuOpen ? "icon-button menu-button active" : "icon-button menu-button"}
           type="button"
           onClick={() => setMenuOpen((open) => !open)}
-          aria-label="Toggle navigation"
+          aria-label={t.nav.toggleNavigation}
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <nav className={menuOpen ? "site-nav open" : "site-nav"} aria-label="Main navigation">
-          {navItems.map(({ to, label, icon: Icon }) => (
+        <nav className={menuOpen ? "site-nav open" : "site-nav"} aria-label={t.nav.mainNavigation}>
+          <label className="site-language-switcher" htmlFor="siteLanguage">
+            <span>{t.language.label}</span>
+            <select id="siteLanguage" value={language} onChange={(event) => setLanguage(event.target.value)}>
+              <option value="en">{t.language.english}</option>
+              <option value="de">{t.language.german}</option>
+            </select>
+          </label>
+          {navItems.map(({ to, labelKey, icon: Icon }) => (
             <NavLink key={to} to={to} onClick={closeMenu}>
               <Icon size={17} />
-              {label}
+              {t.nav[labelKey]}
             </NavLink>
           ))}
           {auth.isAdmin
-            ? adminNavItems.map(({ to, label, icon: Icon }) => (
+            ? adminNavItems.map(({ to, labelKey, icon: Icon }) => (
                 <NavLink key={to} to={to} onClick={closeMenu}>
                   <Icon size={17} />
-                  {label}
+                  {t.nav[labelKey]}
                 </NavLink>
               ))
             : null}
@@ -143,17 +152,17 @@ export default function App() {
             <>
               <NavLink to="/account" onClick={closeMenu}>
                 <UserCircle size={17} />
-                My Account
+                {t.nav.account}
               </NavLink>
               <button className="nav-auth-button" type="button" onClick={handleLogout}>
                 <LogOut size={17} />
-                Logout
+                {t.nav.logout}
               </button>
             </>
           ) : (
             <NavLink to="/login" onClick={closeMenu}>
               <LogIn size={17} />
-              Login
+              {t.nav.login}
             </NavLink>
           )}
         </nav>
@@ -365,21 +374,21 @@ export default function App() {
             {showBrandImage ? <img src={brandImage} alt="" /> : <span>KR</span>}
           </span>
           <div>
-            <strong>Keanu Reeves Company</strong>
+            <strong>{t.footer.company}</strong>
             <span>support@keanureeves.company</span>
-            {simpleAuthFooter ? null : <small>Copyright 2026. All rights reserved.</small>}
+            {simpleAuthFooter ? null : <small>{t.footer.copyright}</small>}
           </div>
         </div>
         {simpleAuthFooter ? null : (
           <div className="footer-stack">
             <DirectContactButtons compact className="footer-direct-contact" />
             <div className="footer-links">
-              <NavLink to="/terms">Terms</NavLink>
-              <NavLink to="/privacy">Privacy</NavLink>
-              <NavLink to="/refund">Refund Policy</NavLink>
-              <NavLink to="/protection">Security Policy</NavLink>
+              <NavLink to="/terms">{t.footer.terms}</NavLink>
+              <NavLink to="/privacy">{t.footer.privacy}</NavLink>
+              <NavLink to="/refund">{t.footer.refund}</NavLink>
+              <NavLink to="/protection">{t.footer.security}</NavLink>
             </div>
-            <div className="social-links" aria-label="Social media links">
+            <div className="social-links" aria-label={t.footer.social}>
               <span>IG</span>
               <span>FB</span>
               <span>X</span>

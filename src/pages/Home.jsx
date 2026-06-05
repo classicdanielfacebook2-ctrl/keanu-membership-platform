@@ -4,52 +4,11 @@ import { Link } from "react-router-dom";
 import { PhotoPlaceholder, VideoPlaceholder } from "../components/MediaPlaceholder.jsx";
 import DirectContactButtons from "../components/DirectContactButtons.jsx";
 import SectionHeader from "../components/SectionHeader.jsx";
+import { useLanguage } from "../context/LanguageContext.jsx";
 import { getApprovedHomeImages } from "../data/homeImages.js";
 import { getApprovedHomeVideos } from "../data/homeVideos.js";
 
-const advertCopy = {
-  "top-video-advert-downloaded": {
-    category: "Top Video Advert",
-    copy: "A cinematic introduction to the membership experience, designed for supporters who value recognition, story, and access."
-  },
-  "main-video-banner-downloaded": {
-    category: "Cinematic Membership Film",
-    copy: "A closer look at the card journey, from selection to secure checkout and account access."
-  },
-  "interview-preview-downloaded": {
-    category: "Interview Feature",
-    copy: "Selected media moments that bring a quieter, more personal tone to the platform."
-  },
-  "membership-campaign-preview-downloaded": {
-    category: "Membership Campaign Film",
-    copy: "A refined view of the membership tiers and the premium experience behind each card."
-  }
-};
-
-const photoCopy = {
-  "official-portrait": {
-    title: "Official Portrait",
-    caption:
-      "A polished portrait moment that sets the tone for a premium membership identity."
-  },
-  "campaign-still": {
-    title: "Campaign Still",
-    caption:
-      "A cinematic still that supports the visual world of the membership platform."
-  },
-  "membership-lifestyle": {
-    title: "Membership Card Lifestyle",
-    caption:
-      "A lifestyle frame shaped around card ownership, belonging, and private access."
-  },
-  "press-photo": {
-    title: "Press Photo",
-    caption:
-      "A refined public-facing image for trust, recognition, and professional presence."
-  }
-};
-
-function ApprovedVideoSlot({ video, label, soundEnabled, activeIframeId, onPlay, onEnableSound, registerVideo }) {
+function ApprovedVideoSlot({ video, label, soundEnabled, activeIframeId, onPlay, onEnableSound, registerVideo, copy }) {
   if (!video) {
     return <VideoPlaceholder label={label} />;
   }
@@ -84,23 +43,23 @@ function ApprovedVideoSlot({ video, label, soundEnabled, activeIframeId, onPlay,
         />
       ) : (
         <div className="video-waiting-state">
-          <span>Video ready</span>
+          <span>{copy.videoReady}</span>
         </div>
       )}
       {!soundEnabled ? (
         <button className="sound-toggle" type="button" onClick={() => onEnableSound(video.id)}>
-          Tap for Sound
+          {copy.tapForSound}
         </button>
       ) : null}
     </div>
   );
 }
 
-function ApprovedPhotoSlot({ image, label }) {
+function ApprovedPhotoSlot({ image, label, copy }) {
   const [failed, setFailed] = useState(false);
 
   if (!image || failed) {
-    return <PhotoPlaceholder label={failed ? "Media currently unavailable" : label} />;
+    return <PhotoPlaceholder label={failed ? copy.unavailable : label} />;
   }
 
   return (
@@ -115,6 +74,8 @@ function ApprovedPhotoSlot({ image, label }) {
 }
 
 export default function Home() {
+  const { t } = useLanguage();
+  const copy = t.home;
   const [approvedVideos, setApprovedVideos] = useState([]);
   const [approvedImages, setApprovedImages] = useState([]);
   const [activeIframeId, setActiveIframeId] = useState("");
@@ -241,50 +202,46 @@ export default function Home() {
         <div className="hero-video-banner">
           <ApprovedVideoSlot
             video={getVideoForSlot("top-video-advert-downloaded", "Top Video Advert")}
-            label="Top Video Advert"
+            label={copy.advert["top-video-advert-downloaded"].category}
             soundEnabled={soundVideoId === "top-video-advert-downloaded"}
             activeIframeId={activeIframeId}
             onPlay={handleVideoPlay}
             onEnableSound={enableSound}
             registerVideo={registerVideo}
+            copy={copy}
           />
         </div>
         <div className="hero-content">
-          <span className="eyebrow">A Premium Membership Experience</span>
-          <h1>More than a card. A connection to a story that continues to inspire.</h1>
-          <p>
-            Behind every membership card is a sense of loyalty, recognition, and connection to a
-            legacy shaped by discipline, resilience, and worldwide admiration.
-          </p>
+          <span className="eyebrow">{copy.heroEyebrow}</span>
+          <h1>{copy.heroTitle}</h1>
+          <p>{copy.heroCopy}</p>
           <div className="hero-actions discover-actions">
             <a className="button discover-button" href="#featured-story">
-              Discover More
+              {copy.discoverMore}
               <ArrowRight size={16} />
             </a>
           </div>
           <DirectContactButtons
             compact
             className="home-hero-contact"
-            title="Contact Us"
-            subtext="Message support directly on WhatsApp or Telegram"
+            title={copy.contactTitle}
+            subtext={copy.contactSubtext}
           />
         </div>
       </section>
 
       <section className="application-ready-section">
         <div className="media-final-cta">
-          <span className="eyebrow">Application Ready</span>
-          <h3>Begin your membership application</h3>
-          <p>
-            Choose your membership level and continue through a secure guided application experience.
-          </p>
+          <span className="eyebrow">{copy.applicationEyebrow}</span>
+          <h3>{copy.applicationTitle}</h3>
+          <p>{copy.applicationCopy}</p>
           <div className="cinematic-trust-row" aria-label="Payment trust indicators">
-            <span>Encrypted session</span>
-            <span>Private account access</span>
+            <span>{copy.encryptedSession}</span>
+            <span>{copy.privateAccess}</span>
           </div>
           <div className="hero-actions">
             <Link className="button discover-button large" to="/apply">
-              Apply for Membership
+              {copy.applyButton}
               <ArrowRight size={18} />
             </Link>
           </div>
@@ -293,15 +250,15 @@ export default function Home() {
 
       <section className="content-section media-showcase" id="featured-story">
         <SectionHeader
-          eyebrow="Featured Story"
-          title="A cinematic path through career, character, and cultural impact."
-          copy="A quieter documentary-style sequence, moving through defining roles, visual moments, and the admiration behind the membership experience."
+          eyebrow={copy.featuredEyebrow}
+          title={copy.featuredTitle}
+          copy={copy.featuredCopy}
         />
         <div className="media-story-stack">
           {advertVideos.map((video) => {
-            const meta = advertCopy[video.id] || {
+            const meta = copy.advert[video.id] || {
               category: video.category,
-              copy: "A cinematic media moment prepared for premium membership presentation."
+              copy: copy.defaultVideoCopy
             };
 
             return (
@@ -314,6 +271,7 @@ export default function Home() {
                   onPlay={handleVideoPlay}
                   onEnableSound={enableSound}
                   registerVideo={registerVideo}
+                  copy={copy}
                 />
                 <div className="media-story-copy">
                   <span className="eyebrow">{meta.category}</span>
@@ -329,13 +287,13 @@ export default function Home() {
         <div className="photo-story-stack">
           {["official-portrait", "campaign-still", "membership-lifestyle", "press-photo"].map((id, index) => {
             const image = imageById[id];
-            const meta = photoCopy[id];
+            const meta = copy.photos[id];
 
             return (
               <article className={`photo-story-block ${index % 2 ? "reverse" : ""}`} key={id}>
-                <ApprovedPhotoSlot image={image} label={meta.title} />
+                <ApprovedPhotoSlot image={image} label={meta.title} copy={copy} />
                 <div className="media-story-copy photo-copy">
-                  <span className="eyebrow">Visual Story</span>
+                  <span className="eyebrow">{copy.visualStory}</span>
                   <h3>{meta.title}</h3>
                   <p>{meta.caption}</p>
                 </div>
