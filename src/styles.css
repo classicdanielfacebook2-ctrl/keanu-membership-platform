@@ -320,6 +320,54 @@ button:disabled {
   filter: saturate(0.94) contrast(1.04);
 }
 
+.auth-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.auth-card-top .auth-brand-mini {
+  margin-bottom: 0;
+}
+
+.auth-language-switcher {
+  display: inline-grid;
+  gap: 0.35rem;
+  min-width: 8.4rem;
+  color: rgba(247, 243, 234, 0.78);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.auth-language-switcher select {
+  min-height: 2.35rem;
+  width: 100%;
+  border: 1px solid rgba(244, 216, 139, 0.22);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(244, 216, 139, 0.08), rgba(255, 255, 255, 0.025)),
+    rgba(0, 0, 0, 0.38);
+  color: var(--ink);
+  padding: 0 2rem 0 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.auth-language-switcher select:focus,
+.auth-language-switcher select:hover {
+  border-color: rgba(244, 216, 139, 0.58);
+  box-shadow: 0 0 0 3px rgba(201, 157, 67, 0.1), 0 0.75rem 1.6rem rgba(0, 0, 0, 0.22);
+}
+
 .auth-heading {
   margin-bottom: 1rem;
 }
