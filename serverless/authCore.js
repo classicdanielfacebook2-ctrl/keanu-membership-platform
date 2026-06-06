@@ -271,25 +271,50 @@ const passwordResetEmailHtml = ({ fullName, resetCode }) => `
 
 export const sendOtpEmail = async ({ to, fullName, otp }) => {
   const apiKey = requiredEnv("RESEND_API_KEY");
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      from: `${COMPANY_NAME} <${OTP_FROM_EMAIL}>`,
-      to,
-      subject: `${COMPANY_NAME} verification code`,
-      html: verificationEmailHtml({ fullName, otp })
-    })
+  const recipientDomain = String(to || "").split("@")[1] || "unknown";
+  console.info("[auth/otp-email] sending", {
+    apiKeyConfigured: Boolean(apiKey),
+    from: OTP_FROM_EMAIL,
+    recipientDomain
   });
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.message || "Resend rejected the verification email.");
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: `${COMPANY_NAME} <${OTP_FROM_EMAIL}>`,
+        to,
+        subject: `${COMPANY_NAME} verification code`,
+        html: verificationEmailHtml({ fullName, otp })
+      })
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error("[auth/otp-email] failed", {
+        status: response.status,
+        message: data?.message || "Resend rejected the verification email.",
+        recipientDomain
+      });
+      throw new Error(data?.message || "Resend rejected the verification email.");
+    }
+
+    console.info("[auth/otp-email] sent", {
+      emailId: data?.id || "",
+      recipientDomain
+    });
+    return data;
+  } catch (error) {
+    console.error("[auth/otp-email] request failed", {
+      message: error instanceof Error ? error.message : String(error),
+      recipientDomain
+    });
+    throw error;
   }
-  return data;
 };
 
 const twilioRequest = async (path, body) => {

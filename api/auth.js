@@ -283,10 +283,48 @@ async function login(req, res) {
   }
 
   if (!isUserVerified(user)) {
+    const intents = await getRegistrationIntentsCollection();
+    const otpFields = await createOtpFields();
+    const pendingVerification = {
+      fullName: user.fullName || "Member",
+      identifier,
+      email: user.email || identifier,
+      phone: user.phone || "",
+      phoneCountry: user.phoneCountry || "",
+      passwordHash: user.passwordHash,
+      role: user.role || "user",
+      channel: "email",
+      otpHash: otpFields.otpHash,
+      otpAttempts: 0,
+      expiresAt: otpFields.otpExpiresAt,
+      createdAt: new Date()
+    };
+
+    await intents.replaceOne({ identifier }, pendingVerification, { upsert: true });
+    try {
+      await sendOtpEmail({
+        to: identifier,
+        fullName: pendingVerification.fullName,
+        otp: otpFields.otp
+      });
+      console.info("[auth/login] verification email sent", {
+        userId: String(user._id),
+        recipientDomain: identifier.split("@")[1] || "unknown"
+      });
+    } catch (error) {
+      await intents.deleteOne({ identifier });
+      console.error("[auth/login] verification email failed", {
+        userId: String(user._id),
+        message: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+
     return sendJson(res, 403, {
-      error: "Please verify your email before logging in.",
+      error: "Please verify your email before logging in. A new verification code has been sent.",
       verificationRequired: true,
-      identifier: user.identifier
+      identifier,
+      expiresAt: otpFields.otpExpiresAt.toISOString()
     });
   }
 
@@ -730,20 +768,43 @@ async function verifyOtp(req, res) {
     return sendJson(res, 401, { error: "Invalid verification code." });
   }
 
-  const result = await users.insertOne({
-    fullName: pending.fullName,
-    identifier: pending.identifier,
-    email: pending.email,
-    phone: pending.phone,
-    phoneCountry: pending.phoneCountry,
-    passwordHash: pending.passwordHash,
-    role: pending.role || "user",
-    verified: true,
-    isVerified: true,
-    createdAt: new Date()
-  });
+  let verifiedUserId;
+  if (user) {
+    await users.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          fullName: pending.fullName,
+          identifier: pending.identifier,
+          email: pending.email,
+          phone: pending.phone,
+          phoneCountry: pending.phoneCountry,
+          passwordHash: pending.passwordHash,
+          role: pending.role || user.role || "user",
+          verified: true,
+          isVerified: true,
+          updatedAt: new Date()
+        }
+      }
+    );
+    verifiedUserId = user._id;
+  } else {
+    const result = await users.insertOne({
+      fullName: pending.fullName,
+      identifier: pending.identifier,
+      email: pending.email,
+      phone: pending.phone,
+      phoneCountry: pending.phoneCountry,
+      passwordHash: pending.passwordHash,
+      role: pending.role || "user",
+      verified: true,
+      isVerified: true,
+      createdAt: new Date()
+    });
+    verifiedUserId = result.insertedId;
+  }
   await intents.deleteOne({ _id: pending._id });
-  const verifiedUser = await users.findOne({ _id: result.insertedId });
+  const verifiedUser = await users.findOne({ _id: verifiedUserId });
   setSessionCookie(res, signToken(verifiedUser));
   return sendJson(res, 200, { user: publicUser(verifiedUser), message: "Account verified successfully." });
 }
