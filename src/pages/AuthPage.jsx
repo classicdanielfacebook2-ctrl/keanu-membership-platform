@@ -19,8 +19,7 @@ const authTranslations = {
       newPassword: "New Password",
       confirmPassword: "Confirm Password",
       verificationCode: "Verification Code",
-      resetCode: "Reset Code",
-      authenticatorCode: "Authenticator Code"
+      resetCode: "Reset Code"
     },
     placeholders: {
       fullName: "Enter your full name",
@@ -29,8 +28,7 @@ const authTranslations = {
       createPassword: "Create a secure password",
       newPassword: "Enter your new password",
       confirmPassword: "Confirm your new password",
-      verificationCode: "Enter verification code",
-      authenticatorCode: "Enter 6-digit code"
+      verificationCode: "Enter verification code"
     },
     buttons: {
       wait: "Please wait...",
@@ -51,11 +49,6 @@ const authTranslations = {
       resetPassword: "Reset password"
     },
     copy: {
-      twoFactor: {
-        label: "ACCOUNT VERIFICATION",
-        heading: "Verify sign in",
-        subtitle: "Enter the code from your authenticator app to continue."
-      },
       verification: {
         label: "ACCOUNT VERIFICATION",
         heading: "Verify your identity",
@@ -121,8 +114,7 @@ const authTranslations = {
       newPassword: "Neues Passwort",
       confirmPassword: "Passwort bestätigen",
       verificationCode: "Bestätigungscode",
-      resetCode: "Zurücksetzungscode",
-      authenticatorCode: "Authenticator-Code"
+      resetCode: "Zurücksetzungscode"
     },
     placeholders: {
       fullName: "Geben Sie Ihren vollständigen Namen ein",
@@ -131,8 +123,7 @@ const authTranslations = {
       createPassword: "Erstellen Sie ein sicheres Passwort",
       newPassword: "Geben Sie Ihr neues Passwort ein",
       confirmPassword: "Bestätigen Sie Ihr neues Passwort",
-      verificationCode: "Bestätigungscode eingeben",
-      authenticatorCode: "6-stelligen Code eingeben"
+      verificationCode: "Bestätigungscode eingeben"
     },
     buttons: {
       wait: "Bitte warten...",
@@ -153,11 +144,6 @@ const authTranslations = {
       resetPassword: "Passwort zurücksetzen"
     },
     copy: {
-      twoFactor: {
-        label: "KONTOBESTÄTIGUNG",
-        heading: "Anmeldung bestätigen",
-        subtitle: "Geben Sie den Code aus Ihrer Authenticator-App ein, um fortzufahren."
-      },
       verification: {
         label: "KONTOBESTÄTIGUNG",
         heading: "Identität bestätigen",
@@ -252,9 +238,6 @@ export default function AuthPage({ mode }) {
   const [otp, setOtp] = useState("");
   const [verificationPending, setVerificationPending] = useState(false);
   const [verificationIdentifier, setVerificationIdentifier] = useState("");
-  const [twoFactorPending, setTwoFactorPending] = useState(false);
-  const [twoFactorChallenge, setTwoFactorChallenge] = useState("");
-  const [twoFactorCode, setTwoFactorCode] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -366,13 +349,7 @@ export default function AuthPage({ mode }) {
         setVerificationIdentifier(data.identifier || selectedIdentifier);
         setMessage("");
       } else {
-        const data = await auth.login({ identifier: selectedIdentifier, password: form.password });
-        if (data.twoFactorRequired) {
-          setTwoFactorPending(true);
-          setTwoFactorChallenge(data.challengeToken || "");
-          setMessage(data.message || "");
-          return;
-        }
+        await auth.login({ identifier: selectedIdentifier, password: form.password });
         completeAuth();
       }
     } catch (requestError) {
@@ -380,22 +357,6 @@ export default function AuthPage({ mode }) {
         setVerificationPending(true);
         setVerificationIdentifier(requestError.identifier || selectedIdentifier);
       }
-      setError(requestError.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleVerifyTwoFactor = async (event) => {
-    event.preventDefault();
-    setSubmitting(true);
-    setError("");
-    setMessage("");
-
-    try {
-      await auth.verifyLoginTwoStep({ challengeToken: twoFactorChallenge, code: twoFactorCode });
-      completeAuth();
-    } catch (requestError) {
       setError(requestError.message);
     } finally {
       setSubmitting(false);
@@ -433,7 +394,7 @@ export default function AuthPage({ mode }) {
     }
   };
 
-  const pageCopy = getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending, twoFactorPending, language });
+  const pageCopy = getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending, language });
 
   return (
     <section className={isUpdatePassword ? "auth-page reset-password-page" : "auth-page"}>
@@ -457,7 +418,7 @@ export default function AuthPage({ mode }) {
           <p>{pageCopy.subtitle}</p>
         </div>
 
-        <form className="auth-form" onSubmit={twoFactorPending ? handleVerifyTwoFactor : verificationPending ? handleVerifyOtp : handleSubmit}>
+        <form className="auth-form" onSubmit={verificationPending ? handleVerifyOtp : handleSubmit}>
           {isUpdatePassword ? (
             <div className="recovery-verified-badge">
               <Check size={15} />
@@ -465,22 +426,7 @@ export default function AuthPage({ mode }) {
             </div>
           ) : null}
 
-          {twoFactorPending ? (
-            <label htmlFor="twoFactorCode">
-              {copy.labels.authenticatorCode}
-              <input
-                id="twoFactorCode"
-                required
-                inputMode="numeric"
-                maxLength="11"
-                placeholder={copy.placeholders.authenticatorCode}
-                value={twoFactorCode}
-                onChange={(event) => setTwoFactorCode(event.target.value.replace(/[^\dA-Za-z-]/g, "").slice(0, 14))}
-              />
-            </label>
-          ) : null}
-
-          {!twoFactorPending && !verificationPending && isRegister ? (
+          {!verificationPending && isRegister ? (
             <>
               <label htmlFor="fullName">
                 {copy.labels.fullName}
@@ -506,7 +452,7 @@ export default function AuthPage({ mode }) {
             </>
           ) : null}
 
-          {!twoFactorPending && !verificationPending && isForgot ? (
+          {!verificationPending && isForgot ? (
             <label htmlFor="recoveryIdentifier">
               {copy.labels.email}
               <input
@@ -520,7 +466,7 @@ export default function AuthPage({ mode }) {
             </label>
           ) : null}
 
-          {!twoFactorPending && !verificationPending && !isRegister && !isForgot && !isUpdatePassword ? (
+          {!verificationPending && !isRegister && !isForgot && !isUpdatePassword ? (
             <label htmlFor="email">
               {copy.labels.email}
               <input
@@ -534,7 +480,7 @@ export default function AuthPage({ mode }) {
             </label>
           ) : null}
 
-          {!twoFactorPending && !verificationPending && isUpdatePassword ? (
+          {!verificationPending && isUpdatePassword ? (
             <>
               <label htmlFor="password">
                 {copy.labels.newPassword}
@@ -595,7 +541,7 @@ export default function AuthPage({ mode }) {
             </>
           ) : null}
 
-          {!twoFactorPending && !verificationPending && !isForgot && !isUpdatePassword ? (
+          {!verificationPending && !isForgot && !isUpdatePassword ? (
             <label htmlFor="password">
               {isReset ? copy.labels.newPassword : copy.labels.password}
               <input
@@ -610,7 +556,7 @@ export default function AuthPage({ mode }) {
             </label>
           ) : null}
 
-          {!twoFactorPending && (verificationPending || isReset) ? (
+          {verificationPending || isReset ? (
             <label htmlFor="otp">
               {isReset ? copy.labels.resetCode : copy.labels.verificationCode}
               <input
@@ -640,8 +586,6 @@ export default function AuthPage({ mode }) {
               ? copy.buttons.wait
               : passwordUpdated
                 ? copy.buttons.redirecting
-              : twoFactorPending
-                ? copy.buttons.verifySignIn
               : verificationPending
                 ? copy.buttons.verifyAccount
                 : isForgot
@@ -662,7 +606,7 @@ export default function AuthPage({ mode }) {
             </div>
           ) : null}
 
-          {!twoFactorPending && !verificationPending && !isUpdatePassword ? (
+          {!verificationPending && !isUpdatePassword ? (
             <div className="auth-links">
               {isRegister ? <Link to={`/login?returnTo=${encodeURIComponent(returnTo)}`}>{copy.links.alreadyAccount}</Link> : null}
               {!isRegister && !isForgot && !isReset && !isUpdatePassword ? (
@@ -688,12 +632,8 @@ export default function AuthPage({ mode }) {
   );
 }
 
-function getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending, twoFactorPending, language = "en" }) {
+function getAuthCopy({ isRegister, isForgot, isReset, isUpdatePassword, verificationPending, language = "en" }) {
   const copy = authTranslations[language]?.copy || authTranslations.en.copy;
-
-  if (twoFactorPending) {
-    return copy.twoFactor;
-  }
 
   if (verificationPending) {
     return copy.verification;

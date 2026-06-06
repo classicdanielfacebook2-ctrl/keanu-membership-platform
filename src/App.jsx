@@ -232,7 +232,7 @@ export default function App() {
             path="/account/security/two-step"
             element={
               <ProtectedRoute>
-                <Account view="two-step" />
+                <Navigate to="/account/security" replace />
               </ProtectedRoute>
             }
           />

@@ -276,7 +276,7 @@ async function login(req, res) {
   }
 
   const users = await getUsersCollection();
-  const user = await users.findOne({ $or: [{ identifier }, { email: identifier }] });
+  let user = await users.findOne({ $or: [{ identifier }, { email: identifier }] });
 
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     return sendJson(res, 401, { error: "Invalid email or password." });
@@ -328,15 +328,27 @@ async function login(req, res) {
     });
   }
 
-  if (user.twoStep?.enabled) {
-    if (isTwoFactorLocked(user)) {
-      return sendJson(res, 429, { error: "Two-step verification is temporarily locked. Please try again later." });
-    }
-    return sendJson(res, 200, {
-      twoFactorRequired: true,
-      challengeToken: signTwoFactorChallenge(user),
-      message: "Enter the 6-digit code from your authenticator app."
-    });
+  if (user.twoStep?.enabled || user.securitySettings?.twoStepEnabled) {
+    await users.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          "twoStep.enabled": false,
+          "securitySettings.twoStepEnabled": false,
+          updatedAt: new Date()
+        },
+        $unset: {
+          "twoStep.secretEncrypted": "",
+          "twoStep.recoveryCodeHashes": "",
+          "twoStep.pendingSecretEncrypted": "",
+          "twoStep.pendingCreatedAt": "",
+          "twoStep.lockedUntil": "",
+          twoFactorLockUntil: ""
+        }
+      }
+    );
+    user = await users.findOne({ _id: user._id });
+    console.info("[auth/login] legacy authenticator disabled", { userId: String(user._id) });
   }
 
   setSessionCookie(res, signToken(user));
@@ -394,7 +406,6 @@ async function securitySettings(req, res) {
   if (req.method === "GET") {
     return sendJson(res, 200, {
       settings: {
-        twoStepEnabled: Boolean(user.securitySettings?.twoStepEnabled),
         requirePasswordBeforePayment: Boolean(user.securitySettings?.requirePasswordBeforePayment),
         requireBankTransferConfirmation: user.securitySettings?.requireBankTransferConfirmation !== false,
         sessionTimeoutMinutes: user.securitySettings?.sessionTimeoutMinutes || 30
@@ -405,7 +416,6 @@ async function securitySettings(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res);
 
   const nextSettings = {
-    twoStepEnabled: Boolean(req.body?.twoStepEnabled),
     requirePasswordBeforePayment: Boolean(req.body?.requirePasswordBeforePayment),
     requireBankTransferConfirmation: Boolean(req.body?.requireBankTransferConfirmation),
     sessionTimeoutMinutes: Math.min(240, Math.max(5, Number(req.body?.sessionTimeoutMinutes || 30)))
@@ -1098,13 +1108,7 @@ const handlers = {
   "security-settings": securitySettings,
   "send-profile-verification": sendProfileVerification,
   "supabase-reset-password": supabaseResetPassword,
-  "two-step-disable": twoStepDisable,
-  "two-step-regenerate-recovery": twoStepRegenerateRecovery,
-  "two-step-setup": twoStepSetup,
-  "two-step-status": twoStepStatus,
-  "two-step-verify-setup": twoStepVerifySetup,
   "update-profile": updateProfile,
-  "verify-login-2fa": verifyLoginTwoStep,
   "verify-otp": verifyOtp,
   "verify-profile-contact": verifyProfileContact
 };

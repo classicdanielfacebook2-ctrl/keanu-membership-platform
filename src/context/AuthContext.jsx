@@ -33,11 +33,6 @@ export function AuthProvider({ children }) {
         if (data.user) setUser(data.user);
         return data;
       },
-      async verifyLoginTwoStep(payload) {
-        const data = await authApi.verifyLoginTwoStep(payload);
-        setUser(data.user);
-        return data;
-      },
       async register(payload) {
         const data = await authApi.register(payload);
         if (data.user) {

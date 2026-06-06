@@ -30,11 +30,6 @@ export const login = (payload) =>
     method: "POST",
     body: JSON.stringify(payload)
   });
-export const verifyLoginTwoStep = (payload) =>
-  authRequest("/api/auth/verify-login-2fa", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
 export const register = (payload) =>
   authRequest("/api/auth/register", {
     method: "POST",
@@ -88,27 +83,6 @@ export const sendProfileVerification = (payload) =>
   });
 export const verifyProfileContact = (payload) =>
   authRequest("/api/auth/verify-profile-contact", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-export const getTwoStepStatus = () => authRequest("/api/auth/two-step-status");
-export const startTwoStepSetup = () =>
-  authRequest("/api/auth/two-step-setup", {
-    method: "POST",
-    body: JSON.stringify({})
-  });
-export const verifyTwoStepSetup = (payload) =>
-  authRequest("/api/auth/two-step-verify-setup", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-export const disableTwoStep = (payload) =>
-  authRequest("/api/auth/two-step-disable", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-export const regenerateRecoveryCodes = (payload) =>
-  authRequest("/api/auth/two-step-regenerate-recovery", {
     method: "POST",
     body: JSON.stringify(payload)
   });

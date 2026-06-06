@@ -4,13 +4,10 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock3,
-  Copy,
   CreditCard,
   History,
-  KeyRound,
   LockKeyhole,
   LogOut,
-  QrCode,
   RefreshCcw,
   ShieldCheck,
   UserCircle,
@@ -26,17 +23,12 @@ import { formatPaymentAmount } from "../data/paymentMethods.js";
 import { getAccountPayments } from "../services/stripeCheckout.js";
 import {
   changePassword,
-  disableTwoStep,
   getSecuritySettings,
-  getTwoStepStatus,
   logoutEverywhere,
-  regenerateRecoveryCodes,
   sendProfileVerification,
-  startTwoStepSetup,
   updateProfile,
   updateSecuritySettings,
-  verifyProfileContact,
-  verifyTwoStepSetup
+  verifyProfileContact
 } from "../services/authApi.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -403,7 +395,6 @@ function PersonalDetails({ auth }) {
 function SecurityPrivacy() {
   const items = [
     ["/account/security/change-password", "Change Password", "Update the password used for member access.", LockKeyhole],
-    ["/account/security/two-step", "2-Step Verification", "Add an extra verification step to sign in.", ShieldCheck],
     ["/account/security/app-security", "App Security", "Manage account protection preferences.", LockKeyhole],
     ["/account/security/logout-everywhere", "Log Out Everywhere", "End active sessions on other devices.", LogOut]
   ];
@@ -476,17 +467,10 @@ function ChangePasswordPanel() {
 
 function SecuritySettingsPanel({ mode, onLogout }) {
   const [settings, setSettings] = useState({
-    twoStepEnabled: false,
     requirePasswordBeforePayment: false,
     requireBankTransferConfirmation: true,
     sessionTimeoutMinutes: 30
   });
-  const [twoStep, setTwoStep] = useState({ enabled: false, recoveryCodeCount: 0, lockedUntil: null });
-  const [setup, setSetup] = useState(null);
-  const [setupCode, setSetupCode] = useState("");
-  const [recoveryCodes, setRecoveryCodes] = useState([]);
-  const [disableForm, setDisableForm] = useState({ currentPassword: "", code: "" });
-  const [regenerateForm, setRegenerateForm] = useState({ currentPassword: "", code: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -508,25 +492,6 @@ function SecuritySettingsPanel({ mode, onLogout }) {
     };
   }, []);
 
-  useEffect(() => {
-    if (mode !== "two-step") return;
-    let active = true;
-    setLoading(true);
-    getTwoStepStatus()
-      .then((data) => {
-        if (active) setTwoStep(data);
-      })
-      .catch((error) => {
-        if (active) setMessage({ type: "error", text: error?.message || "2-step verification status could not be loaded." });
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [mode]);
-
   const save = async (nextSettings) => {
     setSaving(true);
     setMessage(null);
@@ -542,191 +507,6 @@ function SecuritySettingsPanel({ mode, onLogout }) {
   };
 
   if (loading) return <div className="banking-panel account-empty-state">Loading security settings...</div>;
-
-  if (mode === "two-step") {
-    const beginSetup = async () => {
-      setSaving(true);
-      setMessage(null);
-      setRecoveryCodes([]);
-      try {
-        const data = await startTwoStepSetup();
-        setSetup(data);
-        setMessage({ type: "success", text: data.message || "Scan the QR code and enter your authenticator code." });
-      } catch (error) {
-        setMessage({ type: "error", text: error?.message || "2-step setup could not be started." });
-      } finally {
-        setSaving(false);
-      }
-    };
-
-    const confirmSetup = async (event) => {
-      event.preventDefault();
-      setSaving(true);
-      setMessage(null);
-      try {
-        const data = await verifyTwoStepSetup({ code: setupCode });
-        setTwoStep({ enabled: true, recoveryCodeCount: data.recoveryCodes?.length || 0, lockedUntil: null });
-        setSettings((current) => ({ ...current, twoStepEnabled: true }));
-        setRecoveryCodes(data.recoveryCodes || []);
-        setSetup(null);
-        setSetupCode("");
-        setMessage({ type: "success", text: "2-step verification is enabled. Save your recovery codes now." });
-      } catch (error) {
-        setMessage({ type: "error", text: error?.message || "Authenticator code could not be verified." });
-      } finally {
-        setSaving(false);
-      }
-    };
-
-    const disable = async (event) => {
-      event.preventDefault();
-      setSaving(true);
-      setMessage(null);
-      try {
-        const data = await disableTwoStep(disableForm);
-        setTwoStep({ enabled: false, recoveryCodeCount: 0, lockedUntil: null });
-        setSettings((current) => ({ ...current, twoStepEnabled: false }));
-        setDisableForm({ currentPassword: "", code: "" });
-        setMessage({ type: "success", text: data.message || "2-step verification disabled." });
-      } catch (error) {
-        setMessage({ type: "error", text: error?.message || "2-step verification could not be disabled." });
-      } finally {
-        setSaving(false);
-      }
-    };
-
-    const regenerate = async (event) => {
-      event.preventDefault();
-      setSaving(true);
-      setMessage(null);
-      try {
-        const data = await regenerateRecoveryCodes(regenerateForm);
-        setRecoveryCodes(data.recoveryCodes || []);
-        setTwoStep((current) => ({ ...current, recoveryCodeCount: data.recoveryCodes?.length || current.recoveryCodeCount }));
-        setRegenerateForm({ currentPassword: "", code: "" });
-        setMessage({ type: "success", text: "New recovery codes generated. Save them now." });
-      } catch (error) {
-        setMessage({ type: "error", text: error?.message || "Recovery codes could not be regenerated." });
-      } finally {
-        setSaving(false);
-      }
-    };
-
-    const copyRecoveryCodes = async () => {
-      await navigator.clipboard?.writeText(recoveryCodes.join("\n"));
-      setMessage({ type: "success", text: "Recovery codes copied." });
-    };
-
-    return (
-      <div className="banking-panel account-form-panel two-step-panel">
-        <div className="security-status-line">
-          <span>Status</span>
-          <strong>{twoStep.enabled ? "Enabled" : "Not Enabled"}</strong>
-        </div>
-        <p className="muted-copy">Use Google Authenticator, Microsoft Authenticator, Authy, or another compatible app to protect account access.</p>
-        {!twoStep.enabled && !setup ? (
-          <button className="button primary" type="button" disabled={saving} onClick={beginSetup}>
-            <QrCode size={17} />
-            {saving ? "Preparing..." : "Enable 2-Step Verification"}
-          </button>
-        ) : null}
-        {setup ? (
-          <form className="totp-setup-grid" onSubmit={confirmSetup}>
-            <div className="totp-qr-card">
-              <img src={setup.qrCodeDataUrl} alt="Authenticator QR code" />
-            </div>
-            <div className="totp-copy-block">
-              <span>Manual Setup Key</span>
-              <strong>{setup.manualKey}</strong>
-              <small>Scan the QR code or enter this key manually in your authenticator app.</small>
-            </div>
-            <label>
-              <span>Authenticator Code</span>
-              <input
-                inputMode="numeric"
-                maxLength="6"
-                placeholder="Enter 6-digit code"
-                value={setupCode}
-                onChange={(event) => setSetupCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-              />
-            </label>
-            <button className="button primary" type="submit" disabled={saving}>
-              {saving ? "Verifying..." : "Verify and Enable"}
-            </button>
-          </form>
-        ) : null}
-        {recoveryCodes.length ? (
-          <div className="recovery-code-panel">
-            <div>
-              <strong>Recovery codes</strong>
-              <small>These codes are shown once. Store them somewhere private.</small>
-            </div>
-            <div className="recovery-code-grid">
-              {recoveryCodes.map((code) => <code key={code}>{code}</code>)}
-            </div>
-            <button className="button secondary" type="button" onClick={copyRecoveryCodes}>
-              <Copy size={16} />
-              Copy Codes
-            </button>
-          </div>
-        ) : null}
-        {twoStep.enabled ? (
-          <>
-            <div className="security-status-line">
-              <span>Recovery Codes Remaining</span>
-              <strong>{twoStep.recoveryCodeCount}</strong>
-            </div>
-            <form className="two-factor-action-card" onSubmit={regenerate}>
-              <div>
-                <strong>Regenerate recovery codes</strong>
-                <small>Old recovery codes stop working after regeneration.</small>
-              </div>
-              <input
-                type="password"
-                placeholder="Current password"
-                value={regenerateForm.currentPassword}
-                onChange={(event) => setRegenerateForm((current) => ({ ...current, currentPassword: event.target.value }))}
-              />
-              <input
-                inputMode="numeric"
-                maxLength="6"
-                placeholder="Authenticator code"
-                value={regenerateForm.code}
-                onChange={(event) => setRegenerateForm((current) => ({ ...current, code: event.target.value.replace(/\D/g, "").slice(0, 6) }))}
-              />
-              <button className="button secondary" type="submit" disabled={saving}>
-                <KeyRound size={16} />
-                Regenerate Codes
-              </button>
-            </form>
-            <form className="two-factor-action-card danger" onSubmit={disable}>
-              <div>
-                <strong>Disable 2-step verification</strong>
-                <small>Requires your current password and authenticator code.</small>
-              </div>
-              <input
-                type="password"
-                placeholder="Current password"
-                value={disableForm.currentPassword}
-                onChange={(event) => setDisableForm((current) => ({ ...current, currentPassword: event.target.value }))}
-              />
-              <input
-                inputMode="numeric"
-                maxLength="6"
-                placeholder="Authenticator code"
-                value={disableForm.code}
-                onChange={(event) => setDisableForm((current) => ({ ...current, code: event.target.value.replace(/\D/g, "").slice(0, 6) }))}
-              />
-              <button className="button secondary" type="submit" disabled={saving}>
-                Disable 2-Step Verification
-              </button>
-            </form>
-          </>
-        ) : null}
-        <InlineMessage message={message} />
-      </div>
-    );
-  }
 
   if (mode === "logout-everywhere") {
     return (
@@ -813,7 +593,6 @@ export default function Account({ view = "home" }) {
     personal: ["Personal Details", "Update contact information and verification settings."],
     security: ["Security & Privacy", "Protect your account and manage access."],
     "change-password": ["Change Password", "Update your member access password."],
-    "two-step": ["2-Step Verification", "Use an authenticator app for stronger account access."],
     "app-security": ["App Security", "Manage payment and session security preferences."],
     "logout-everywhere": ["Log Out Everywhere", "End active sessions on this account."],
     payments: ["Payments", "Review pending and active payment requests."],
@@ -828,11 +607,6 @@ export default function Account({ view = "home" }) {
       { label: "My Account", to: "/account" },
       { label: "Security & Privacy", to: "/account/security" },
       { label: "Change Password" }
-    ],
-    "two-step": [
-      { label: "My Account", to: "/account" },
-      { label: "Security & Privacy", to: "/account/security" },
-      { label: "2-Step Verification" }
     ],
     "app-security": [
       { label: "My Account", to: "/account" },
@@ -850,7 +624,6 @@ export default function Account({ view = "home" }) {
   };
   const fallbackByView = {
     "change-password": "/account/security",
-    "two-step": "/account/security",
     "app-security": "/account/security",
     "logout-everywhere": "/account/security",
     payments: "/account",
@@ -893,7 +666,6 @@ export default function Account({ view = "home" }) {
       {view === "personal" ? <PersonalDetails auth={auth} /> : null}
       {view === "security" ? <SecurityPrivacy /> : null}
       {view === "change-password" ? <ChangePasswordPanel /> : null}
-      {view === "two-step" ? <SecuritySettingsPanel mode="two-step" onLogout={logoutAll} /> : null}
       {view === "app-security" ? <SecuritySettingsPanel mode="app-security" onLogout={logoutAll} /> : null}
       {view === "logout-everywhere" ? <SecuritySettingsPanel mode="logout-everywhere" onLogout={logoutAll} /> : null}
       {view === "payments" ? (
